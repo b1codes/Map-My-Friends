@@ -1,0 +1,24 @@
+{
+  "hooks": {
+    "BeforeAgent": [
+      {
+        "name": "api-schema-hook",
+        "type": "command",
+        "command": "python3 $GEMINI_PROJECT_DIR/.gemini/hooks/api_schema.py",
+        "description": "Provides current API endpoints from urls.py"
+      },
+      {
+        "name": "db-schema-hook",
+        "type": "command",
+        "command": "python3 $GEMINI_PROJECT_DIR/.gemini/hooks/db_schema.py",
+        "description": "Provides current DB schema from inspectdb"
+      },
+      {
+        "name": "test-results-hook",
+        "type": "command",
+        "command": "python3 $GEMINI_PROJECT_DIR/.gemini/hooks/test_results.py",
+        "description": "Provides results from the last test run"
+      }
+    ]
+  }
+}
