@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frontend/models/person.dart';
+import 'package:map_my_friends/models/person.dart';
 
 void main() {
   group('Person Model Serialization Fix', () {

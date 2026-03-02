@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frontend/bloc/location/location_bloc.dart';
-import 'package:frontend/bloc/people/people_bloc.dart';
-import 'package:frontend/screens/map/map_screen.dart';
-import 'package:frontend/services/api_service.dart';
-import 'package:frontend/components/map/person_map_marker.dart';
-import 'package:frontend/models/person.dart';
+import 'package:map_my_friends/bloc/location/location_bloc.dart';
+import 'package:map_my_friends/bloc/people/people_bloc.dart';
+import 'package:map_my_friends/screens/map/map_screen.dart';
+import 'package:map_my_friends/services/api_service.dart';
+import 'package:map_my_friends/components/map/person_map_marker.dart';
+import 'package:map_my_friends/models/person.dart';
 import 'package:geolocator/geolocator.dart';
-// import 'package:frontend/components/map/map_controls.dart'; // Implicitly tested via MapScreen
+// import 'package:map_my_friends/components/map/map_controls.dart'; // Implicitly tested via MapScreen
 
 // Mock ApiService
 class MockApiService implements ApiService {

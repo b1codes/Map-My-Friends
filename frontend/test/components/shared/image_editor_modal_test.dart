@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:frontend/components/shared/image_editor_modal.dart';
+import 'package:map_my_friends/components/shared/image_editor_modal.dart';
 
 void main() {
   testWidgets('ImageEditorModal renders and has save button', (
