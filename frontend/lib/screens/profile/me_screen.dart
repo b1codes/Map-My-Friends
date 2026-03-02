@@ -10,6 +10,8 @@ import '../../bloc/profile/profile_state.dart';
 import '../../components/shared/image_editor_modal.dart';
 import '../../components/shared/custom_text_form_field.dart';
 import '../../bloc/theme/theme_cubit.dart';
+import '../../bloc/auth/auth_bloc.dart';
+import '../../bloc/auth/auth_event.dart';
 
 class MeScreen extends StatefulWidget {
   const MeScreen({super.key});
@@ -428,6 +430,38 @@ class _MeScreenState extends State<MeScreen> {
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              SizedBox(
+                                height: 50,
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    context.read<AuthBloc>().add(
+                                      LogoutRequested(),
+                                    );
+                                  },
+                                  icon: const Icon(
+                                    Icons.logout,
+                                    color: Colors.red,
+                                  ),
+                                  label: const Text(
+                                    'Logout',
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(
+                                      color: Colors.red,
+                                      width: 2,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
                                 ),
                               ),
                               const SizedBox(

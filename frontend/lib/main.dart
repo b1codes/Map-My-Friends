@@ -112,10 +112,6 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  void _logout() {
-    context.read<AuthBloc>().add(LogoutRequested());
-  }
-
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -129,22 +125,6 @@ class _MainScreenState extends State<MainScreen> {
             children: [
               // Content Layer
               Positioned.fill(child: _getScreen(_selectedIndex)),
-
-              // Mobile Floating Logout Button (Top Right)
-              if (!isDesktop)
-                Positioned(
-                  top: 50, // Safe area padding
-                  right: 20,
-                  child: GlassContainer(
-                    padding: EdgeInsets.zero,
-                    borderRadius: 30,
-                    child: IconButton(
-                      icon: const Icon(Icons.logout, color: Colors.indigo),
-                      onPressed: _logout,
-                      tooltip: 'Logout',
-                    ),
-                  ),
-                ),
 
               // Glass Navigation Rail (Desktop)
               if (isDesktop)
@@ -189,34 +169,6 @@ class _MainScreenState extends State<MainScreen> {
                           index: 2,
                           isSelected: _selectedIndex == 2,
                         ),
-
-                        const Spacer(),
-                        InkWell(
-                          onTap: _logout,
-                          child: Container(
-                            width: 60,
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Column(
-                              children: [
-                                const Icon(
-                                  Icons.logout,
-                                  color: Colors.indigo,
-                                  size: 28,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Logout',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.normal,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
                       ],
                     ),
                   ),
