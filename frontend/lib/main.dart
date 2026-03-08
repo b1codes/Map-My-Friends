@@ -131,11 +131,11 @@ class _MainScreenState extends State<MainScreen> {
                 Positioned(
                   left: 20,
                   top: 20,
-                  bottom: 20,
                   child: GlassContainer(
                     width: 80,
                     padding: const EdgeInsets.symmetric(vertical: 20),
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         const SizedBox(height: 20),
                         // App Logo
