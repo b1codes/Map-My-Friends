@@ -228,6 +228,10 @@ class _MainScreenState extends State<MainScreen> {
     required int index,
     required bool isSelected,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selectedColor = isDark ? Colors.indigoAccent : Colors.indigo;
+    final unselectedColor = isDark ? Colors.white70 : Colors.grey[700];
+
     return InkWell(
       onTap: () => _onItemTapped(index),
       child: Container(
@@ -243,7 +247,7 @@ class _MainScreenState extends State<MainScreen> {
           children: [
             Icon(
               isSelected ? selectedIcon : icon,
-              color: isSelected ? Colors.indigo : Colors.grey[700],
+              color: isSelected ? selectedColor : unselectedColor,
               size: 28,
             ),
             const SizedBox(height: 4),
@@ -252,7 +256,7 @@ class _MainScreenState extends State<MainScreen> {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? Colors.indigo : Colors.grey[700],
+                color: isSelected ? selectedColor : unselectedColor,
               ),
             ),
           ],
@@ -267,6 +271,10 @@ class _MainScreenState extends State<MainScreen> {
     required int index,
     required bool isSelected,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selectedColor = isDark ? Colors.indigoAccent : Colors.indigo;
+    final unselectedColor = isDark ? Colors.white70 : Colors.grey[700];
+
     return InkWell(
       onTap: () => _onItemTapped(index),
       child: Column(
@@ -274,7 +282,7 @@ class _MainScreenState extends State<MainScreen> {
         children: [
           Icon(
             icon,
-            color: isSelected ? Colors.indigo : Colors.grey[700],
+            color: isSelected ? selectedColor : unselectedColor,
             size: 28,
           ),
           Text(
@@ -282,7 +290,7 @@ class _MainScreenState extends State<MainScreen> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              color: isSelected ? Colors.indigo : Colors.grey[700],
+              color: isSelected ? selectedColor : unselectedColor,
             ),
           ),
         ],
