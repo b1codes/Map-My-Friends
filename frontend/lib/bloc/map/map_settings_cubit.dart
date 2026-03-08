@@ -9,27 +9,31 @@ class MapSettingsState extends Equatable {
   final bool showControls;
   final MapType mapType;
   final ThemeMode themeMode;
+  final bool showAirports;
 
   const MapSettingsState({
     this.showControls = true,
     this.mapType = MapType.standard,
     this.themeMode = ThemeMode.system,
+    this.showAirports = false,
   });
 
   MapSettingsState copyWith({
     bool? showControls,
     MapType? mapType,
     ThemeMode? themeMode,
+    bool? showAirports,
   }) {
     return MapSettingsState(
       showControls: showControls ?? this.showControls,
       mapType: mapType ?? this.mapType,
       themeMode: themeMode ?? this.themeMode,
+      showAirports: showAirports ?? this.showAirports,
     );
   }
 
   @override
-  List<Object> get props => [showControls, mapType, themeMode];
+  List<Object> get props => [showControls, mapType, themeMode, showAirports];
 }
 
 class MapSettingsCubit extends Cubit<MapSettingsState> {
@@ -44,12 +48,14 @@ class MapSettingsCubit extends Cubit<MapSettingsState> {
     final mapTypeIndex = prefs.getInt('map_type') ?? MapType.standard.index;
     final themeModeIndex =
         prefs.getInt('map_theme_mode') ?? ThemeMode.system.index;
+    final showAirports = prefs.getBool('map_show_airports') ?? false;
 
     emit(
       state.copyWith(
         showControls: showControls,
         mapType: MapType.values[mapTypeIndex],
         themeMode: ThemeMode.values[themeModeIndex],
+        showAirports: showAirports,
       ),
     );
   }
@@ -68,5 +74,11 @@ class MapSettingsCubit extends Cubit<MapSettingsState> {
   void setMapTheme(ThemeMode mode) {
     prefs.setInt('map_theme_mode', mode.index);
     emit(state.copyWith(themeMode: mode));
+  }
+
+  void toggleAirports() {
+    final newValue = !state.showAirports;
+    prefs.setBool('map_show_airports', newValue);
+    emit(state.copyWith(showAirports: newValue));
   }
 }

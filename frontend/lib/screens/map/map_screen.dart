@@ -17,8 +17,11 @@ import '../../components/map/custom_map_marker.dart';
 import '../../components/map/cluster_people_modal.dart';
 import '../../components/shared/glass_container.dart';
 import '../../models/person.dart';
+import '../../models/airport.dart';
 import '../../bloc/profile/profile_bloc.dart';
 import '../../bloc/profile/profile_state.dart';
+import '../../bloc/airport/airport_bloc.dart';
+import '../../bloc/airport/airport_state.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -425,6 +428,68 @@ class _MapScreenState extends State<MapScreen> {
                                 ),
                               ],
                             ),
+                            // Airport markers layer
+                            if (settingsState.showAirports)
+                              BlocBuilder<AirportBloc, AirportState>(
+                                builder: (context, airportState) {
+                                  if (airportState is MapAirportsLoaded) {
+                                    return MarkerLayer(
+                                      markers: airportState.airports
+                                          .map(
+                                            (airport) => Marker(
+                                              point: LatLng(
+                                                airport.latitude,
+                                                airport.longitude,
+                                              ),
+                                              width: 28,
+                                              height: 28,
+                                              child: GestureDetector(
+                                                onTap: () {
+                                                  showModalBottomSheet(
+                                                    context: context,
+                                                    backgroundColor:
+                                                        Colors.transparent,
+                                                    builder: (context) =>
+                                                        _AirportBottomSheet(
+                                                          airport: airport,
+                                                        ),
+                                                  );
+                                                },
+                                                child: Container(
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    shape: BoxShape.circle,
+                                                    boxShadow: const [
+                                                      BoxShadow(
+                                                        color: Colors.black26,
+                                                        blurRadius: 3,
+                                                        offset: Offset(0, 1),
+                                                      ),
+                                                    ],
+                                                    border: Border.all(
+                                                      color: const Color(
+                                                        0xFF1565C0,
+                                                      ),
+                                                      width: 1.5,
+                                                    ),
+                                                  ),
+                                                  child: const Center(
+                                                    child: Icon(
+                                                      Icons.flight,
+                                                      color: Color(0xFF1565C0),
+                                                      size: 16,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              ),
                           ],
                         ),
                         if (settingsState.showControls)
@@ -531,5 +596,85 @@ class _NorthTrianglePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _NorthTrianglePainter oldDelegate) {
     return color != oldDelegate.color;
+  }
+}
+
+class _AirportBottomSheet extends StatelessWidget {
+  final Airport airport;
+
+  const _AirportBottomSheet({required this.airport});
+
+  @override
+  Widget build(BuildContext context) {
+    final typeLabel = airport.airportType == 'large_airport'
+        ? 'International Airport'
+        : 'Regional Airport';
+
+    return Container(
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.grey[400],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1565C0).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.flight,
+                color: Color(0xFF1565C0),
+                size: 32,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              airport.name,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              airport.iataCode,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: const Color(0xFF1565C0),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${airport.city}, ${airport.country}',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              typeLabel,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

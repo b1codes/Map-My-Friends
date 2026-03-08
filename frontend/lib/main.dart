@@ -5,6 +5,8 @@ import 'bloc/auth/auth_event.dart';
 import 'bloc/auth/auth_state.dart';
 import 'bloc/location/location_bloc.dart';
 import 'bloc/people/people_bloc.dart';
+import 'bloc/airport/airport_bloc.dart';
+import 'bloc/airport/airport_event.dart';
 import 'bloc/profile/profile_bloc.dart';
 import 'bloc/profile/profile_event.dart';
 import 'services/api_service.dart';
@@ -52,6 +54,9 @@ class MyApp extends StatelessWidget {
         BlocProvider<ThemeCubit>(create: (context) => ThemeCubit()),
         BlocProvider<MapSettingsCubit>(
           create: (context) => MapSettingsCubit(prefs: prefs),
+        ),
+        BlocProvider<AirportBloc>(
+          create: (context) => AirportBloc()..add(LoadMapAirports()),
         ),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(

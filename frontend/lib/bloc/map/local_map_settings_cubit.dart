@@ -20,4 +20,8 @@ class LocalMapSettingsCubit extends Cubit<MapSettingsState> {
   void setMapTheme(ThemeMode mode) {
     emit(state.copyWith(themeMode: mode));
   }
+
+  void toggleAirports() {
+    emit(state.copyWith(showAirports: !state.showAirports));
+  }
 }

@@ -35,6 +35,14 @@ class MapSettingsModal extends StatelessWidget {
                       },
                       secondary: const Icon(Icons.control_camera),
                     ),
+                    SwitchListTile(
+                      title: const Text('Show Airports'),
+                      value: state.showAirports,
+                      onChanged: (value) {
+                        context.read<LocalMapSettingsCubit>().toggleAirports();
+                      },
+                      secondary: const Icon(Icons.flight),
+                    ),
                     const Divider(),
                     ListTile(
                       title: const Text('Map Type'),
