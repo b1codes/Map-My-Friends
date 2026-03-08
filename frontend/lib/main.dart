@@ -16,14 +16,19 @@ import 'components/shared/glass_container.dart';
 import 'bloc/theme/theme_cubit.dart';
 
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'bloc/map/map_settings_cubit.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   tz.initializeTimeZones();
-  runApp(const MyApp());
+  final prefs = await SharedPreferences.getInstance();
+  runApp(MyApp(prefs: prefs));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final SharedPreferences prefs;
+  const MyApp({super.key, required this.prefs});
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +49,9 @@ class MyApp extends StatelessWidget {
         ),
         BlocProvider<ProfileBloc>(create: (context) => ProfileBloc()),
         BlocProvider<ThemeCubit>(create: (context) => ThemeCubit()),
+        BlocProvider<MapSettingsCubit>(
+          create: (context) => MapSettingsCubit(prefs: prefs),
+        ),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(
         builder: (context, themeMode) {

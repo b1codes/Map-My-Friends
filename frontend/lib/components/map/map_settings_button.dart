@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../bloc/map/map_settings_cubit.dart';
+import '../../bloc/map/local_map_settings_cubit.dart';
 import '../shared/glass_container.dart';
 import 'map_settings_modal.dart';
 
@@ -25,9 +25,9 @@ class MapSettingsButton extends StatelessWidget {
               context: context,
               backgroundColor: Colors.transparent,
               builder: (_) {
-                // Pass the existing cubit to the modal
+                // Pass the existing scoped cubit to the modal
                 return BlocProvider.value(
-                  value: context.read<MapSettingsCubit>(),
+                  value: context.read<LocalMapSettingsCubit>(),
                   child: const MapSettingsModal(),
                 );
               },

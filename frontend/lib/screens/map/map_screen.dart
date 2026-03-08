@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../bloc/location/location_bloc.dart';
 import '../../bloc/people/people_bloc.dart';
 import '../../bloc/map/map_settings_cubit.dart';
+import '../../bloc/map/local_map_settings_cubit.dart';
 import '../../components/map/map_controls.dart';
 import '../../components/map/map_settings_button.dart';
 import '../../components/map/person_map_marker.dart';
@@ -62,8 +63,10 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => MapSettingsCubit(),
+    return BlocProvider<LocalMapSettingsCubit>(
+      create: (context) => LocalMapSettingsCubit(
+        initialState: context.read<MapSettingsCubit>().state,
+      ),
       child: Scaffold(
         body: BlocConsumer<LocationBloc, LocationState>(
           listener: (context, state) {
@@ -122,7 +125,7 @@ class _MapScreenState extends State<MapScreen> {
                   );
                 }
 
-                return BlocBuilder<MapSettingsCubit, MapSettingsState>(
+                return BlocBuilder<LocalMapSettingsCubit, MapSettingsState>(
                   builder: (context, settingsState) {
                     return Stack(
                       children: [

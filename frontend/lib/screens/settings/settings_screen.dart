@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../bloc/location/location_bloc.dart';
 import '../../bloc/theme/theme_cubit.dart';
+import '../../bloc/map/map_settings_cubit.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -63,6 +64,99 @@ class SettingsScreen extends StatelessWidget {
                     context.read<ThemeCubit>().setTheme(newSelection.first);
                   },
                   showSelectedIcon: false,
+                );
+              },
+            ),
+            const SizedBox(height: 32),
+            Text(
+              'Default Map Settings',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            BlocBuilder<MapSettingsCubit, MapSettingsState>(
+              builder: (context, state) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Map Style',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    SegmentedButton<MapType>(
+                      segments: const [
+                        ButtonSegment(
+                          value: MapType.standard,
+                          icon: Icon(Icons.map),
+                          label: Text('Standard'),
+                        ),
+                        ButtonSegment(
+                          value: MapType.satellite,
+                          icon: Icon(Icons.satellite),
+                          label: Text('Satellite'),
+                        ),
+                        ButtonSegment(
+                          value: MapType.minimal,
+                          icon: Icon(Icons.layers),
+                          label: Text('Minimal'),
+                        ),
+                      ],
+                      selected: {state.mapType},
+                      onSelectionChanged: (Set<MapType> newSelection) {
+                        context.read<MapSettingsCubit>().setMapType(
+                          newSelection.first,
+                        );
+                      },
+                      showSelectedIcon: false,
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Minimal Map Theme',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    SegmentedButton<ThemeMode>(
+                      segments: const [
+                        ButtonSegment(
+                          value: ThemeMode.light,
+                          icon: Icon(Icons.light_mode),
+                          label: Text('Light'),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.system,
+                          icon: Icon(Icons.brightness_auto),
+                          label: Text('System'),
+                        ),
+                        ButtonSegment(
+                          value: ThemeMode.dark,
+                          icon: Icon(Icons.dark_mode),
+                          label: Text('Dark'),
+                        ),
+                      ],
+                      selected: {state.themeMode},
+                      onSelectionChanged: (Set<ThemeMode> newSelection) {
+                        context.read<MapSettingsCubit>().setMapTheme(
+                          newSelection.first,
+                        );
+                      },
+                      showSelectedIcon: false,
+                    ),
+                    const SizedBox(height: 16),
+                    SwitchListTile(
+                      title: const Text('Show Map Controls'),
+                      subtitle: const Text('Zoom buttons and center location'),
+                      value: state.showControls,
+                      onChanged: (bool value) {
+                        // Ensure it's correctly matching state even if toggled quickly
+                        if (value != state.showControls) {
+                          context.read<MapSettingsCubit>().toggleControls();
+                        }
+                      },
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ],
                 );
               },
             ),

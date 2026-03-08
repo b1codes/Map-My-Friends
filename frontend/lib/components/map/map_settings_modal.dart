@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../bloc/map/map_settings_cubit.dart';
+import '../../bloc/map/local_map_settings_cubit.dart';
 import '../shared/glass_container.dart';
 
 class MapSettingsModal extends StatelessWidget {
@@ -22,7 +23,7 @@ class MapSettingsModal extends StatelessWidget {
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-            BlocBuilder<MapSettingsCubit, MapSettingsState>(
+            BlocBuilder<LocalMapSettingsCubit, MapSettingsState>(
               builder: (context, state) {
                 return Column(
                   children: [
@@ -30,7 +31,7 @@ class MapSettingsModal extends StatelessWidget {
                       title: const Text('Show Map Controls'),
                       value: state.showControls,
                       onChanged: (value) {
-                        context.read<MapSettingsCubit>().toggleControls();
+                        context.read<LocalMapSettingsCubit>().toggleControls();
                       },
                       secondary: const Icon(Icons.control_camera),
                     ),
@@ -41,7 +42,7 @@ class MapSettingsModal extends StatelessWidget {
                         value: state.mapType,
                         onChanged: (MapType? newValue) {
                           if (newValue != null) {
-                            context.read<MapSettingsCubit>().setMapType(
+                            context.read<LocalMapSettingsCubit>().setMapType(
                               newValue,
                             );
                           }
@@ -78,7 +79,7 @@ class MapSettingsModal extends StatelessWidget {
                         ],
                         selected: {state.themeMode},
                         onSelectionChanged: (Set<ThemeMode> newSelection) {
-                          context.read<MapSettingsCubit>().setMapTheme(
+                          context.read<LocalMapSettingsCubit>().setMapTheme(
                             newSelection.first,
                           );
                         },

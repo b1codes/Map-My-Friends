@@ -8,6 +8,8 @@ import 'package:map_my_friends/services/api_service.dart';
 import 'package:map_my_friends/components/map/person_map_marker.dart';
 import 'package:map_my_friends/models/person.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:map_my_friends/bloc/map/map_settings_cubit.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 // import 'package:map_my_friends/components/map/map_controls.dart'; // Implicitly tested via MapScreen
 
 // Mock ApiService
@@ -65,6 +67,23 @@ class FakePeopleBloc extends Bloc<PeopleEvent, PeopleState>
   }
 }
 
+class FakeMapSettingsCubit extends Cubit<MapSettingsState>
+    implements MapSettingsCubit {
+  @override
+  final SharedPreferences prefs;
+
+  FakeMapSettingsCubit(this.prefs) : super(const MapSettingsState());
+
+  @override
+  void toggleControls() {}
+
+  @override
+  void setMapType(MapType type) {}
+
+  @override
+  void setMapTheme(ThemeMode mode) {}
+}
+
 void main() {
   // Use a simple test that doesn't depend on complex implementation details
   // but verifies that the UI is built after state is loaded.
@@ -72,12 +91,18 @@ void main() {
   testWidgets('MapScreen shows zoom and pan controls', (
     WidgetTester tester,
   ) async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+
     // Build our app and trigger a frame.
     await tester.pumpWidget(
       MultiBlocProvider(
         providers: [
           BlocProvider<LocationBloc>(create: (context) => FakeLocationBloc()),
           BlocProvider<PeopleBloc>(create: (context) => FakePeopleBloc()),
+          BlocProvider<MapSettingsCubit>(
+            create: (context) => FakeMapSettingsCubit(prefs),
+          ),
         ],
         child: const MaterialApp(home: MapScreen()),
       ),
