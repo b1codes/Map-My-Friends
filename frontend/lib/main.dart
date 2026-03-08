@@ -6,6 +6,7 @@ import 'bloc/auth/auth_state.dart';
 import 'bloc/location/location_bloc.dart';
 import 'bloc/people/people_bloc.dart';
 import 'bloc/profile/profile_bloc.dart';
+import 'bloc/profile/profile_event.dart';
 import 'services/api_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/map/map_screen.dart';
@@ -100,6 +101,13 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load profile data (custom pin settings) on app launch
+    context.read<ProfileBloc>().add(LoadProfile());
+  }
 
   Widget _getScreen(int index) {
     switch (index) {

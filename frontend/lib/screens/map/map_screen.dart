@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -13,6 +15,7 @@ import '../../components/map/map_settings_button.dart';
 import '../../components/map/person_map_marker.dart';
 import '../../components/map/custom_map_marker.dart';
 import '../../components/map/cluster_people_modal.dart';
+import '../../components/shared/glass_container.dart';
 import '../../models/person.dart';
 import '../../bloc/profile/profile_bloc.dart';
 import '../../bloc/profile/profile_state.dart';
@@ -26,6 +29,10 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
+
+  void _resetNorth() {
+    _mapController.rotate(0);
+  }
 
   String _getTileUrl(BuildContext context, MapSettingsState settings) {
     if (settings.mapType == MapType.satellite) {
@@ -423,6 +430,71 @@ class _MapScreenState extends State<MapScreen> {
                         if (settingsState.showControls)
                           MapControls(mapController: _mapController),
                         const MapSettingsButton(),
+                        // Compass indicator
+                        StreamBuilder<MapEvent>(
+                          stream: _mapController.mapEventStream,
+                          builder: (context, snapshot) {
+                            final rotation = _mapController.camera.rotation;
+                            // Only show compass when map is rotated
+                            if (rotation == 0) {
+                              return const SizedBox.shrink();
+                            }
+                            return Positioned(
+                              top: MediaQuery.of(context).padding.top + 95,
+                              right: 20,
+                              child: GestureDetector(
+                                onTap: _resetNorth,
+                                child: GlassContainer(
+                                  width: 44,
+                                  height: 44,
+                                  padding: EdgeInsets.zero,
+                                  borderRadius: 22,
+                                  child: Transform.rotate(
+                                    angle: -rotation * (math.pi / 180),
+                                    child: Stack(
+                                      alignment: Alignment.center,
+                                      children: [
+                                        // North indicator (red triangle)
+                                        Positioned(
+                                          top: 6,
+                                          child: CustomPaint(
+                                            size: const Size(10, 10),
+                                            painter: _NorthTrianglePainter(
+                                              color: Colors.red,
+                                            ),
+                                          ),
+                                        ),
+                                        // South indicator (white/grey triangle)
+                                        Positioned(
+                                          bottom: 6,
+                                          child: Transform.rotate(
+                                            angle: math.pi,
+                                            child: CustomPaint(
+                                              size: const Size(10, 10),
+                                              painter: _NorthTrianglePainter(
+                                                color: Colors.white70,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        // "N" label
+                                        const Text(
+                                          'N',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.red,
+                                            height: 1,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ],
                     );
                   },
@@ -433,5 +505,31 @@ class _MapScreenState extends State<MapScreen> {
         ),
       ),
     );
+  }
+}
+
+class _NorthTrianglePainter extends CustomPainter {
+  final Color color;
+
+  _NorthTrianglePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final path = ui.Path()
+      ..moveTo(size.width / 2, 0)
+      ..lineTo(0, size.height)
+      ..lineTo(size.width, size.height)
+      ..close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _NorthTrianglePainter oldDelegate) {
+    return color != oldDelegate.color;
   }
 }
