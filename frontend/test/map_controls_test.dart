@@ -87,6 +87,9 @@ class FakeMapSettingsCubit extends Cubit<MapSettingsState>
 
   @override
   void toggleAirports() {}
+
+  @override
+  void setAirportFilter(AirportFilter filter) {}
 }
 
 void main() {

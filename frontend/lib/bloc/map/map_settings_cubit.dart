@@ -5,17 +5,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 enum MapType { standard, satellite, minimal }
 
+enum AirportFilter { all, international, regional }
+
 class MapSettingsState extends Equatable {
   final bool showControls;
   final MapType mapType;
   final ThemeMode themeMode;
   final bool showAirports;
+  final AirportFilter airportFilter;
 
   const MapSettingsState({
     this.showControls = true,
     this.mapType = MapType.standard,
     this.themeMode = ThemeMode.system,
     this.showAirports = false,
+    this.airportFilter = AirportFilter.all,
   });
 
   MapSettingsState copyWith({
@@ -23,17 +27,20 @@ class MapSettingsState extends Equatable {
     MapType? mapType,
     ThemeMode? themeMode,
     bool? showAirports,
+    AirportFilter? airportFilter,
   }) {
     return MapSettingsState(
       showControls: showControls ?? this.showControls,
       mapType: mapType ?? this.mapType,
       themeMode: themeMode ?? this.themeMode,
       showAirports: showAirports ?? this.showAirports,
+      airportFilter: airportFilter ?? this.airportFilter,
     );
   }
 
   @override
-  List<Object> get props => [showControls, mapType, themeMode, showAirports];
+  List<Object> get props =>
+      [showControls, mapType, themeMode, showAirports, airportFilter];
 }
 
 class MapSettingsCubit extends Cubit<MapSettingsState> {
@@ -49,6 +56,8 @@ class MapSettingsCubit extends Cubit<MapSettingsState> {
     final themeModeIndex =
         prefs.getInt('map_theme_mode') ?? ThemeMode.system.index;
     final showAirports = prefs.getBool('map_show_airports') ?? false;
+    final airportFilterIndex =
+        prefs.getInt('map_airport_filter') ?? AirportFilter.all.index;
 
     emit(
       state.copyWith(
@@ -56,6 +65,7 @@ class MapSettingsCubit extends Cubit<MapSettingsState> {
         mapType: MapType.values[mapTypeIndex],
         themeMode: ThemeMode.values[themeModeIndex],
         showAirports: showAirports,
+        airportFilter: AirportFilter.values[airportFilterIndex],
       ),
     );
   }
@@ -80,5 +90,10 @@ class MapSettingsCubit extends Cubit<MapSettingsState> {
     final newValue = !state.showAirports;
     prefs.setBool('map_show_airports', newValue);
     emit(state.copyWith(showAirports: newValue));
+  }
+
+  void setAirportFilter(AirportFilter filter) {
+    prefs.setInt('map_airport_filter', filter.index);
+    emit(state.copyWith(airportFilter: filter));
   }
 }

@@ -240,6 +240,114 @@ class _MapScreenState extends State<MapScreen> {
                                 return widget;
                               },
                             ),
+                            // Airport markers layer (rendered before person markers)
+                            if (settingsState.showAirports)
+                              BlocBuilder<AirportBloc, AirportState>(
+                                builder: (context, airportState) {
+                                  if (airportState is MapAirportsLoaded) {
+                                    final filteredAirports = airportState
+                                        .airports
+                                        .where((airport) {
+                                          // Filter by type first
+                                          bool typeMatch;
+                                          switch (settingsState.airportFilter) {
+                                            case AirportFilter.international:
+                                              typeMatch =
+                                                  airport.airportType ==
+                                                  'large_airport';
+                                              break;
+                                            case AirportFilter.regional:
+                                              typeMatch =
+                                                  airport.airportType ==
+                                                  'medium_airport';
+                                              break;
+                                            case AirportFilter.all:
+                                              typeMatch = true;
+                                              break;
+                                          }
+
+                                          if (!typeMatch) return false;
+
+                                          // Hide if too close to any person pin (within 500 meters)
+                                          const distance = Distance();
+                                          final airportLatLng = LatLng(
+                                            airport.latitude,
+                                            airport.longitude,
+                                          );
+
+                                          // Check against all active markers (people + user location)
+                                          for (var marker in markers) {
+                                            final d = distance.as(
+                                              LengthUnit.Meter,
+                                              airportLatLng,
+                                              marker.point,
+                                            );
+                                            if (d < 500) {
+                                              return false;
+                                            }
+                                          }
+
+                                          return true;
+                                        })
+                                        .toList();
+
+                                    return MarkerLayer(
+                                      markers: filteredAirports
+                                          .map(
+                                            (airport) => Marker(
+                                              point: LatLng(
+                                                airport.latitude,
+                                                airport.longitude,
+                                              ),
+                                              width: 28,
+                                              height: 28,
+                                              child: GestureDetector(
+                                                onTap: () {
+                                                  showModalBottomSheet(
+                                                    context: context,
+                                                    backgroundColor:
+                                                        Colors.transparent,
+                                                    builder: (context) =>
+                                                        _AirportBottomSheet(
+                                                          airport: airport,
+                                                        ),
+                                                  );
+                                                },
+                                                child: Container(
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    shape: BoxShape.circle,
+                                                    boxShadow: const [
+                                                      BoxShadow(
+                                                        color: Colors.black26,
+                                                        blurRadius: 3,
+                                                        offset: Offset(0, 1),
+                                                      ),
+                                                    ],
+                                                    border: Border.all(
+                                                      color: const Color(
+                                                        0xFF1565C0,
+                                                      ),
+                                                      width: 1.5,
+                                                    ),
+                                                  ),
+                                                  child: const Center(
+                                                    child: Icon(
+                                                      Icons.flight,
+                                                      color: Color(0xFF1565C0),
+                                                      size: 16,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              ),
                             MarkerClusterLayerWidget(
                               options: MarkerClusterLayerOptions(
                                 maxClusterRadius: 45,
@@ -428,68 +536,6 @@ class _MapScreenState extends State<MapScreen> {
                                 ),
                               ],
                             ),
-                            // Airport markers layer
-                            if (settingsState.showAirports)
-                              BlocBuilder<AirportBloc, AirportState>(
-                                builder: (context, airportState) {
-                                  if (airportState is MapAirportsLoaded) {
-                                    return MarkerLayer(
-                                      markers: airportState.airports
-                                          .map(
-                                            (airport) => Marker(
-                                              point: LatLng(
-                                                airport.latitude,
-                                                airport.longitude,
-                                              ),
-                                              width: 28,
-                                              height: 28,
-                                              child: GestureDetector(
-                                                onTap: () {
-                                                  showModalBottomSheet(
-                                                    context: context,
-                                                    backgroundColor:
-                                                        Colors.transparent,
-                                                    builder: (context) =>
-                                                        _AirportBottomSheet(
-                                                          airport: airport,
-                                                        ),
-                                                  );
-                                                },
-                                                child: Container(
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.white,
-                                                    shape: BoxShape.circle,
-                                                    boxShadow: const [
-                                                      BoxShadow(
-                                                        color: Colors.black26,
-                                                        blurRadius: 3,
-                                                        offset: Offset(0, 1),
-                                                      ),
-                                                    ],
-                                                    border: Border.all(
-                                                      color: const Color(
-                                                        0xFF1565C0,
-                                                      ),
-                                                      width: 1.5,
-                                                    ),
-                                                  ),
-                                                  child: const Center(
-                                                    child: Icon(
-                                                      Icons.flight,
-                                                      color: Color(0xFF1565C0),
-                                                      size: 16,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          )
-                                          .toList(),
-                                    );
-                                  }
-                                  return const SizedBox.shrink();
-                                },
-                              ),
                           ],
                         ),
                         if (settingsState.showControls)

@@ -43,6 +43,47 @@ class MapSettingsModal extends StatelessWidget {
                       },
                       secondary: const Icon(Icons.flight),
                     ),
+                    if (state.showAirports) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          left: 16.0,
+                          right: 16.0,
+                          bottom: 8.0,
+                        ),
+                        child: SegmentedButton<AirportFilter>(
+                          segments: const [
+                            ButtonSegment(
+                              value: AirportFilter.international,
+                              label: Text('International'),
+                              icon: Icon(Icons.public, size: 16),
+                            ),
+                            ButtonSegment(
+                              value: AirportFilter.all,
+                              label: Text('Both'),
+                            ),
+                            ButtonSegment(
+                              value: AirportFilter.regional,
+                              label: Text('Regional'),
+                              icon: Icon(Icons.location_city, size: 16),
+                            ),
+                          ],
+                          selected: {state.airportFilter},
+                          onSelectionChanged: (Set<AirportFilter> selection) {
+                            context
+                                .read<LocalMapSettingsCubit>()
+                                .setAirportFilter(selection.first);
+                          },
+                          showSelectedIcon: false,
+                          style: ButtonStyle(
+                            visualDensity: VisualDensity.compact,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            side: WidgetStateProperty.all(
+                              BorderSide(color: Colors.grey.withOpacity(0.5)),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     const Divider(),
                     ListTile(
                       title: const Text('Map Type'),
