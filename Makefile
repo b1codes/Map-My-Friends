@@ -15,6 +15,9 @@ mig:
 user:
 	docker compose exec api poetry run python manage.py createsuperuser
 
+airports:
+	docker compose exec api poetry run python manage.py import_airports
+
 shell:
 	docker compose exec api poetry run python manage.py shell
 

@@ -19,6 +19,12 @@ A personal geospatial application to track and visualize friends' locations in r
 ### Map Visualization
 - **Interactive Map** - View all contacts on an OSM-powered map
 - **Location Pins** - See where your friends are located geographically
+- **Airports Integration** - International and Regional airport markers with proximity-based visibility and type filtering
+
+### Security & Bot Protection
+- **Rate Limiting** - Burst and sustained throttling for sensitive endpoints
+- **Honeypot Validation** - Hidden fields to deter automated registration bots
+- **Security Hardening** - Production-ready headers, CORS, and Nginx rate limiting
 
 ---
 
@@ -127,6 +133,11 @@ flutter run
 | PUT | `/api/people/{id}/` | Update person (auth required) |
 | DELETE | `/api/people/{id}/` | Delete person (auth required) |
 
+### Airports (`/api/airports/`)
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET | `/api/airports/nearest/` | List N nearest airports to a lat/lon (auth required) |
+
 ---
 
 ## 🕹 Development Workflow & Commands
@@ -142,6 +153,7 @@ Since the backend runs inside a Docker container, you must execute commands *ins
 | **Build Containers** | `make build` |
 | **Run Migrations** | `make mig` |
 | **Create Superuser** | `make user` |
+| **Import Airports** | `make airports` |
 | **Open Python Shell** | `make shell` |
 | **Access Database** | `make db` |
 | **Run Tests** | `make test` |
@@ -165,7 +177,8 @@ map-my-friends/
 │   ├── config/                 # Core Django settings & URLs
 │   ├── apps/                   # Application modules
 │   │   ├── people/             # Person model, views, serializers
-│   │   └── users/              # User profiles, auth views
+│   │   ├── users/              # User profiles, auth views
+│   │   └── airports/           # Airport geospatial data & filtering
 │   └── media/                  # Uploaded files (profile images)
 │
 └── frontend/                   # Flutter App
@@ -176,7 +189,8 @@ map-my-friends/
         │   ├── auth/           # Authentication state
         │   ├── location/       # Location permissions
         │   ├── people/         # People list state
-        │   └── profile/        # User profile state
+        │   ├── profile/        # User profile state
+        │   └── airport/        # Airport filtering & data
         ├── models/             # Data models
         ├── screens/            # UI screens
         │   ├── auth/           # Login, Register, Forgot Password
