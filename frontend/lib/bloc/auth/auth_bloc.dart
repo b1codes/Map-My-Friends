@@ -74,6 +74,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         passwordConfirm: event.passwordConfirm,
         firstName: event.firstName,
         lastName: event.lastName,
+        firstNameHp: event.firstNameHp,
       );
       emit(const RegistrationSuccess());
     } catch (e) {

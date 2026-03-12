@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 
+from .throttles import BurstAnonRateThrottle, SustainedAnonRateThrottle
 from .models import UserProfile
 from .serializers import (
     UserProfileSerializer,
@@ -53,12 +54,15 @@ class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     permission_classes = [AllowAny]
     serializer_class = RegisterSerializer
+    throttle_classes = [BurstAnonRateThrottle, SustainedAnonRateThrottle]
 
 
 class PasswordResetRequestView(generics.GenericAPIView):
     """Request a password reset email."""
     serializer_class = PasswordResetRequestSerializer
     permission_classes = [AllowAny]
+    # Restrict password reset requests to prevent spam
+    throttle_classes = [BurstAnonRateThrottle, SustainedAnonRateThrottle]
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)
@@ -86,6 +90,7 @@ class PasswordResetConfirmView(generics.GenericAPIView):
     """Confirm password reset with token and new password."""
     serializer_class = PasswordResetConfirmSerializer
     permission_classes = [AllowAny]
+    throttle_classes = [BurstAnonRateThrottle]
 
     def post(self, request):
         serializer = self.get_serializer(data=request.data)

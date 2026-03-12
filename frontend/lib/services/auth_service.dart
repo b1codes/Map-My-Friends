@@ -81,6 +81,7 @@ class AuthService {
     required String passwordConfirm,
     String? firstName,
     String? lastName,
+    String? firstNameHp,
   }) async {
     try {
       final response = await _dio.post(
@@ -90,9 +91,10 @@ class AuthService {
           'email': email,
           'password': password,
           'password_confirm': passwordConfirm,
-          if (firstName != null) 'first_name': firstName,
-          if (lastName != null) 'last_name': lastName,
-        },
+          'first_name': firstName,
+          'last_name': lastName,
+          'first_name_hp': firstNameHp,
+        }..removeWhere((key, value) => value == null),
       );
 
       if (response.statusCode != 201) {

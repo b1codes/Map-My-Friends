@@ -19,6 +19,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _lastNameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _passwordConfirmController = TextEditingController();
+  // Honeypot controller
+  final _firstNameHpController = TextEditingController();
+  
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
@@ -30,6 +33,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _lastNameController.dispose();
     _passwordController.dispose();
     _passwordConfirmController.dispose();
+    _firstNameHpController.dispose();
     super.dispose();
   }
 
@@ -47,6 +51,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           lastName: _lastNameController.text.trim().isNotEmpty
               ? _lastNameController.text.trim()
               : null,
+          firstNameHp: _firstNameHpController.text,
         ),
       );
     }
@@ -240,6 +245,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         },
                       ),
                       const SizedBox(height: 32),
+
+                      // Honeypot field (hidden from users, but bots will fill it)
+                      const Offstage(
+                        child: TextField(
+                          autofillHints: [AutofillHints.givenName],
+                        ),
+                      ),
+                      // Actual hidden field that's part of the form
+                      SizedBox(
+                        height: 0,
+                        width: 0,
+                        child: TextFormField(
+                          controller: _firstNameHpController,
+                          focusNode: FocusNode(canRequestFocus: false),
+                          decoration: const InputDecoration(
+                            labelText: 'First Name', // Same as real field to confuse bots
+                          ),
+                        ),
+                      ),
 
                       // Register Button
                       BlocBuilder<AuthBloc, AuthState>(

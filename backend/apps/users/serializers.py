@@ -54,12 +54,19 @@ class RegisterSerializer(serializers.ModelSerializer):
     password_confirm = serializers.CharField(write_only=True, required=True)
     first_name = serializers.CharField(required=False, allow_blank=True)
     last_name = serializers.CharField(required=False, allow_blank=True)
+    # Honeypot field
+    first_name_hp = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
     class Meta:
         model = User
-        fields = ('username', 'email', 'password', 'password_confirm', 'first_name', 'last_name')
+        fields = ('username', 'email', 'password', 'password_confirm', 'first_name', 'last_name', 'first_name_hp')
 
     def validate(self, attrs):
+        if attrs.get('first_name_hp'):
+            # If honeypot is filled, it's a bot.
+            # We raise a generic error to not reveal it's a honeypot.
+            raise serializers.ValidationError({"detail": "Invalid request."})
+
         if attrs['password'] != attrs['password_confirm']:
             raise serializers.ValidationError({"password": "Passwords do not match."})
         
@@ -70,6 +77,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data.pop('password_confirm')
+        validated_data.pop('first_name_hp', None)
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data['email'],

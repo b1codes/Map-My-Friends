@@ -26,6 +26,7 @@ class RegisterRequested extends AuthEvent {
   final String passwordConfirm;
   final String? firstName;
   final String? lastName;
+  final String? firstNameHp;
 
   const RegisterRequested({
     required this.username,
@@ -34,6 +35,7 @@ class RegisterRequested extends AuthEvent {
     required this.passwordConfirm,
     this.firstName,
     this.lastName,
+    this.firstNameHp,
   });
 
   @override
@@ -44,6 +46,7 @@ class RegisterRequested extends AuthEvent {
     passwordConfirm,
     firstName,
     lastName,
+    firstNameHp,
   ];
 }
 

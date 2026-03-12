@@ -1,6 +1,31 @@
+# Rate limiting zone definition
+limit_req_zone $binary_remote_addr zone=api_limit:10m rate=5r/s;
+
+# Bot detection map
+map $http_user_agent $is_bot {
+    default 0;
+    ~*(python-requests|Go-http-client|curl|libwww-perl|wget|Apache-HttpClient) 1;
+}
+
 server {
     listen 80;
     server_name yourdomain.com api.yourdomain.com EC2-PUBLIC-IP;
+
+    # Block bots
+    if ($is_bot) {
+        return 403;
+    }
+
+    location /api/ {
+        # Apply rate limiting
+        limit_req zone=api_limit burst=10 nodelay;
+        
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 
     location / {
         proxy_pass http://localhost:8000;
