@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'apps.users',
     'apps.people',
     'apps.airports',
+    'apps.stations',
 ]
 
 MIDDLEWARE = [

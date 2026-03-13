@@ -12,6 +12,7 @@ import '../../components/shared/image_editor_modal.dart';
 import '../../components/shared/custom_text_form_field.dart';
 import '../../components/map/custom_map_marker.dart';
 import '../../components/shared/nearby_airports_section.dart';
+import '../../components/shared/nearby_stations_section.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../bloc/auth/auth_event.dart';
 import '../../bloc/location/location_bloc.dart';
@@ -705,6 +706,26 @@ class _MeScreenState extends State<MeScreen> {
                                         bottom: 24,
                                       ),
                                       child: NearbyAirportsSection(
+                                        latitude:
+                                            locationState.position!.latitude,
+                                        longitude:
+                                            locationState.position!.longitude,
+                                      ),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              ),
+
+                              BlocBuilder<LocationBloc, LocationState>(
+                                builder: (context, locationState) {
+                                  if (locationState is LocationLoaded &&
+                                      locationState.position != null) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 24,
+                                      ),
+                                      child: NearbyStationsSection(
                                         latitude:
                                             locationState.position!.latitude,
                                         longitude:

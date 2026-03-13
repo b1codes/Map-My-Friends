@@ -7,6 +7,8 @@ import 'bloc/location/location_bloc.dart';
 import 'bloc/people/people_bloc.dart';
 import 'bloc/airport/airport_bloc.dart';
 import 'bloc/airport/airport_event.dart';
+import 'bloc/station/station_bloc.dart';
+import 'bloc/station/station_event.dart';
 import 'bloc/profile/profile_bloc.dart';
 import 'bloc/profile/profile_event.dart';
 import 'services/api_service.dart';
@@ -57,6 +59,9 @@ class MyApp extends StatelessWidget {
         ),
         BlocProvider<AirportBloc>(
           create: (context) => AirportBloc()..add(LoadMapAirports()),
+        ),
+        BlocProvider<StationBloc>(
+          create: (context) => StationBloc()..add(LoadMapStations()),
         ),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(

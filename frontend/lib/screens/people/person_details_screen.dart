@@ -7,6 +7,7 @@ import '../../models/person.dart';
 import '../../bloc/people/people_bloc.dart';
 import '../../components/map/custom_map_marker.dart';
 import '../../components/shared/nearby_airports_section.dart';
+import '../../components/shared/nearby_stations_section.dart';
 import 'add_edit_person_screen.dart';
 
 class PersonDetailsScreen extends StatelessWidget {
@@ -244,6 +245,10 @@ class PersonDetailsScreen extends StatelessWidget {
         if (person.latitude != null && person.longitude != null) ...[
           const SizedBox(height: 24),
           NearbyAirportsSection(
+            latitude: person.latitude!,
+            longitude: person.longitude!,
+          ),
+          NearbyStationsSection(
             latitude: person.latitude!,
             longitude: person.longitude!,
           ),

@@ -12,6 +12,7 @@ class MapSettingsState extends Equatable {
   final MapType mapType;
   final ThemeMode themeMode;
   final bool showAirports;
+  final bool showStations;
   final AirportFilter airportFilter;
 
   const MapSettingsState({
@@ -19,6 +20,7 @@ class MapSettingsState extends Equatable {
     this.mapType = MapType.standard,
     this.themeMode = ThemeMode.system,
     this.showAirports = false,
+    this.showStations = false,
     this.airportFilter = AirportFilter.all,
   });
 
@@ -27,6 +29,7 @@ class MapSettingsState extends Equatable {
     MapType? mapType,
     ThemeMode? themeMode,
     bool? showAirports,
+    bool? showStations,
     AirportFilter? airportFilter,
   }) {
     return MapSettingsState(
@@ -34,13 +37,20 @@ class MapSettingsState extends Equatable {
       mapType: mapType ?? this.mapType,
       themeMode: themeMode ?? this.themeMode,
       showAirports: showAirports ?? this.showAirports,
+      showStations: showStations ?? this.showStations,
       airportFilter: airportFilter ?? this.airportFilter,
     );
   }
 
   @override
-  List<Object> get props =>
-      [showControls, mapType, themeMode, showAirports, airportFilter];
+  List<Object> get props => [
+        showControls,
+        mapType,
+        themeMode,
+        showAirports,
+        showStations,
+        airportFilter,
+      ];
 }
 
 class MapSettingsCubit extends Cubit<MapSettingsState> {
@@ -56,6 +66,7 @@ class MapSettingsCubit extends Cubit<MapSettingsState> {
     final themeModeIndex =
         prefs.getInt('map_theme_mode') ?? ThemeMode.system.index;
     final showAirports = prefs.getBool('map_show_airports') ?? false;
+    final showStations = prefs.getBool('map_show_stations') ?? false;
     final airportFilterIndex =
         prefs.getInt('map_airport_filter') ?? AirportFilter.all.index;
 
@@ -65,6 +76,7 @@ class MapSettingsCubit extends Cubit<MapSettingsState> {
         mapType: MapType.values[mapTypeIndex],
         themeMode: ThemeMode.values[themeModeIndex],
         showAirports: showAirports,
+        showStations: showStations,
         airportFilter: AirportFilter.values[airportFilterIndex],
       ),
     );
@@ -76,6 +88,18 @@ class MapSettingsCubit extends Cubit<MapSettingsState> {
     emit(state.copyWith(showControls: newValue));
   }
 
+  void toggleAirports() {
+    final newValue = !state.showAirports;
+    prefs.setBool('map_show_airports', newValue);
+    emit(state.copyWith(showAirports: newValue));
+  }
+
+  void toggleStations() {
+    final newValue = !state.showStations;
+    prefs.setBool('map_show_stations', newValue);
+    emit(state.copyWith(showStations: newValue));
+  }
+
   void setMapType(MapType type) {
     prefs.setInt('map_type', type.index);
     emit(state.copyWith(mapType: type));
@@ -84,12 +108,6 @@ class MapSettingsCubit extends Cubit<MapSettingsState> {
   void setMapTheme(ThemeMode mode) {
     prefs.setInt('map_theme_mode', mode.index);
     emit(state.copyWith(themeMode: mode));
-  }
-
-  void toggleAirports() {
-    final newValue = !state.showAirports;
-    prefs.setBool('map_show_airports', newValue);
-    emit(state.copyWith(showAirports: newValue));
   }
 
   void setAirportFilter(AirportFilter filter) {

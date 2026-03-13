@@ -18,10 +18,13 @@ import '../../components/map/cluster_people_modal.dart';
 import '../../components/shared/glass_container.dart';
 import '../../models/person.dart';
 import '../../models/airport.dart';
+import '../../models/station.dart';
 import '../../bloc/profile/profile_bloc.dart';
 import '../../bloc/profile/profile_state.dart';
 import '../../bloc/airport/airport_bloc.dart';
 import '../../bloc/airport/airport_state.dart';
+import '../../bloc/station/station_bloc.dart';
+import '../../bloc/station/station_state.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -55,7 +58,6 @@ class _MapScreenState extends State<MapScreen> {
     Brightness brightness;
 
     if (mode == ThemeMode.system) {
-      // Use Theme.of(context).brightness to catch the app's current effective theme
       brightness = Theme.of(context).brightness;
     } else if (mode == ThemeMode.light) {
       brightness = Brightness.light;
@@ -203,7 +205,6 @@ class _MapScreenState extends State<MapScreen> {
                               subdomains: const ['a', 'b', 'c'],
                               userAgentPackageName: 'com.mapmyfriends.app',
                               tileBuilder: (context, widget, tile) {
-                                // Check if we are in Standard mode AND Dark mode
                                 bool isStandard =
                                     settingsState.mapType == MapType.standard;
                                 bool isDark = _isDark(context, settingsState);
@@ -212,26 +213,10 @@ class _MapScreenState extends State<MapScreen> {
                                   return ColorFiltered(
                                     colorFilter: const ColorFilter.matrix(
                                       <double>[
-                                        -1,
-                                        0,
-                                        0,
-                                        0,
-                                        255,
-                                        0,
-                                        -1,
-                                        0,
-                                        0,
-                                        255,
-                                        0,
-                                        0,
-                                        -1,
-                                        0,
-                                        255,
-                                        0,
-                                        0,
-                                        0,
-                                        1,
-                                        0,
+                                        -1, 0, 0, 0, 255,
+                                        0, -1, 0, 0, 255,
+                                        0, 0, -1, 0, 255,
+                                        0, 0, 0, 1, 0,
                                       ],
                                     ),
                                     child: widget,
@@ -240,190 +225,56 @@ class _MapScreenState extends State<MapScreen> {
                                 return widget;
                               },
                             ),
-                            // Airport markers layer (rendered before person markers)
-                            if (settingsState.showAirports)
-                              BlocBuilder<AirportBloc, AirportState>(
-                                builder: (context, airportState) {
-                                  if (airportState is MapAirportsLoaded) {
-                                    final filteredAirports = airportState
-                                        .airports
-                                        .where((airport) {
-                                          // Filter by type first
-                                          bool typeMatch;
-                                          switch (settingsState.airportFilter) {
-                                            case AirportFilter.international:
-                                              typeMatch =
-                                                  airport.airportType ==
-                                                  'large_airport';
-                                              break;
-                                            case AirportFilter.regional:
-                                              typeMatch =
-                                                  airport.airportType ==
-                                                  'medium_airport';
-                                              break;
-                                            case AirportFilter.all:
-                                              typeMatch = true;
-                                              break;
-                                          }
-
-                                          if (!typeMatch) return false;
-
-                                          // Hide if too close to any person pin (within 500 meters)
-                                          const distance = Distance();
-                                          final airportLatLng = LatLng(
-                                            airport.latitude,
-                                            airport.longitude,
-                                          );
-
-                                          // Check against all active markers (people + user location)
-                                          for (var marker in markers) {
-                                            final d = distance.as(
-                                              LengthUnit.Meter,
-                                              airportLatLng,
-                                              marker.point,
-                                            );
-                                            if (d < 500) {
-                                              return false;
-                                            }
-                                          }
-
-                                          return true;
-                                        })
-                                        .toList();
-
-                                    return MarkerLayer(
-                                      markers: filteredAirports
-                                          .map(
-                                            (airport) => Marker(
-                                              point: LatLng(
-                                                airport.latitude,
-                                                airport.longitude,
-                                              ),
-                                              width: 28,
-                                              height: 28,
-                                              child: GestureDetector(
-                                                onTap: () {
-                                                  showModalBottomSheet(
-                                                    context: context,
-                                                    backgroundColor:
-                                                        Colors.transparent,
-                                                    builder: (context) =>
-                                                        _AirportBottomSheet(
-                                                          airport: airport,
-                                                        ),
-                                                  );
-                                                },
-                                                child: Container(
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.white,
-                                                    shape: BoxShape.circle,
-                                                    boxShadow: const [
-                                                      BoxShadow(
-                                                        color: Colors.black26,
-                                                        blurRadius: 3,
-                                                        offset: Offset(0, 1),
-                                                      ),
-                                                    ],
-                                                    border: Border.all(
-                                                      color: const Color(
-                                                        0xFF1565C0,
-                                                      ),
-                                                      width: 1.5,
-                                                    ),
-                                                  ),
-                                                  child: const Center(
-                                                    child: Icon(
-                                                      Icons.flight,
-                                                      color: Color(0xFF1565C0),
-                                                      size: 16,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          )
-                                          .toList(),
-                                    );
-                                  }
-                                  return const SizedBox.shrink();
-                                },
-                              ),
                             MarkerClusterLayerWidget(
                               options: MarkerClusterLayerOptions(
                                 maxClusterRadius: 45,
                                 size: const Size(120, 48),
                                 markers: markers,
                                 disableClusteringAtZoom: 19,
-                                spiderfyCluster:
-                                    false, // Turn off exploding pins out
+                                spiderfyCluster: false,
                                 onMarkerTap: (marker) {
-                                  // Fallback tap handler if single marker tapped
                                   if (marker.key is ValueKey<String> &&
                                       peopleState is PeopleLoaded) {
-                                    final id =
-                                        (marker.key as ValueKey<String>).value;
-                                    final person = peopleState.people
-                                        .firstWhere((p) => p.id == id);
+                                    final id = (marker.key as ValueKey<String>).value;
+                                    final person = peopleState.people.firstWhere((p) => p.id == id);
                                     showModalBottomSheet(
                                       context: context,
                                       backgroundColor: Colors.transparent,
-                                      builder: (context) =>
-                                          ClusterPeopleModal.withPeople(
-                                            people: [person],
-                                          ),
+                                      builder: (context) => ClusterPeopleModal.withPeople(people: [person]),
                                     );
                                   }
                                 },
                                 onClusterTap: (clusterNode) {
                                   if (peopleState is PeopleLoaded) {
-                                    // Extract all Person objects belonging to the cluster
                                     List<Person> clusterPeople = [];
                                     for (var marker in clusterNode.markers) {
                                       if (marker.key is ValueKey<String>) {
-                                        final id =
-                                            (marker.key as ValueKey<String>)
-                                                .value;
+                                        final id = (marker.key as ValueKey<String>).value;
                                         try {
-                                          clusterPeople.add(
-                                            peopleState.people.firstWhere(
-                                              (p) => p.id == id,
-                                            ),
-                                          );
+                                          clusterPeople.add(peopleState.people.firstWhere((p) => p.id == id));
                                         } catch (_) {}
                                       }
                                     }
-
                                     if (clusterPeople.isNotEmpty) {
                                       showModalBottomSheet(
                                         context: context,
                                         backgroundColor: Colors.transparent,
-                                        builder: (context) =>
-                                            ClusterPeopleModal.withPeople(
-                                              people: clusterPeople,
-                                            ),
+                                        builder: (context) => ClusterPeopleModal.withPeople(people: clusterPeople),
                                       );
                                     }
                                   }
                                 },
                                 builder: (context, clusterMarkers) {
                                   List<Widget> children = [];
-
-                                  int displayCount = clusterMarkers.length > 4
-                                      ? 3
-                                      : clusterMarkers.length;
+                                  int displayCount = clusterMarkers.length > 4 ? 3 : clusterMarkers.length;
                                   bool hasExtra = clusterMarkers.length > 4;
-
                                   double itemSize = 36.0;
-                                  double overlap = 20.0; // Tightly overlap pins
-
-                                  // Calculate total width of the overlapping group
+                                  double overlap = 20.0;
                                   double totalWidth = 0;
                                   if (displayCount > 0) {
-                                    totalWidth =
-                                        (displayCount - 1) * overlap + itemSize;
+                                    totalWidth = (displayCount - 1) * overlap + itemSize;
                                     if (hasExtra) totalWidth += overlap;
                                   }
-
                                   for (int i = 0; i < displayCount; i++) {
                                     children.add(
                                       Positioned(
@@ -436,7 +287,6 @@ class _MapScreenState extends State<MapScreen> {
                                       ),
                                     );
                                   }
-
                                   if (hasExtra) {
                                     int extraCount = clusterMarkers.length - 3;
                                     children.add(
@@ -446,31 +296,16 @@ class _MapScreenState extends State<MapScreen> {
                                           width: itemSize,
                                           height: itemSize,
                                           decoration: BoxDecoration(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.primaryContainer,
+                                            color: Theme.of(context).colorScheme.primaryContainer,
                                             shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.primary,
-                                              width: 2,
-                                            ),
-                                            boxShadow: const [
-                                              BoxShadow(
-                                                color: Colors.black26,
-                                                blurRadius: 4,
-                                                offset: Offset(0, 2),
-                                              ),
-                                            ],
+                                            border: Border.all(color: Theme.of(context).colorScheme.primary, width: 2),
+                                            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
                                           ),
                                           alignment: Alignment.center,
                                           child: Text(
                                             '+$extraCount',
                                             style: TextStyle(
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.onPrimaryContainer,
+                                              color: Theme.of(context).colorScheme.onPrimaryContainer,
                                               fontWeight: FontWeight.bold,
                                               fontSize: 12,
                                             ),
@@ -479,27 +314,14 @@ class _MapScreenState extends State<MapScreen> {
                                       ),
                                     );
                                   }
-
                                   return Center(
                                     child: Container(
-                                      width:
-                                          totalWidth +
-                                          8, // 4px padding on each side
-                                      height:
-                                          itemSize +
-                                          8, // 4px padding top/bottom
+                                      width: totalWidth + 8,
+                                      height: itemSize + 8,
                                       decoration: BoxDecoration(
-                                        color: Theme.of(
-                                          context,
-                                        ).cardColor.withOpacity(0.8),
+                                        color: Theme.of(context).cardColor.withOpacity(0.8),
                                         borderRadius: BorderRadius.circular(24),
-                                        boxShadow: const [
-                                          BoxShadow(
-                                            color: Colors.black26,
-                                            blurRadius: 4,
-                                            offset: Offset(0, 2),
-                                          ),
-                                        ],
+                                        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2))],
                                       ),
                                       child: Stack(
                                         clipBehavior: Clip.none,
@@ -510,10 +332,7 @@ class _MapScreenState extends State<MapScreen> {
                                             width: totalWidth,
                                             height: itemSize,
                                             child: IgnorePointer(
-                                              child: Stack(
-                                                clipBehavior: Clip.none,
-                                                children: children,
-                                              ),
+                                              child: Stack(clipBehavior: Clip.none, children: children),
                                             ),
                                           ),
                                         ],
@@ -523,88 +342,94 @@ class _MapScreenState extends State<MapScreen> {
                                 },
                               ),
                             ),
+                            // Airport markers layer
+                            if (settingsState.showAirports)
+                              BlocBuilder<AirportBloc, AirportState>(
+                                builder: (context, airportState) {
+                                  if (airportState is MapAirportsLoaded) {
+                                    final filteredAirports = airportState.airports.where((airport) {
+                                      bool typeMatch;
+                                      switch (settingsState.airportFilter) {
+                                        case AirportFilter.international: typeMatch = airport.airportType == 'large_airport'; break;
+                                        case AirportFilter.regional: typeMatch = airport.airportType == 'medium_airport'; break;
+                                        case AirportFilter.all: typeMatch = true; break;
+                                      }
+                                      if (!typeMatch) return false;
+                                      const distance = Distance();
+                                      final airportLatLng = LatLng(airport.latitude, airport.longitude);
+                                      for (var marker in markers) {
+                                        if (distance.as(LengthUnit.Meter, airportLatLng, marker.point) < 50) return false;
+                                      }
+                                      return true;
+                                    }).toList();
+
+                                    return MarkerLayer(
+                                      markers: filteredAirports.map((airport) => Marker(
+                                        point: LatLng(airport.latitude, airport.longitude),
+                                        width: 28, height: 28,
+                                        child: GestureDetector(
+                                          onTap: () => showModalBottomSheet(
+                                            context: context,
+                                            backgroundColor: Colors.transparent,
+                                            builder: (context) => _AirportBottomSheet(airport: airport),
+                                          ),
+                                          child: _MarkerIcon(icon: Icons.flight, color: const Color(0xFF1565C0)),
+                                        ),
+                                      )).toList(),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              ),
+                            // Station markers layer
+                            if (settingsState.showStations)
+                              BlocBuilder<StationBloc, StationState>(
+                                builder: (context, stationState) {
+                                  if (stationState is MapStationsLoaded) {
+                                    final filteredStations = stationState.stations.where((station) {
+                                      const distance = Distance();
+                                      final stationLatLng = LatLng(station.latitude, station.longitude);
+                                      for (var marker in markers) {
+                                        if (distance.as(LengthUnit.Meter, stationLatLng, marker.point) < 50) return false;
+                                      }
+                                      return true;
+                                    }).toList();
+
+                                    return MarkerLayer(
+                                      markers: filteredStations.map((station) => Marker(
+                                        point: LatLng(station.latitude, station.longitude),
+                                        width: 28, height: 28,
+                                        child: GestureDetector(
+                                          onTap: () => showModalBottomSheet(
+                                            context: context,
+                                            backgroundColor: Colors.transparent,
+                                            builder: (context) => _StationBottomSheet(station: station),
+                                          ),
+                                          child: _MarkerIcon(icon: Icons.train, color: const Color(0xFFE65100)),
+                                        ),
+                                      )).toList(),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                              ),
                             RichAttributionWidget(
                               alignment: AttributionAlignment.bottomLeft,
                               attributions: [
                                 TextSourceAttribution(
                                   'OpenStreetMap contributors',
-                                  onTap: () => launchUrl(
-                                    Uri.parse(
-                                      'https://openstreetmap.org/copyright',
-                                    ),
-                                  ),
+                                  onTap: () => launchUrl(Uri.parse('https://openstreetmap.org/copyright')),
                                 ),
                               ],
                             ),
                           ],
                         ),
-                        if (settingsState.showControls)
-                          MapControls(mapController: _mapController),
+                        if (settingsState.showControls) MapControls(mapController: _mapController),
                         const MapSettingsButton(),
-                        // Compass indicator
-                        StreamBuilder<MapEvent>(
-                          stream: _mapController.mapEventStream,
-                          builder: (context, snapshot) {
-                            final rotation = _mapController.camera.rotation;
-                            // Only show compass when map is rotated
-                            if (rotation == 0) {
-                              return const SizedBox.shrink();
-                            }
-                            return Positioned(
-                              top: MediaQuery.of(context).padding.top + 95,
-                              right: 20,
-                              child: GestureDetector(
-                                onTap: _resetNorth,
-                                child: GlassContainer(
-                                  width: 44,
-                                  height: 44,
-                                  padding: EdgeInsets.zero,
-                                  borderRadius: 22,
-                                  child: Transform.rotate(
-                                    angle: -rotation * (math.pi / 180),
-                                    child: Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        // North indicator (red triangle)
-                                        Positioned(
-                                          top: 6,
-                                          child: CustomPaint(
-                                            size: const Size(10, 10),
-                                            painter: _NorthTrianglePainter(
-                                              color: Colors.red,
-                                            ),
-                                          ),
-                                        ),
-                                        // South indicator (white/grey triangle)
-                                        Positioned(
-                                          bottom: 6,
-                                          child: Transform.rotate(
-                                            angle: math.pi,
-                                            child: CustomPaint(
-                                              size: const Size(10, 10),
-                                              painter: _NorthTrianglePainter(
-                                                color: Colors.white70,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        // "N" label
-                                        const Text(
-                                          'N',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.red,
-                                            height: 1,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
+                        Positioned(
+                          top: MediaQuery.of(context).padding.top + 95,
+                          right: 20,
+                          child: _CompassIndicator(mapController: _mapController, onReset: _resetNorth),
                         ),
                       ],
                     );
@@ -619,105 +444,124 @@ class _MapScreenState extends State<MapScreen> {
   }
 }
 
+class _MarkerIcon extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  const _MarkerIcon({required this.icon, required this.color});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 3, offset: Offset(0, 1))],
+        border: Border.all(color: color, width: 1.5),
+      ),
+      child: Center(child: Icon(icon, color: color, size: 16)),
+    );
+  }
+}
+
+class _CompassIndicator extends StatelessWidget {
+  final MapController mapController;
+  final VoidCallback onReset;
+  const _CompassIndicator({required this.mapController, required this.onReset});
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<MapEvent>(
+      stream: mapController.mapEventStream,
+      builder: (context, snapshot) {
+        final rotation = mapController.camera.rotation;
+        if (rotation == 0) return const SizedBox.shrink();
+        return GestureDetector(
+          onTap: onReset,
+          child: GlassContainer(
+            width: 44, height: 44, padding: EdgeInsets.zero, borderRadius: 22,
+            child: Transform.rotate(
+              angle: -rotation * (math.pi / 180),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Positioned(top: 6, child: CustomPaint(size: const Size(10, 10), painter: _NorthTrianglePainter(color: Colors.red))),
+                  Positioned(bottom: 6, child: Transform.rotate(angle: math.pi, child: CustomPaint(size: const Size(10, 10), painter: _NorthTrianglePainter(color: Colors.white70)))),
+                  const Text('N', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red, height: 1)),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _NorthTrianglePainter extends CustomPainter {
   final Color color;
-
   _NorthTrianglePainter({required this.color});
-
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final path = ui.Path()
-      ..moveTo(size.width / 2, 0)
-      ..lineTo(0, size.height)
-      ..lineTo(size.width, size.height)
-      ..close();
-
+    final paint = Paint()..color = color..style = PaintingStyle.fill;
+    final path = ui.Path()..moveTo(size.width / 2, 0)..lineTo(0, size.height)..lineTo(size.width, size.height)..close();
     canvas.drawPath(path, paint);
   }
-
   @override
-  bool shouldRepaint(covariant _NorthTrianglePainter oldDelegate) {
-    return color != oldDelegate.color;
-  }
+  bool shouldRepaint(covariant _NorthTrianglePainter oldDelegate) => color != oldDelegate.color;
 }
 
 class _AirportBottomSheet extends StatelessWidget {
   final Airport airport;
-
   const _AirportBottomSheet({required this.airport});
-
   @override
   Widget build(BuildContext context) {
-    final typeLabel = airport.airportType == 'large_airport'
-        ? 'International Airport'
-        : 'Regional Airport';
+    final typeLabel = airport.airportType == 'large_airport' ? 'International Airport' : 'Regional Airport';
+    return _BaseBottomSheet(
+      icon: Icons.flight, color: const Color(0xFF1565C0), title: airport.name,
+      subtitle: airport.iataCode, location: '${airport.city}, ${airport.country}', label: typeLabel,
+    );
+  }
+}
 
+class _StationBottomSheet extends StatelessWidget {
+  final Station station;
+  const _StationBottomSheet({required this.station});
+  @override
+  Widget build(BuildContext context) {
+    return _BaseBottomSheet(
+      icon: Icons.train, color: const Color(0xFFE65100), title: station.name,
+      subtitle: station.uicRef != null && station.uicRef!.isNotEmpty ? 'Ref: ${station.uicRef}' : null,
+      location: '${station.city ?? "Unknown City"}, ${station.country ?? "Unknown Country"}',
+      label: station.stationType ?? 'Train Station',
+    );
+  }
+}
+
+class _BaseBottomSheet extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String? subtitle;
+  final String location;
+  final String label;
+  const _BaseBottomSheet({required this.icon, required this.color, required this.title, this.subtitle, required this.location, required this.label});
+  @override
+  Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
+      decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(20)),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.grey[400],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1565C0).withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.flight,
-                color: Color(0xFF1565C0),
-                size: 32,
-              ),
-            ),
+            Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(2))),
+            Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle), child: Icon(icon, color: color, size: 32)),
             const SizedBox(height: 12),
-            Text(
-              airport.name,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              airport.iataCode,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: const Color(0xFF1565C0),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+            if (subtitle != null) ...[const SizedBox(height: 4), Text(subtitle!, style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: color, fontWeight: FontWeight.bold))],
             const SizedBox(height: 8),
-            Text(
-              '${airport.city}, ${airport.country}',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
+            Text(location, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             const SizedBox(height: 4),
-            Text(
-              typeLabel,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
+            Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ],
         ),
       ),

@@ -43,6 +43,14 @@ class MapSettingsModal extends StatelessWidget {
                       },
                       secondary: const Icon(Icons.flight),
                     ),
+                    SwitchListTile(
+                      title: const Text('Show Train Stations'),
+                      value: state.showStations,
+                      onChanged: (value) {
+                        context.read<LocalMapSettingsCubit>().toggleStations();
+                      },
+                      secondary: const Icon(Icons.train),
+                    ),
                     if (state.showAirports) ...[
                       Padding(
                         padding: const EdgeInsets.only(

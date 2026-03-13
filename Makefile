@@ -18,6 +18,10 @@ user:
 airports:
 	docker compose exec api poetry run python manage.py import_airports
 
+stations:
+	@read -p "JSON File Path (default: train_stations.json): " file_path; \
+	docker compose exec api poetry run python manage.py import_stations $${file_path:-train_stations.json}
+
 shell:
 	docker compose exec api poetry run python manage.py shell
 

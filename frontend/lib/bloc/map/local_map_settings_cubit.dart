@@ -25,6 +25,10 @@ class LocalMapSettingsCubit extends Cubit<MapSettingsState> {
     emit(state.copyWith(showAirports: !state.showAirports));
   }
 
+  void toggleStations() {
+    emit(state.copyWith(showStations: !state.showStations));
+  }
+
   void setAirportFilter(AirportFilter filter) {
     emit(state.copyWith(airportFilter: filter));
   }
