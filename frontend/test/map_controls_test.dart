@@ -10,6 +10,8 @@ import 'package:map_my_friends/models/person.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:map_my_friends/bloc/map/map_settings_cubit.dart';
 import 'package:map_my_friends/bloc/airport/airport_bloc.dart';
+import 'package:map_my_friends/bloc/station/station_bloc.dart';
+import 'package:map_my_friends/bloc/station/station_event.dart';
 import 'package:map_my_friends/bloc/profile/profile_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 // import 'package:map_my_friends/components/map/map_controls.dart'; // Implicitly tested via MapScreen
@@ -89,6 +91,9 @@ class FakeMapSettingsCubit extends Cubit<MapSettingsState>
   void toggleAirports() {}
 
   @override
+  void toggleStations() {}
+
+  @override
   void setAirportFilter(AirportFilter filter) {}
 }
 
@@ -112,6 +117,7 @@ void main() {
             create: (context) => FakeMapSettingsCubit(prefs),
           ),
           BlocProvider<AirportBloc>(create: (context) => AirportBloc()),
+          BlocProvider<StationBloc>(create: (context) => StationBloc()),
           BlocProvider<ProfileBloc>(create: (context) => ProfileBloc()),
         ],
         child: const MaterialApp(home: MapScreen()),
