@@ -4,7 +4,6 @@ from django.contrib.auth.models import User
 from django.contrib.gis.geos import Point
 from apps.people.models import Person
 from .models import Trip, TripStop
-from rest_framework.test import APIRequestFactory
 from .serializers import TripSerializer
 
 
@@ -152,3 +151,41 @@ class TripSerializerTests(TestCase):
         updated = serializer.save()
         self.assertEqual(updated.name, 'Updated Trip')
         self.assertEqual(updated.stops.count(), 2)
+
+    def test_serializer_update_handles_sequence_order_overlap(self):
+        trip = Trip.objects.create(
+            name='Overlap Trip',
+            date=datetime.date(2026, 8, 1),
+            user=self.user,
+        )
+        TripStop.objects.create(
+            trip=trip, person=self.person, sequence_order=1,
+            location=Point(-87.6298, 41.8781, srid=4326),
+        )
+        TripStop.objects.create(
+            trip=trip, person=self.person, sequence_order=2,
+            location=Point(-73.9857, 40.7484, srid=4326),
+        )
+        # Update with stops where sequence_order 2 overlaps with old stop 2 but is a different stop
+        data = {
+            'name': 'Overlap Trip',
+            'date': '2026-08-01',
+            'stops': [
+                {
+                    'person': self.person.id,
+                    'sequence_order': 2,
+                    'location': {'type': 'Point', 'coordinates': [-87.6298, 41.8781]},
+                },
+                {
+                    'person': self.person.id,
+                    'sequence_order': 3,
+                    'location': {'type': 'Point', 'coordinates': [-73.9857, 40.7484]},
+                },
+            ],
+        }
+        serializer = TripSerializer(trip, data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        updated = serializer.save()
+        self.assertEqual(updated.stops.count(), 2)
+        orders = list(updated.stops.values_list('sequence_order', flat=True))
+        self.assertEqual(orders, [2, 3])
