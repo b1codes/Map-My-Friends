@@ -21,7 +21,10 @@ class RoutingService {
 
       // Segment Friend -> Friend: Request OSRM v1/driving route.
       if (start.person != null && end.person != null) {
-        final segmentPoints = await _fetchOSRMRoute(start.location, end.location);
+        final segmentPoints = await _fetchOSRMRoute(
+          start.location,
+          end.location,
+        );
         if (segmentPoints.isNotEmpty) {
           // Add segment points, skipping the first one if it duplicates the last point of fullPath
           if (fullPath.isNotEmpty) {
@@ -45,16 +48,21 @@ class RoutingService {
 
   Future<List<LatLng>> _fetchOSRMRoute(LatLng start, LatLng end) async {
     try {
-      final coordinates = '${start.longitude},${start.latitude};${end.longitude},${end.latitude}';
-      final url = 'https://router.project-osrm.org/route/v1/driving/$coordinates?overview=full&geometries=geojson';
+      final coordinates =
+          '${start.longitude},${start.latitude};${end.longitude},${end.latitude}';
+      final url =
+          'https://router.project-osrm.org/route/v1/driving/$coordinates?overview=full&geometries=geojson';
 
       final response = await _dio.get(url);
 
       if (response.statusCode == 200) {
         final data = response.data;
         if (data['routes'] != null && data['routes'].isNotEmpty) {
-          final List<dynamic> coords = data['routes'][0]['geometry']['coordinates'];
-          return coords.map((c) => LatLng(c[1].toDouble(), c[0].toDouble())).toList();
+          final List<dynamic> coords =
+              data['routes'][0]['geometry']['coordinates'];
+          return coords
+              .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
+              .toList();
         }
       }
     } catch (e) {

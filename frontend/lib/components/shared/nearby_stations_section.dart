@@ -108,11 +108,8 @@ class _NearbyStationsSectionState extends State<NearbyStationsSection> {
                               children: [
                                 Text(
                                   station.name,
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.bold),
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 4),

@@ -100,10 +100,7 @@ class UnifiedClusterModal extends StatelessWidget {
             : null,
       ),
       title: Text('${p.firstName} ${p.lastName}'),
-      subtitle: Text(
-        p.relationshipTag,
-        style: const TextStyle(fontSize: 12),
-      ),
+      subtitle: Text(p.relationshipTag, style: const TextStyle(fontSize: 12)),
       trailing: const Icon(Icons.chevron_right),
       onTap: () {
         Navigator.pop(context); // close modal

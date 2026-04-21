@@ -1,13 +1,14 @@
+import 'package:equatable/equatable.dart';
 import 'package:latlong2/latlong.dart';
 import 'person.dart';
 
-class TripStop {
+class TripStop extends Equatable {
   final String id;
   final Person? person;
   final LatLng location;
   final int sequenceOrder;
 
-  TripStop({
+  const TripStop({
     required this.id,
     this.person,
     required this.location,
@@ -22,4 +23,7 @@ class TripStop {
       sequenceOrder: sequenceOrder ?? this.sequenceOrder,
     );
   }
+
+  @override
+  List<Object?> get props => [id, person, location, sequenceOrder];
 }

@@ -50,14 +50,14 @@ class MapSettingsState extends Equatable {
 
   @override
   List<Object> get props => [
-        showControls,
-        mapType,
-        themeMode,
-        showAirports,
-        showStations,
-        airportFilter,
-        stationFilter,
-      ];
+    showControls,
+    mapType,
+    themeMode,
+    showAirports,
+    showStations,
+    airportFilter,
+    stationFilter,
+  ];
 }
 
 class MapSettingsCubit extends Cubit<MapSettingsState> {

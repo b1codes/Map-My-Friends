@@ -122,10 +122,8 @@ void main() {
           BlocProvider<PeopleBloc>(create: (context) => FakePeopleBloc()),
           BlocProvider<MapSettingsCubit>(create: (context) => mapSettingsCubit),
           BlocProvider<LocalMapSettingsCubit>(
-            create:
-                (context) => LocalMapSettingsCubit(
-                  initialState: mapSettingsCubit.state,
-                ),
+            create: (context) =>
+                LocalMapSettingsCubit(initialState: mapSettingsCubit.state),
           ),
           BlocProvider<AirportBloc>(create: (context) => AirportBloc()),
           BlocProvider<StationBloc>(create: (context) => StationBloc()),

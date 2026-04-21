@@ -6,9 +6,11 @@ import 'trip_event.dart';
 import 'trip_state.dart';
 
 class TripBloc extends Bloc<TripEvent, TripState> {
-  final RoutingService _routingService = RoutingService();
+  final RoutingService _routingService;
 
-  TripBloc() : super(const TripState()) {
+  TripBloc({RoutingService? routingService})
+    : _routingService = routingService ?? RoutingService(),
+      super(const TripState()) {
     on<AddStop>(_onAddStop);
     on<RemoveStop>(_onRemoveStop);
     on<ReorderStops>(_onReorderStops);
@@ -18,57 +20,72 @@ class TripBloc extends Bloc<TripEvent, TripState> {
 
   Future<void> _onAddStop(AddStop event, Emitter<TripState> emit) async {
     if (event.person.latitude == null || event.person.longitude == null) return;
-    
+
     final newStop = TripStop(
       id: DateTime.now().toString(),
       person: event.person,
       location: LatLng(event.person.latitude!, event.person.longitude!),
       sequenceOrder: state.stops.length,
     );
-    
+
     final newStops = List<TripStop>.from(state.stops)..add(newStop);
-    emit(state.copyWith(stops: newStops, isLoading: true));
-    
+    emit(state.copyWith(stops: newStops, isOptimizing: true));
+
     final route = await _routingService.getRoute(newStops);
-    emit(state.copyWith(routePoints: route, isLoading: false));
+    emit(state.copyWith(routePoints: route, isOptimizing: false));
   }
 
   Future<void> _onRemoveStop(RemoveStop event, Emitter<TripState> emit) async {
     final newStops = List<TripStop>.from(state.stops)..removeAt(event.index);
-    emit(state.copyWith(stops: _resortStops(newStops), isLoading: true));
-    
+    emit(state.copyWith(stops: _resortStops(newStops), isOptimizing: true));
+
     final route = await _routingService.getRoute(newStops);
-    emit(state.copyWith(routePoints: route, isLoading: false));
+    emit(state.copyWith(routePoints: route, isOptimizing: false));
   }
 
-  Future<void> _onReorderStops(ReorderStops event, Emitter<TripState> emit) async {
+  Future<void> _onReorderStops(
+    ReorderStops event,
+    Emitter<TripState> emit,
+  ) async {
     var newStops = List<TripStop>.from(state.stops);
     int newIndex = event.newIndex;
     if (event.oldIndex < newIndex) newIndex -= 1;
     final item = newStops.removeAt(event.oldIndex);
     newStops.insert(newIndex, item);
-    
-    emit(state.copyWith(stops: _resortStops(newStops), isLoading: true));
+
+    emit(state.copyWith(stops: _resortStops(newStops), isOptimizing: true));
     final route = await _routingService.getRoute(newStops);
-    emit(state.copyWith(routePoints: route, isLoading: false));
+    emit(state.copyWith(routePoints: route, isOptimizing: false));
   }
 
   void _onClearTrip(ClearTrip event, Emitter<TripState> emit) {
     emit(const TripState());
   }
 
-  Future<void> _onOptimizeTrip(OptimizeTrip event, Emitter<TripState> emit) async {
+  Future<void> _onOptimizeTrip(
+    OptimizeTrip event,
+    Emitter<TripState> emit,
+  ) async {
     if (state.stops.length < 3) return;
-    emit(state.copyWith(isLoading: true));
-    
+    emit(state.copyWith(isOptimizing: true));
+
     final optimized = _solveTSP(state.stops);
     final route = await _routingService.getRoute(optimized);
-    
-    emit(state.copyWith(stops: _resortStops(optimized), routePoints: route, isLoading: false));
+
+    emit(
+      state.copyWith(
+        stops: _resortStops(optimized),
+        routePoints: route,
+        isOptimizing: false,
+      ),
+    );
   }
 
   List<TripStop> _resortStops(List<TripStop> stops) {
-    return List.generate(stops.length, (i) => stops[i].copyWith(sequenceOrder: i));
+    return List.generate(
+      stops.length,
+      (i) => stops[i].copyWith(sequenceOrder: i),
+    );
   }
 
   List<TripStop> _solveTSP(List<TripStop> stops) {
@@ -95,7 +112,11 @@ class TripBloc extends Bloc<TripEvent, TripState> {
       int nearestIdx = 0;
       double minDist = double.infinity;
       for (int i = 0; i < unvisited.length; i++) {
-        final d = distance.as(LengthUnit.Meter, path.last.location, unvisited[i].location);
+        final d = distance.as(
+          LengthUnit.Meter,
+          path.last.location,
+          unvisited[i].location,
+        );
         if (d < minDist) {
           minDist = d;
           nearestIdx = i;
@@ -110,7 +131,11 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     final distance = const Distance();
     double total = 0;
     for (int i = 0; i < path.length - 1; i++) {
-      total += distance.as(LengthUnit.Meter, path[i].location, path[i + 1].location);
+      total += distance.as(
+        LengthUnit.Meter,
+        path[i].location,
+        path[i + 1].location,
+      );
     }
     return total;
   }

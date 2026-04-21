@@ -167,8 +167,9 @@ class _MapScreenState extends State<MapScreen> {
                     if (peopleState is PeopleLoaded) {
                       markers.addAll(
                         peopleState.people
-                            .where((p) =>
-                                p.latitude != null && p.longitude != null)
+                            .where(
+                              (p) => p.latitude != null && p.longitude != null,
+                            )
                             .map(
                               (p) => Marker(
                                 key: ValueKey('person_${p.id}'),
@@ -209,8 +210,10 @@ class _MapScreenState extends State<MapScreen> {
                             .map(
                               (airport) => Marker(
                                 key: ValueKey('airport_${airport.iataCode}'),
-                                point:
-                                    LatLng(airport.latitude, airport.longitude),
+                                point: LatLng(
+                                  airport.latitude,
+                                  airport.longitude,
+                                ),
                                 width: 28,
                                 height: 28,
                                 child: _MarkerIcon(
@@ -272,8 +275,10 @@ class _MapScreenState extends State<MapScreen> {
 
                               return Marker(
                                 key: ValueKey('station_${station.osmId}'),
-                                point:
-                                    LatLng(station.latitude, station.longitude),
+                                point: LatLng(
+                                  station.latitude,
+                                  station.longitude,
+                                ),
                                 width: 28,
                                 height: 28,
                                 child: _MarkerIcon(
@@ -367,7 +372,8 @@ class _MapScreenState extends State<MapScreen> {
                                       if (airportState is MapAirportsLoaded) {
                                         final airport = airportState.airports
                                             .firstWhere(
-                                                (a) => a.iataCode == iata);
+                                              (a) => a.iataCode == iata,
+                                            );
                                         showModalBottomSheet(
                                           context: context,
                                           backgroundColor: Colors.transparent,
@@ -378,12 +384,14 @@ class _MapScreenState extends State<MapScreen> {
                                         );
                                       }
                                     } else if (key.startsWith('station_')) {
-                                      final osmId =
-                                          int.tryParse(key.substring(8));
+                                      final osmId = int.tryParse(
+                                        key.substring(8),
+                                      );
                                       if (stationState is MapStationsLoaded) {
                                         final station = stationState.stations
                                             .firstWhere(
-                                                (s) => s.osmId == osmId);
+                                              (s) => s.osmId == osmId,
+                                            );
                                         showModalBottomSheet(
                                           context: context,
                                           backgroundColor: Colors.transparent,
@@ -462,10 +470,9 @@ class _MapScreenState extends State<MapScreen> {
                                 },
                                 builder: (context, clusterMarkers) {
                                   List<Widget> children = [];
-                                  int displayCount =
-                                      clusterMarkers.length > 4
-                                          ? 3
-                                          : clusterMarkers.length;
+                                  int displayCount = clusterMarkers.length > 4
+                                      ? 3
+                                      : clusterMarkers.length;
                                   bool hasExtra = clusterMarkers.length > 4;
                                   double itemSize = 36.0;
                                   double overlap = 20.0;
@@ -496,14 +503,14 @@ class _MapScreenState extends State<MapScreen> {
                                           width: itemSize,
                                           height: itemSize,
                                           decoration: BoxDecoration(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .primaryContainer,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.primaryContainer,
                                             shape: BoxShape.circle,
                                             border: Border.all(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .primary,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
                                               width: 2,
                                             ),
                                             boxShadow: const [
@@ -518,9 +525,9 @@ class _MapScreenState extends State<MapScreen> {
                                           child: Text(
                                             '+$extraCount',
                                             style: TextStyle(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .onPrimaryContainer,
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onPrimaryContainer,
                                               fontWeight: FontWeight.bold,
                                               fontSize: 12,
                                             ),
@@ -534,9 +541,9 @@ class _MapScreenState extends State<MapScreen> {
                                       width: totalWidth + 8,
                                       height: itemSize + 8,
                                       decoration: BoxDecoration(
-                                        color: Theme.of(context)
-                                            .cardColor
-                                            .withOpacity(0.8),
+                                        color: Theme.of(
+                                          context,
+                                        ).cardColor.withOpacity(0.8),
                                         borderRadius: BorderRadius.circular(24),
                                         boxShadow: const [
                                           BoxShadow(
@@ -583,12 +590,16 @@ class _MapScreenState extends State<MapScreen> {
                             ),
                           ],
                         ),
-                        if (settingsState.showControls) MapControls(mapController: _mapController),
+                        if (settingsState.showControls)
+                          MapControls(mapController: _mapController),
                         const MapSettingsButton(),
                         Positioned(
                           top: MediaQuery.of(context).padding.top + 95,
                           right: 20,
-                          child: _CompassIndicator(mapController: _mapController, onReset: _resetNorth),
+                          child: _CompassIndicator(
+                            mapController: _mapController,
+                            onReset: _resetNorth,
+                          ),
                         ),
                       ],
                     );
@@ -613,7 +624,9 @@ class _MarkerIcon extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         shape: BoxShape.circle,
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 3, offset: Offset(0, 1))],
+        boxShadow: const [
+          BoxShadow(color: Colors.black26, blurRadius: 3, offset: Offset(0, 1)),
+        ],
         border: Border.all(color: color, width: 1.5),
       ),
       child: Center(child: Icon(icon, color: color, size: 16)),
@@ -635,15 +648,41 @@ class _CompassIndicator extends StatelessWidget {
         return GestureDetector(
           onTap: onReset,
           child: GlassContainer(
-            width: 44, height: 44, padding: EdgeInsets.zero, borderRadius: 22,
+            width: 44,
+            height: 44,
+            padding: EdgeInsets.zero,
+            borderRadius: 22,
             child: Transform.rotate(
               angle: -rotation * (math.pi / 180),
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  Positioned(top: 6, child: CustomPaint(size: const Size(10, 10), painter: _NorthTrianglePainter(color: Colors.red))),
-                  Positioned(bottom: 6, child: Transform.rotate(angle: math.pi, child: CustomPaint(size: const Size(10, 10), painter: _NorthTrianglePainter(color: Colors.white70)))),
-                  const Text('N', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.red, height: 1)),
+                  Positioned(
+                    top: 6,
+                    child: CustomPaint(
+                      size: const Size(10, 10),
+                      painter: _NorthTrianglePainter(color: Colors.red),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 6,
+                    child: Transform.rotate(
+                      angle: math.pi,
+                      child: CustomPaint(
+                        size: const Size(10, 10),
+                        painter: _NorthTrianglePainter(color: Colors.white70),
+                      ),
+                    ),
+                  ),
+                  const Text(
+                    'N',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                      height: 1,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -659,11 +698,18 @@ class _NorthTrianglePainter extends CustomPainter {
   _NorthTrianglePainter({required this.color});
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color..style = PaintingStyle.fill;
-    final path = ui.Path()..moveTo(size.width / 2, 0)..lineTo(0, size.height)..lineTo(size.width, size.height)..close();
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final path = ui.Path()
+      ..moveTo(size.width / 2, 0)
+      ..lineTo(0, size.height)
+      ..lineTo(size.width, size.height)
+      ..close();
     canvas.drawPath(path, paint);
   }
-  @override
-  bool shouldRepaint(covariant _NorthTrianglePainter oldDelegate) => color != oldDelegate.color;
-}
 
+  @override
+  bool shouldRepaint(covariant _NorthTrianglePainter oldDelegate) =>
+      color != oldDelegate.color;
+}

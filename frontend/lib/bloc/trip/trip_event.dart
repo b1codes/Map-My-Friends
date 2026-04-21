@@ -29,4 +29,5 @@ class ReorderStops extends TripEvent {
 }
 
 class OptimizeTrip extends TripEvent {}
+
 class ClearTrip extends TripEvent {}

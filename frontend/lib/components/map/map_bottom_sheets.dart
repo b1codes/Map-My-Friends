@@ -7,10 +7,16 @@ class AirportBottomSheet extends StatelessWidget {
   const AirportBottomSheet({super.key, required this.airport});
   @override
   Widget build(BuildContext context) {
-    final typeLabel = airport.airportType == 'large_airport' ? 'International Airport' : 'Regional Airport';
+    final typeLabel = airport.airportType == 'large_airport'
+        ? 'International Airport'
+        : 'Regional Airport';
     return BaseBottomSheet(
-      icon: Icons.flight, color: const Color(0xFF1565C0), title: airport.name,
-      subtitle: airport.iataCode, location: '${airport.city}, ${airport.country}', label: typeLabel,
+      icon: Icons.flight,
+      color: const Color(0xFF1565C0),
+      title: airport.name,
+      subtitle: airport.iataCode,
+      location: '${airport.city}, ${airport.country}',
+      label: typeLabel,
     );
   }
 }
@@ -70,26 +76,77 @@ class BaseBottomSheet extends StatelessWidget {
   final String? subtitle;
   final String location;
   final String label;
-  const BaseBottomSheet({super.key, required this.icon, required this.color, required this.title, this.subtitle, required this.location, required this.label});
+  const BaseBottomSheet({
+    super.key,
+    required this.icon,
+    required this.color,
+    required this.title,
+    this.subtitle,
+    required this.location,
+    required this.label,
+  });
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16), decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(2))),
-            Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle), child: Icon(icon, color: color, size: 32)),
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.grey[400],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 32),
+            ),
             const SizedBox(height: 12),
-            Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-            if (subtitle != null) ...[const SizedBox(height: 4), Text(subtitle!, style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: color, fontWeight: FontWeight.bold))],
+            Text(
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                subtitle!,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
             const SizedBox(height: 8),
-            Text(location, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            Text(
+              location,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           ],
         ),
       ),

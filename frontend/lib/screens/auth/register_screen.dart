@@ -21,7 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordConfirmController = TextEditingController();
   // Honeypot controller
   final _firstNameHpController = TextEditingController();
-  
+
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
@@ -260,7 +260,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           controller: _firstNameHpController,
                           focusNode: FocusNode(canRequestFocus: false),
                           decoration: const InputDecoration(
-                            labelText: 'First Name', // Same as real field to confuse bots
+                            labelText:
+                                'First Name', // Same as real field to confuse bots
                           ),
                         ),
                       ),

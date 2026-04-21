@@ -5,26 +5,26 @@ import '../../models/trip.dart';
 class TripState extends Equatable {
   final List<TripStop> stops;
   final List<LatLng> routePoints;
-  final bool isLoading;
+  final bool isOptimizing;
 
   const TripState({
     this.stops = const [],
     this.routePoints = const [],
-    this.isLoading = false,
+    this.isOptimizing = false,
   });
 
   TripState copyWith({
     List<TripStop>? stops,
     List<LatLng>? routePoints,
-    bool? isLoading,
+    bool? isOptimizing,
   }) {
     return TripState(
       stops: stops ?? this.stops,
       routePoints: routePoints ?? this.routePoints,
-      isLoading: isLoading ?? this.isLoading,
+      isOptimizing: isOptimizing ?? this.isOptimizing,
     );
   }
 
   @override
-  List<Object?> get props => [stops, routePoints, isLoading];
+  List<Object?> get props => [stops, routePoints, isOptimizing];
 }
