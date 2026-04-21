@@ -2,9 +2,15 @@ import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/trip.dart';
+import 'api_service.dart';
 
 class RoutingService {
-  final Dio _dio = Dio();
+  final ApiService _apiService;
+
+  RoutingService({ApiService? apiService})
+    : _apiService = apiService ?? ApiService();
+
+  Dio get _dio => _apiService.dio;
 
   /// Fetches a hybrid route based on stop types.
   /// - Friend -> Friend: Driving route via OSRM.

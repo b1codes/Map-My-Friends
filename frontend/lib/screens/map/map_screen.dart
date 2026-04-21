@@ -367,37 +367,6 @@ class _MapScreenState extends State<MapScreen> {
                                 );
                               },
                             ),
-                            BlocBuilder<TripBloc, TripState>(
-                              builder: (context, state) {
-                                return MarkerLayer(
-                                  markers:
-                                      state.stops.asMap().entries.map((entry) {
-                                        final idx = entry.key;
-                                        final stop = entry.value;
-                                        return Marker(
-                                          point: stop.location,
-                                          width: 30,
-                                          height: 30,
-                                          child: Container(
-                                            decoration: const BoxDecoration(
-                                              color: Colors.indigo,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                String.fromCharCode(65 + idx),
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      }).toList(),
-                                );
-                              },
-                            ),
                             MarkerClusterLayerWidget(
                               options: MarkerClusterLayerOptions(
                                 maxClusterRadius: 45,
@@ -631,6 +600,38 @@ class _MapScreenState extends State<MapScreen> {
                                   );
                                 },
                               ),
+                            ),
+                            BlocBuilder<TripBloc, TripState>(
+                              builder: (context, state) {
+                                return MarkerLayer(
+                                  markers: state.stops.asMap().entries.map((
+                                    entry,
+                                  ) {
+                                    final idx = entry.key;
+                                    final stop = entry.value;
+                                    return Marker(
+                                      point: stop.location,
+                                      width: 30,
+                                      height: 30,
+                                      child: Container(
+                                        decoration: const BoxDecoration(
+                                          color: Colors.indigo,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            String.fromCharCode(65 + idx),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                );
+                              },
                             ),
                             RichAttributionWidget(
                               alignment: AttributionAlignment.bottomLeft,

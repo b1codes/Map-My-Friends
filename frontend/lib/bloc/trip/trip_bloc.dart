@@ -7,6 +7,7 @@ import 'trip_state.dart';
 
 class TripBloc extends Bloc<TripEvent, TripState> {
   final RoutingService _routingService;
+  int _routingRequestId = 0;
 
   TripBloc({RoutingService? routingService})
     : _routingService = routingService ?? RoutingService(),
@@ -31,7 +32,10 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     final newStops = List<TripStop>.from(state.stops)..add(newStop);
     emit(state.copyWith(stops: newStops, isOptimizing: true));
 
+    final requestId = ++_routingRequestId;
     final route = await _routingService.getRoute(newStops);
+    if (requestId != _routingRequestId) return;
+
     emit(state.copyWith(routePoints: route, isOptimizing: false));
   }
 
@@ -39,7 +43,10 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     final newStops = List<TripStop>.from(state.stops)..removeAt(event.index);
     emit(state.copyWith(stops: _resortStops(newStops), isOptimizing: true));
 
+    final requestId = ++_routingRequestId;
     final route = await _routingService.getRoute(newStops);
+    if (requestId != _routingRequestId) return;
+
     emit(state.copyWith(routePoints: route, isOptimizing: false));
   }
 
@@ -54,11 +61,16 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     newStops.insert(newIndex, item);
 
     emit(state.copyWith(stops: _resortStops(newStops), isOptimizing: true));
+
+    final requestId = ++_routingRequestId;
     final route = await _routingService.getRoute(newStops);
+    if (requestId != _routingRequestId) return;
+
     emit(state.copyWith(routePoints: route, isOptimizing: false));
   }
 
   void _onClearTrip(ClearTrip event, Emitter<TripState> emit) {
+    _routingRequestId++; // Cancel any pending requests
     emit(const TripState());
   }
 
@@ -69,8 +81,10 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     if (state.stops.length < 3) return;
     emit(state.copyWith(isOptimizing: true));
 
+    final requestId = ++_routingRequestId;
     final optimized = _solveTSP(state.stops);
     final route = await _routingService.getRoute(optimized);
+    if (requestId != _routingRequestId) return;
 
     emit(
       state.copyWith(
