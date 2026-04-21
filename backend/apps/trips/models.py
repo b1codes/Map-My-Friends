@@ -17,12 +17,13 @@ class Trip(models.Model):
 
 class TripStop(models.Model):
     trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name='stops')
-    person = models.ForeignKey('people.Person', on_delete=models.CASCADE)
+    person = models.ForeignKey('people.Person', on_delete=models.SET_NULL, null=True)
     sequence_order = models.PositiveIntegerField()
     location = models.PointField()
 
     class Meta:
         ordering = ['sequence_order']
+        unique_together = [('trip', 'sequence_order')]
 
     def __str__(self):
         return f"Stop {self.sequence_order} on {self.trip}"
