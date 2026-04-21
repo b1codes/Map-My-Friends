@@ -5,6 +5,7 @@ from django.contrib.gis.geos import Point
 from apps.people.models import Person
 from .models import Trip, TripStop
 from .serializers import TripSerializer
+from rest_framework.test import APIClient
 
 
 class TripModelTests(TestCase):
@@ -189,3 +190,96 @@ class TripSerializerTests(TestCase):
         self.assertEqual(updated.stops.count(), 2)
         orders = list(updated.stops.values_list('sequence_order', flat=True))
         self.assertEqual(orders, [2, 3])
+
+
+class TripApiTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(username='apiuser', password='pw')
+        self.other_user = User.objects.create_user(username='other', password='pw')
+        self.client.force_authenticate(user=self.user)
+        self.person = Person.objects.create(
+            tag='FRIEND',
+            first_name='Bob',
+            last_name='Jones',
+            city='Chicago',
+            state='IL',
+            country='US',
+            location=Point(-87.6298, 41.8781, srid=4326),
+        )
+
+    def test_unauthenticated_returns_401(self):
+        unauthenticated = APIClient()
+        response = unauthenticated.get('/api/trips/')
+        self.assertEqual(response.status_code, 401)
+
+    def test_list_returns_only_own_trips(self):
+        Trip.objects.create(name='My Trip', date='2026-07-01', user=self.user)
+        Trip.objects.create(name='Other Trip', date='2026-07-02', user=self.other_user)
+        response = self.client.get('/api/trips/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['name'], 'My Trip')
+
+    def test_create_trip_with_stops(self):
+        payload = {
+            'name': 'Road Trip',
+            'date': '2026-08-15',
+            'stops': [
+                {
+                    'person': self.person.id,
+                    'sequence_order': 1,
+                    'location': {'type': 'Point', 'coordinates': [-87.6298, 41.8781]},
+                },
+                {
+                    'person': self.person.id,
+                    'sequence_order': 2,
+                    'location': {'type': 'Point', 'coordinates': [-73.9857, 40.7484]},
+                },
+            ],
+        }
+        response = self.client.post('/api/trips/', payload, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['name'], 'Road Trip')
+        self.assertEqual(len(response.data['stops']), 2)
+        self.assertEqual(Trip.objects.filter(user=self.user).count(), 1)
+
+    def test_update_replaces_stops(self):
+        trip = Trip.objects.create(name='Old', date='2026-07-01', user=self.user)
+        TripStop.objects.create(
+            trip=trip, person=self.person, sequence_order=1,
+            location=Point(-87.6298, 41.8781, srid=4326),
+        )
+        payload = {
+            'name': 'Updated',
+            'date': '2026-09-01',
+            'stops': [
+                {
+                    'person': self.person.id,
+                    'sequence_order': 1,
+                    'location': {'type': 'Point', 'coordinates': [-73.9857, 40.7484]},
+                },
+                {
+                    'person': self.person.id,
+                    'sequence_order': 2,
+                    'location': {'type': 'Point', 'coordinates': [-87.6298, 41.8781]},
+                },
+            ],
+        }
+        response = self.client.put(f'/api/trips/{trip.id}/', payload, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['name'], 'Updated')
+        self.assertEqual(len(response.data['stops']), 2)
+
+    def test_cannot_access_other_users_trip(self):
+        other_trip = Trip.objects.create(
+            name='Secret Trip', date='2026-07-01', user=self.other_user
+        )
+        response = self.client.get(f'/api/trips/{other_trip.id}/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_delete_trip(self):
+        trip = Trip.objects.create(name='Doomed Trip', date='2026-07-01', user=self.user)
+        response = self.client.delete(f'/api/trips/{trip.id}/')
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Trip.objects.filter(id=trip.id).exists())
