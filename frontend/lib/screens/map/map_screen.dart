@@ -23,6 +23,9 @@ import '../../bloc/airport/airport_bloc.dart';
 import '../../bloc/airport/airport_state.dart';
 import '../../bloc/station/station_bloc.dart';
 import '../../bloc/station/station_state.dart';
+import '../../bloc/trip/trip_bloc.dart';
+import '../../bloc/trip/trip_state.dart';
+import 'trip_planner_sheet.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -33,9 +36,16 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
+  bool _showTripPlanner = false;
 
   void _resetNorth() {
     _mapController.rotate(0);
+  }
+
+  void _toggleTripPlanner() {
+    setState(() {
+      _showTripPlanner = !_showTripPlanner;
+    });
   }
 
   String _getTileUrl(BuildContext context, MapSettingsState settings) {
@@ -341,6 +351,53 @@ class _MapScreenState extends State<MapScreen> {
                                 return widget;
                               },
                             ),
+                            BlocBuilder<TripBloc, TripState>(
+                              builder: (context, state) {
+                                if (state.routePoints.isEmpty) {
+                                  return const SizedBox.shrink();
+                                }
+                                return PolylineLayer(
+                                  polylines: [
+                                    Polyline(
+                                      points: state.routePoints,
+                                      color: Colors.indigo.withOpacity(0.7),
+                                      strokeWidth: 5,
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                            BlocBuilder<TripBloc, TripState>(
+                              builder: (context, state) {
+                                return MarkerLayer(
+                                  markers:
+                                      state.stops.asMap().entries.map((entry) {
+                                        final idx = entry.key;
+                                        final stop = entry.value;
+                                        return Marker(
+                                          point: stop.location,
+                                          width: 30,
+                                          height: 30,
+                                          child: Container(
+                                            decoration: const BoxDecoration(
+                                              color: Colors.indigo,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                String.fromCharCode(65 + idx),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      }).toList(),
+                                );
+                              },
+                            ),
                             MarkerClusterLayerWidget(
                               options: MarkerClusterLayerOptions(
                                 maxClusterRadius: 45,
@@ -591,7 +648,11 @@ class _MapScreenState extends State<MapScreen> {
                           ],
                         ),
                         if (settingsState.showControls)
-                          MapControls(mapController: _mapController),
+                          MapControls(
+                            mapController: _mapController,
+                            onToggleTripPlanner: _toggleTripPlanner,
+                            showTripPlanner: _showTripPlanner,
+                          ),
                         const MapSettingsButton(),
                         Positioned(
                           top: MediaQuery.of(context).padding.top + 95,
@@ -601,6 +662,7 @@ class _MapScreenState extends State<MapScreen> {
                             onReset: _resetNorth,
                           ),
                         ),
+                        if (_showTripPlanner) const TripPlannerSheet(),
                       ],
                     );
                   },

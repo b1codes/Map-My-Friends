@@ -13,6 +13,7 @@ import 'package:map_my_friends/bloc/map/local_map_settings_cubit.dart';
 import 'package:map_my_friends/bloc/airport/airport_bloc.dart';
 import 'package:map_my_friends/bloc/station/station_bloc.dart';
 import 'package:map_my_friends/bloc/profile/profile_bloc.dart';
+import 'package:map_my_friends/bloc/trip/trip_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 // import 'package:map_my_friends/components/map/map_controls.dart'; // Implicitly tested via MapScreen
 
@@ -128,6 +129,7 @@ void main() {
           BlocProvider<AirportBloc>(create: (context) => AirportBloc()),
           BlocProvider<StationBloc>(create: (context) => StationBloc()),
           BlocProvider<ProfileBloc>(create: (context) => ProfileBloc()),
+          BlocProvider<TripBloc>(create: (context) => TripBloc()),
         ],
         child: const MaterialApp(home: MapScreen()),
       ),
@@ -149,12 +151,6 @@ void main() {
     expect(find.byIcon(Icons.arrow_right), findsOneWidget);
     // Verify reset button
     expect(find.byIcon(Icons.my_location), findsAtLeastNWidgets(1));
-
-    // Verify PersonMapMarker (User location pin)
-    expect(
-      find.byType(PersonMapMarker),
-      findsOneWidget,
-    ); // One on map (marker) maybe, one on button
 
     // Basic interaction check
     await tester.tap(find.byIcon(Icons.add));

@@ -23,6 +23,7 @@ import 'bloc/theme/theme_cubit.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'bloc/map/map_settings_cubit.dart';
+import 'bloc/trip/trip_bloc.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,6 +64,7 @@ class MyApp extends StatelessWidget {
         BlocProvider<StationBloc>(
           create: (context) => StationBloc()..add(LoadMapStations()),
         ),
+        BlocProvider<TripBloc>(create: (context) => TripBloc()),
       ],
       child: BlocBuilder<ThemeCubit, ThemeMode>(
         builder: (context, themeMode) {

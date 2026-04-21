@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../models/person.dart';
 import '../../models/airport.dart';
 import '../../models/station.dart';
 import '../../screens/people/person_details_screen.dart';
+import '../../bloc/trip/trip_bloc.dart';
+import '../../bloc/trip/trip_event.dart';
 
 import '../../components/map/map_bottom_sheets.dart';
 
@@ -101,7 +104,28 @@ class UnifiedClusterModal extends StatelessWidget {
       ),
       title: Text('${p.firstName} ${p.lastName}'),
       subtitle: Text(p.relationshipTag, style: const TextStyle(fontSize: 12)),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(
+              Icons.add_location_alt_outlined,
+              color: Colors.indigo,
+            ),
+            tooltip: 'Add to Trip',
+            onPressed: () {
+              context.read<TripBloc>().add(AddStop(p));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Added ${p.firstName} to trip'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
+          const Icon(Icons.chevron_right),
+        ],
+      ),
       onTap: () {
         Navigator.pop(context); // close modal
         Navigator.push(

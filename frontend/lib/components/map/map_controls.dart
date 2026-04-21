@@ -7,8 +7,15 @@ import '../shared/glass_container.dart';
 
 class MapControls extends StatelessWidget {
   final MapController mapController;
+  final VoidCallback onToggleTripPlanner;
+  final bool showTripPlanner;
 
-  const MapControls({super.key, required this.mapController});
+  const MapControls({
+    super.key,
+    required this.mapController,
+    required this.onToggleTripPlanner,
+    this.showTripPlanner = false,
+  });
 
   void _zoomIn() {
     mapController.move(
@@ -52,15 +59,15 @@ class MapControls extends StatelessWidget {
     required VoidCallback onPressed,
     required IconData icon,
     String? tooltip,
+    Color? color,
   }) {
     return IconButton(
       onPressed: onPressed,
-      icon: Icon(
-        icon,
-        color: Colors.indigo,
-      ), // Changed to Indigo for readability
+      icon: Icon(icon, color: color ?? Colors.indigo),
       tooltip: tooltip,
-      style: IconButton.styleFrom(hoverColor: Colors.indigo.withOpacity(0.1)),
+      style: IconButton.styleFrom(
+        hoverColor: (color ?? Colors.indigo).withOpacity(0.1),
+      ),
     );
   }
 
@@ -71,6 +78,22 @@ class MapControls extends StatelessWidget {
         final isDesktop = constraints.maxWidth >= 600;
         return Stack(
           children: [
+            // Trip Planner Toggle
+            Positioned(
+              top: 20,
+              right: 20,
+              child: GlassContainer(
+                padding: const EdgeInsets.all(4),
+                child: _buildGlassButton(
+                  onPressed: onToggleTripPlanner,
+                  icon: showTripPlanner ? Icons.map : Icons.route_outlined,
+                  tooltip: showTripPlanner
+                      ? 'Hide Trip Planner'
+                      : 'Show Trip Planner',
+                  color: showTripPlanner ? Colors.indigo : Colors.white70,
+                ),
+              ),
+            ),
             // Pan Controls Group
             Positioned(
               bottom: isDesktop ? 20 : 120, // Float above bottom nav on mobile

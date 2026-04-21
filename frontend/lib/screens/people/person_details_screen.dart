@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/person.dart';
 import '../../bloc/people/people_bloc.dart';
+import '../../bloc/trip/trip_bloc.dart';
+import '../../bloc/trip/trip_event.dart';
 import '../../components/map/custom_map_marker.dart';
 import '../../components/shared/nearby_airports_section.dart';
 import '../../components/shared/nearby_stations_section.dart';
@@ -81,6 +83,29 @@ class PersonDetailsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _buildProfileHeader(context, person),
+                        const SizedBox(height: 32),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            context.read<TripBloc>().add(AddStop(person));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Added ${person.firstName} to trip',
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.add_location_alt_outlined),
+                          label: const Text('Add to Trip Planner'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.indigo,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 32),
                         _buildInfoSection(context, person),
                       ],
