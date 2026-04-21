@@ -4,4 +4,4 @@
 - [x] Task 2: Routing Service
 - [x] Task 3: Trip BLoC (State, Events, Logic)
 - [x] Task 4: Trip Planner UI
-- [ ] Task 5: Map Integration
+- [x] Task 5: Map Integration
