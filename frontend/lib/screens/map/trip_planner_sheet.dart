@@ -59,7 +59,7 @@ class TripPlannerSheet extends StatelessWidget {
                             icon: const Icon(Icons.delete_sweep_outlined),
                             tooltip: 'Clear Trip',
                           ),
-                        if (state.stops.length > 2)
+                        if (state.stops.length > 2 || state.isOptimizing)
                           state.isOptimizing
                               ? const Padding(
                                   padding: EdgeInsets.all(8.0),
@@ -84,32 +84,39 @@ class TripPlannerSheet extends StatelessWidget {
                   const Divider(height: 1),
                   Expanded(
                     child: state.stops.isEmpty
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(32.0),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.map_outlined,
-                                    size: 48,
-                                    color: Colors.white24,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Add friends from the map to start planning your trip!',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(color: Colors.white70),
-                                  ),
-                                ],
+                        ? ListView(
+                            controller: scrollController,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.all(64.0),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.map_outlined,
+                                      size: 48,
+                                      color: Colors.white24,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    const Text(
+                                      'Add friends from the map to start planning your trip!',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: Colors.white70),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
+                            ],
                           )
                         : ReorderableListView.builder(
                             scrollController: scrollController,
                             itemCount: state.stops.length,
                             itemBuilder: (context, index) {
                               final stop = state.stops[index];
+                              final String title = stop.person != null
+                                  ? '${stop.person!.firstName} ${stop.person!.lastName}'
+                                  : 'Generic Stop ${index + 1}';
+
                               return ListTile(
                                 key: ValueKey(stop.id),
                                 leading: CircleAvatar(
@@ -127,7 +134,7 @@ class TripPlannerSheet extends StatelessWidget {
                                   ),
                                 ),
                                 title: Text(
-                                  '${stop.person?.firstName} ${stop.person?.lastName}',
+                                  title,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w500,
                                   ),
