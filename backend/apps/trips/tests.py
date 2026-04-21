@@ -218,8 +218,9 @@ class TripApiTests(TestCase):
         Trip.objects.create(name='Other Trip', date='2026-07-02', user=self.other_user)
         response = self.client.get('/api/trips/')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['name'], 'My Trip')
+        results = response.data['results'] if isinstance(response.data, dict) else response.data
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['name'], 'My Trip')
 
     def test_create_trip_with_stops(self):
         payload = {
@@ -270,6 +271,7 @@ class TripApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['name'], 'Updated')
         self.assertEqual(len(response.data['stops']), 2)
+        self.assertEqual(TripStop.objects.filter(trip=trip).count(), 2)
 
     def test_cannot_access_other_users_trip(self):
         other_trip = Trip.objects.create(
