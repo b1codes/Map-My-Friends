@@ -1,11 +1,12 @@
 from django.contrib.gis.db import models
 from phonenumber_field.modelfields import PhoneNumberField
+from django.utils.translation import gettext_lazy as _
 
 
 class Person(models.Model):
     TAG_CHOICES = [
-        ('FRIEND', 'Friend'),
-        ('FAMILY', 'Family'),
+        ('FRIEND', _('Friend')),
+        ('FAMILY', _('Family')),
     ]
 
     tag = models.CharField(max_length=10, choices=TAG_CHOICES)
@@ -29,19 +30,19 @@ class Person(models.Model):
     pin_color = models.CharField(max_length=20, default='#F44336')
     
     PIN_STYLE_CHOICES = [
-        ('teardrop', 'Teardrop'),
-        ('circle', 'Circle'),
-        ('square', 'Square'),
-        ('triangle', 'Triangle'),
-        ('diamond', 'Diamond'),
+        ('teardrop', _('Teardrop')),
+        ('circle', _('Circle')),
+        ('square', _('Square')),
+        ('triangle', _('Triangle')),
+        ('diamond', _('Diamond')),
     ]
     pin_style = models.CharField(max_length=20, choices=PIN_STYLE_CHOICES, default='teardrop')
     
     PIN_ICON_TYPE_CHOICES = [
-        ('none', 'None'),
-        ('emoji', 'Emoji'),
-        ('initials', 'Initials'),
-        ('picture', 'Picture'),
+        ('none', _('None')),
+        ('emoji', _('Emoji')),
+        ('initials', _('Initials')),
+        ('picture', _('Picture')),
     ]
     pin_icon_type = models.CharField(max_length=20, choices=PIN_ICON_TYPE_CHOICES, default='none')
     
@@ -79,11 +80,11 @@ class Person(models.Model):
                     if attempt < 2:
                         time.sleep(1)
                     else:
-                        raise ValidationError("Geocoding service unavailable. Please try again later.")
+                        raise ValidationError(_("Geocoding service unavailable. Please try again later."))
             else:
                 if not self.location:
                     address_str = f"{self.street or ''}, {self.city}, {self.state}, {self.country}".strip(", ")
-                    raise ValidationError(f"Could not geocode address: {address_str}")
+                    raise ValidationError(_("Could not geocode address: %(address)s") % {'address': address_str})
 
         super().save(*args, **kwargs)
 

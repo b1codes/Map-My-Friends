@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from phonenumber_field.modelfields import PhoneNumberField
+from django.utils.translation import gettext_lazy as _
 
 
 class UserProfile(models.Model):
@@ -18,24 +19,24 @@ class UserProfile(models.Model):
 
     # Map Pin Customization
     PIN_STYLE_CHOICES = [
-        ('teardrop', 'Teardrop'),
-        ('circle', 'Circle'),
-        ('square', 'Square'),
-        ('triangle', 'Triangle'),
-        ('diamond', 'Diamond'),
+        ('teardrop', _('Teardrop')),
+        ('circle', _('Circle')),
+        ('square', _('Square')),
+        ('triangle', _('Triangle')),
+        ('diamond', _('Diamond')),
     ]
     
     PIN_ICON_TYPE_CHOICES = [
-        ('none', 'None'),
-        ('emoji', 'Emoji'),
-        ('initials', 'Initials'),
-        ('picture', 'Profile Picture'),
+        ('none', _('None')),
+        ('emoji', _('Emoji')),
+        ('initials', _('Initials')),
+        ('picture', _('Profile Picture')),
     ]
 
-    pin_color = models.CharField(max_length=7, default='#2196F3', help_text="Hex color code for the map pin")
-    pin_style = models.CharField(max_length=20, choices=PIN_STYLE_CHOICES, default='teardrop', help_text="Shape of the map pin")
-    pin_icon_type = models.CharField(max_length=20, choices=PIN_ICON_TYPE_CHOICES, default='none', help_text="What to display inside the pin")
-    pin_emoji = models.CharField(max_length=10, blank=True, null=True, help_text="Emoji to display if icon_type is 'emoji'")
+    pin_color = models.CharField(max_length=7, default='#2196F3', help_text=_("Hex color code for the map pin"))
+    pin_style = models.CharField(max_length=20, choices=PIN_STYLE_CHOICES, default='teardrop', help_text=_("Shape of the map pin"))
+    pin_icon_type = models.CharField(max_length=20, choices=PIN_ICON_TYPE_CHOICES, default='none', help_text=_("What to display inside the pin"))
+    pin_emoji = models.CharField(max_length=10, blank=True, null=True, help_text=_("Emoji to display if icon_type is 'emoji'"))
 
     def __str__(self):
         return f"Profile for {self.user.username}"

@@ -1,10 +1,11 @@
 from django.contrib.gis.db import models
+from django.utils.translation import gettext_lazy as _
 
 
 class Airport(models.Model):
     AIRPORT_TYPE_CHOICES = [
-        ('large_airport', 'Large Airport'),
-        ('medium_airport', 'Medium Airport'),
+        ('large_airport', _('Large Airport')),
+        ('medium_airport', _('Medium Airport')),
     ]
 
     name = models.CharField(max_length=255)

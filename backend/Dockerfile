@@ -5,6 +5,7 @@ FROM python:3.14-slim
 # - gdal-bin, libgdal-dev: REQUIRED for GeoDjango/PostGIS
 # - libpq-dev: Required for building database drivers
 # - build-essential, python3-dev: REQUIRED for Python 3.14 to compile missing wheels
+# - gettext: REQUIRED for Django makemessages
 RUN apt-get update && apt-get install -y \
     binutils \
     libproj-dev \
@@ -14,6 +15,7 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     build-essential \
     python3-dev \
+    gettext \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Set Environment Variables
