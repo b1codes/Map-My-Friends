@@ -26,6 +26,9 @@ import 'bloc/map/map_settings_cubit.dart';
 import 'bloc/trip/trip_bloc.dart';
 import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
 
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/app_localizations.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await FMTCObjectBoxBackend().initialise();
@@ -72,6 +75,16 @@ class MyApp extends StatelessWidget {
         builder: (context, themeMode) {
           return MaterialApp(
             title: 'Map My Friends',
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('en'), // English
+              Locale('es'), // Spanish
+            ],
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeMode,

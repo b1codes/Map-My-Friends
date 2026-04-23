@@ -1,0 +1,21 @@
+{
+  "@@locale": "en",
+  "appTitle": "Map My Friends",
+  "@appTitle": {
+    "description": "The title of the application"
+  },
+  "addPerson": "Add Person",
+  "editPerson": "Edit Person",
+  "save": "Save",
+  "firstName": "First Name",
+  "lastName": "Last Name",
+  "phoneNumber": "Phone Number",
+  "birthday": "Birthday",
+  "city": "City",
+  "state": "State",
+  "country": "Country",
+  "street": "Street Address",
+  "profile": "Profile",
+  "settings": "Settings",
+  "logout": "Logout"
+}

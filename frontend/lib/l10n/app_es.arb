@@ -1,0 +1,18 @@
+{
+  "@@locale": "es",
+  "appTitle": "Map My Friends",
+  "addPerson": "Agregar Persona",
+  "editPerson": "Editar Persona",
+  "save": "Guardar",
+  "firstName": "Nombre",
+  "lastName": "Apellido",
+  "phoneNumber": "Número de Teléfono",
+  "birthday": "Cumpleaños",
+  "city": "Ciudad",
+  "state": "Estado",
+  "country": "País",
+  "street": "Dirección",
+  "profile": "Perfil",
+  "settings": "Ajustes",
+  "logout": "Cerrar Sesión"
+}

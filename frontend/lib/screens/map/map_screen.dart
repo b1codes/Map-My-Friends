@@ -315,7 +315,9 @@ class _MapScreenState extends State<MapScreen> {
                               urlTemplate: _getTileUrl(context, settingsState),
                               subdomains: const ['a', 'b', 'c'],
                               userAgentPackageName: 'com.mapmyfriends.app',
-                              tileProvider: FMTCStore('mapStore').getTileProvider(),
+                              tileProvider: FMTCStore(
+                                'mapStore',
+                              ).getTileProvider(),
                               tileBuilder: (context, widget, tile) {
                                 bool isStandard =
                                     settingsState.mapType == MapType.standard;

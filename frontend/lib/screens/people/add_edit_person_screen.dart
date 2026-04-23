@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/person.dart';
 import '../../bloc/people/people_bloc.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -335,9 +336,10 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.person != null ? 'Edit Person' : 'Add Person'),
+        title: Text(widget.person != null ? l10n.editPerson : l10n.addPerson),
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
