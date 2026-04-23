@@ -1,4 +1,5 @@
 from django.contrib.gis.db import models
+from phonenumber_field.modelfields import PhoneNumberField
 
 
 class Person(models.Model):
@@ -18,7 +19,7 @@ class Person(models.Model):
     street = models.CharField(max_length=255, blank=True, null=True)
     
     birthday = models.DateField(blank=True, null=True)
-    phone_number = models.CharField(max_length=20, blank=True, null=True)
+    phone_number = PhoneNumberField(blank=True, null=True)
     
     profile_image = models.ImageField(upload_to='profile_images/', blank=True, null=True)
     
@@ -57,11 +58,19 @@ class Person(models.Model):
 
             geolocator = Nominatim(user_agent="map_my_friends_global_connect")
             tf = TimezoneFinder()
-            address = f"{self.street or ''}, {self.city}, {self.state}, {self.country}".strip(", ")
             
+            # Structured query for better international accuracy
+            query = {
+                'city': self.city,
+                'state': self.state,
+                'country': self.country,
+            }
+            if self.street:
+                query['street'] = self.street
+
             for attempt in range(3):
                 try:
-                    location = geolocator.geocode(address)
+                    location = geolocator.geocode(query)
                     if location:
                         self.location = Point(location.longitude, location.latitude)
                         self.timezone = tf.timezone_at(lng=location.longitude, lat=location.latitude)
@@ -73,7 +82,8 @@ class Person(models.Model):
                         raise ValidationError("Geocoding service unavailable. Please try again later.")
             else:
                 if not self.location:
-                    raise ValidationError(f"Could not geocode address: {address}")
+                    address_str = f"{self.street or ''}, {self.city}, {self.state}, {self.country}".strip(", ")
+                    raise ValidationError(f"Could not geocode address: {address_str}")
 
         super().save(*args, **kwargs)
 

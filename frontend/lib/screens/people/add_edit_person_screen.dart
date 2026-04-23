@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import '../../models/person.dart';
 import '../../bloc/people/people_bloc.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -543,11 +544,22 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      CustomTextFormField(
+                      IntlPhoneField(
                         controller: _phoneController,
-                        labelText: 'Phone Number (Optional)',
-                        prefixIcon: const Icon(Icons.phone_outlined),
-                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          labelText: 'Phone Number (Optional)',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerLowest,
+                        ),
+                        initialCountryCode: 'US',
+                        onChanged: (phone) {
+                          // _phoneController is already updated by the widget
+                        },
                       ),
                       const SizedBox(height: 16),
 

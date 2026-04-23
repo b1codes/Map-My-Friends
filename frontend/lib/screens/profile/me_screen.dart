@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import '../../bloc/profile/profile_bloc.dart';
 import '../../bloc/profile/profile_event.dart';
 import '../../bloc/profile/profile_state.dart';
@@ -358,14 +359,25 @@ class _MeScreenState extends State<MeScreen> {
                                 ],
                               ),
                               const SizedBox(height: 16),
-                              CustomTextFormField(
+                              IntlPhoneField(
                                 controller: _phoneNumberController,
-                                labelText: 'Phone Number',
-                                prefixIcon: const Icon(Icons.phone_outlined),
-                                keyboardType: TextInputType.phone,
+                                decoration: InputDecoration(
+                                  labelText: 'Phone Number',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  filled: true,
+                                  fillColor: Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerLowest,
+                                ),
+                                initialCountryCode: 'US',
+                                onChanged: (phone) {
+                                  // _phoneNumberController is already updated
+                                },
                               ),
                               const SizedBox(height: 16),
-                              CustomTextFormField(
+...                              CustomTextFormField(
                                 controller: _birthDateController,
                                 labelText: 'Birth Date (YYYY-MM-DD)',
                                 prefixIcon: const Icon(Icons.cake_outlined),

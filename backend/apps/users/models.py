@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from phonenumber_field.modelfields import PhoneNumberField
 
 
 class UserProfile(models.Model):
@@ -13,7 +14,7 @@ class UserProfile(models.Model):
     country = models.CharField(max_length=100, blank=True, default='')
     street = models.CharField(max_length=255, blank=True, default='')
     birth_date = models.DateField(blank=True, null=True)
-    phone_number = models.CharField(max_length=20, blank=True, default='')
+    phone_number = PhoneNumberField(blank=True, default='')
 
     # Map Pin Customization
     PIN_STYLE_CHOICES = [
