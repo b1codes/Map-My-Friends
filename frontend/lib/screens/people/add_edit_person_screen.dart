@@ -647,7 +647,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                       const SizedBox(height: 16),
 
                       DropdownButtonFormField<String>(
-                        value: _pinStyle,
+                        initialValue: _pinStyle,
                         items: const [
                           DropdownMenuItem(
                             value: 'teardrop',
@@ -685,7 +685,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                       const SizedBox(height: 16),
 
                       DropdownButtonFormField<String>(
-                        value: _pinIconType,
+                        initialValue: _pinIconType,
                         items: const [
                           DropdownMenuItem(value: 'none', child: Text('None')),
                           DropdownMenuItem(

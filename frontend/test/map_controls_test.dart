@@ -5,7 +5,6 @@ import 'package:map_my_friends/bloc/location/location_bloc.dart';
 import 'package:map_my_friends/bloc/people/people_bloc.dart';
 import 'package:map_my_friends/screens/map/map_screen.dart';
 import 'package:map_my_friends/services/api_service.dart';
-import 'package:map_my_friends/components/map/person_map_marker.dart';
 import 'package:map_my_friends/models/person.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:map_my_friends/bloc/map/map_settings_cubit.dart';

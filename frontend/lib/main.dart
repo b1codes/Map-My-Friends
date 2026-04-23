@@ -24,9 +24,11 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'bloc/map/map_settings_cubit.dart';
 import 'bloc/trip/trip_bloc.dart';
+import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await FMTCObjectBoxBackend().initialise();
   tz.initializeTimeZones();
   final prefs = await SharedPreferences.getInstance();
   runApp(MyApp(prefs: prefs));

@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
 import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -314,6 +315,7 @@ class _MapScreenState extends State<MapScreen> {
                               urlTemplate: _getTileUrl(context, settingsState),
                               subdomains: const ['a', 'b', 'c'],
                               userAgentPackageName: 'com.mapmyfriends.app',
+                              tileProvider: FMTCStore('mapStore').getTileProvider(),
                               tileBuilder: (context, widget, tile) {
                                 bool isStandard =
                                     settingsState.mapType == MapType.standard;
