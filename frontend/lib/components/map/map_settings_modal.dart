@@ -78,7 +78,9 @@ class MapSettingsModal extends StatelessWidget {
                             visualDensity: VisualDensity.compact,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             side: WidgetStateProperty.all(
-                              BorderSide(color: Colors.grey.withOpacity(0.5)),
+                              BorderSide(
+                                color: Colors.grey.withValues(alpha: 0.5),
+                              ),
                             ),
                           ),
                         ),
@@ -136,7 +138,9 @@ class MapSettingsModal extends StatelessWidget {
                             visualDensity: VisualDensity.compact,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             side: WidgetStateProperty.all(
-                              BorderSide(color: Colors.grey.withOpacity(0.5)),
+                              BorderSide(
+                                color: Colors.grey.withValues(alpha: 0.5),
+                              ),
                             ),
                           ),
                         ),
@@ -170,13 +174,15 @@ class MapSettingsModal extends StatelessWidget {
                           visualDensity: VisualDensity.compact,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           side: WidgetStateProperty.all(
-                            BorderSide(color: Colors.grey.withOpacity(0.5)),
+                            BorderSide(
+                              color: Colors.grey.withValues(alpha: 0.5),
+                            ),
                           ),
                         ),
                       ),
-                      ),
-                      const Divider(),
-                      ListTile(
+                    ),
+                    const Divider(),
+                    ListTile(
                       title: const Text('Map Type'),
                       trailing: DropdownButton<MapType>(
                         value: state.mapType,
@@ -228,7 +234,9 @@ class MapSettingsModal extends StatelessWidget {
                           visualDensity: VisualDensity.compact,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           side: WidgetStateProperty.all(
-                            BorderSide(color: Colors.grey.withOpacity(0.5)),
+                            BorderSide(
+                              color: Colors.grey.withValues(alpha: 0.5),
+                            ),
                           ),
                         ),
                       ),

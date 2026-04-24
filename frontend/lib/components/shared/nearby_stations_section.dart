@@ -47,8 +47,7 @@ class _NearbyStationsSectionState extends State<NearbyStationsSection> {
 
   @override
   Widget build(BuildContext context) {
-    final distanceUnit =
-        context.watch<MapSettingsCubit>().state.distanceUnit;
+    final distanceUnit = context.watch<MapSettingsCubit>().state.distanceUnit;
 
     return BlocProvider.value(
       value: _stationBloc,
@@ -98,7 +97,9 @@ class _NearbyStationsSectionState extends State<NearbyStationsSection> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFE65100).withOpacity(0.1),
+                              color: const Color(
+                                0xFFE65100,
+                              ).withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(

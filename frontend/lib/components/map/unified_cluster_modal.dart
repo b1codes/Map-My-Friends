@@ -143,7 +143,7 @@ class UnifiedClusterModal extends StatelessWidget {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: const Color(0xFF1565C0).withOpacity(0.1),
+          color: const Color(0xFF1565C0).withValues(alpha: 0.1),
           shape: BoxShape.circle,
         ),
         child: const Icon(Icons.flight, color: Color(0xFF1565C0), size: 24),
@@ -199,7 +199,7 @@ class UnifiedClusterModal extends StatelessWidget {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           shape: BoxShape.circle,
         ),
         child: Icon(iconData, color: color, size: 24),

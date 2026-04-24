@@ -66,7 +66,7 @@ class MapControls extends StatelessWidget {
       icon: Icon(icon, color: color ?? Colors.indigo),
       tooltip: tooltip,
       style: IconButton.styleFrom(
-        hoverColor: (color ?? Colors.indigo).withOpacity(0.1),
+        hoverColor: (color ?? Colors.indigo).withValues(alpha: 0.1),
       ),
     );
   }

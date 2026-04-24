@@ -11,6 +11,7 @@ import 'bloc/station/station_bloc.dart';
 import 'bloc/station/station_event.dart';
 import 'bloc/profile/profile_bloc.dart';
 import 'bloc/profile/profile_event.dart';
+import 'bloc/profile/profile_state.dart';
 import 'services/api_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/map/map_screen.dart';
@@ -175,108 +176,109 @@ class _MainScreenState extends State<MainScreen> {
       ],
       child: LayoutBuilder(
         builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth >= 600;
+          final isDesktop = constraints.maxWidth >= 600;
 
-        return Scaffold(
-          extendBodyBehindAppBar: true,
-          // Removed AppBar as requested
-          body: Stack(
-            children: [
-              // Content Layer
-              Positioned.fill(child: _getScreen(_selectedIndex)),
+          return Scaffold(
+            extendBodyBehindAppBar: true,
+            // Removed AppBar as requested
+            body: Stack(
+              children: [
+                // Content Layer
+                Positioned.fill(child: _getScreen(_selectedIndex)),
 
-              // Glass Navigation Rail (Desktop)
-              if (isDesktop)
-                Positioned(
-                  left: 20,
-                  top: 20,
-                  child: GlassContainer(
-                    width: 80,
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(height: 20),
-                        // App Logo
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.asset(
-                            'assets/Map-My-Friends-Default-1024x1024@1x.png',
-                            width: 48,
-                            height: 48,
+                // Glass Navigation Rail (Desktop)
+                if (isDesktop)
+                  Positioned(
+                    left: 20,
+                    top: 20,
+                    child: GlassContainer(
+                      width: 80,
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(height: 20),
+                          // App Logo
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.asset(
+                              'assets/Map-My-Friends-Default-1024x1024@1x.png',
+                              width: 48,
+                              height: 48,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 40),
+                          const SizedBox(height: 40),
 
-                        _buildGlassNavItem(
-                          icon: Icons.map_outlined,
-                          selectedIcon: Icons.map,
-                          label: 'Map',
-                          index: 0,
-                          isSelected: _selectedIndex == 0,
-                        ),
-                        const SizedBox(height: 20),
-                        _buildGlassNavItem(
-                          icon: Icons.people_outline,
-                          selectedIcon: Icons.people,
-                          label: 'People',
-                          index: 1,
-                          isSelected: _selectedIndex == 1,
-                        ),
-                        const SizedBox(height: 20),
-                        _buildGlassNavItem(
-                          icon: Icons.person_outline,
-                          selectedIcon: Icons.person,
-                          label: 'Me',
-                          index: 2,
-                          isSelected: _selectedIndex == 2,
-                        ),
-                      ],
+                          _buildGlassNavItem(
+                            icon: Icons.map_outlined,
+                            selectedIcon: Icons.map,
+                            label: 'Map',
+                            index: 0,
+                            isSelected: _selectedIndex == 0,
+                          ),
+                          const SizedBox(height: 20),
+                          _buildGlassNavItem(
+                            icon: Icons.people_outline,
+                            selectedIcon: Icons.people,
+                            label: 'People',
+                            index: 1,
+                            isSelected: _selectedIndex == 1,
+                          ),
+                          const SizedBox(height: 20),
+                          _buildGlassNavItem(
+                            icon: Icons.person_outline,
+                            selectedIcon: Icons.person,
+                            label: 'Me',
+                            index: 2,
+                            isSelected: _selectedIndex == 2,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
 
-              // Glass Bottom Navigation (Mobile)
-              if (!isDesktop)
-                Positioned(
-                  left: 20,
-                  right: 20,
-                  bottom: 20,
-                  child: GlassContainer(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 10,
-                      horizontal: 20,
-                    ),
-                    borderRadius: 30,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildGlassNavItemMobile(
-                          icon: Icons.map,
-                          label: 'Map',
-                          index: 0,
-                          isSelected: _selectedIndex == 0,
-                        ),
-                        _buildGlassNavItemMobile(
-                          icon: Icons.people,
-                          label: 'People',
-                          index: 1,
-                          isSelected: _selectedIndex == 1,
-                        ),
-                        _buildGlassNavItemMobile(
-                          icon: Icons.person,
-                          label: 'Me',
-                          index: 2,
-                          isSelected: _selectedIndex == 2,
-                        ),
-                      ],
+                // Glass Bottom Navigation (Mobile)
+                if (!isDesktop)
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: 20,
+                    child: GlassContainer(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 10,
+                        horizontal: 20,
+                      ),
+                      borderRadius: 30,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildGlassNavItemMobile(
+                            icon: Icons.map,
+                            label: 'Map',
+                            index: 0,
+                            isSelected: _selectedIndex == 0,
+                          ),
+                          _buildGlassNavItemMobile(
+                            icon: Icons.people,
+                            label: 'People',
+                            index: 1,
+                            isSelected: _selectedIndex == 1,
+                          ),
+                          _buildGlassNavItemMobile(
+                            icon: Icons.person,
+                            label: 'Me',
+                            index: 2,
+                            isSelected: _selectedIndex == 2,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-        );
-      },
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -301,7 +303,7 @@ class _MainScreenState extends State<MainScreen> {
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: isSelected
               ? BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 )
               : null,

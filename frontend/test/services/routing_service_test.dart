@@ -36,30 +36,11 @@ void main() {
       longitude: 10.0,
     );
 
-    final personB = Person(
-      id: '2',
-      firstName: 'B',
-      lastName: 'User',
-      relationshipTag: 'Friend',
-      city: 'City',
-      state: 'State',
-      country: 'Country',
-      latitude: 11.0,
-      longitude: 11.0,
-    );
-
     final stopA = TripStop(
       id: 's1',
       person: personA,
       location: const LatLng(10.0, 10.0),
       sequenceOrder: 0,
-    );
-
-    final stopB = TripStop(
-      id: 's2',
-      person: personB,
-      location: const LatLng(11.0, 11.0),
-      sequenceOrder: 1,
     );
 
     test('getRoute returns straight line for non-person stops', () async {

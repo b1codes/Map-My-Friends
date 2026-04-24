@@ -494,7 +494,8 @@ class _MeScreenState extends State<MeScreen> {
                                 showSelectedIcon: false,
                                 style: const ButtonStyle(
                                   visualDensity: VisualDensity.compact,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
                                 ),
                               ),
 

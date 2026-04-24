@@ -322,9 +322,12 @@ class _MapScreenState extends State<MapScreen> {
                               urlTemplate: _getTileUrl(context, settingsState),
                               subdomains: const ['a', 'b', 'c'],
                               userAgentPackageName: 'com.mapmyfriends.app',
-                              tileProvider: FMTCStore(
-                                'mapStore',
-                              ).getTileProvider(),
+                              tileProvider: FMTCTileProvider(
+                                stores: const {
+                                  'mapStore':
+                                      BrowseStoreStrategy.readUpdateCreate,
+                                },
+                              ),
                               tileBuilder: (context, widget, tile) {
                                 bool isStandard =
                                     settingsState.mapType == MapType.standard;
@@ -371,7 +374,9 @@ class _MapScreenState extends State<MapScreen> {
                                   polylines: [
                                     Polyline(
                                       points: state.routePoints,
-                                      color: Colors.indigo.withOpacity(0.7),
+                                      color: Colors.indigo.withValues(
+                                        alpha: 0.7,
+                                      ),
                                       strokeWidth: 5,
                                     ),
                                   ],
@@ -580,7 +585,7 @@ class _MapScreenState extends State<MapScreen> {
                                       decoration: BoxDecoration(
                                         color: Theme.of(
                                           context,
-                                        ).cardColor.withOpacity(0.8),
+                                        ).cardColor.withValues(alpha: 0.8),
                                         borderRadius: BorderRadius.circular(24),
                                         boxShadow: const [
                                           BoxShadow(

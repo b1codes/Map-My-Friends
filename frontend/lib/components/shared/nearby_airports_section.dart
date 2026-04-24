@@ -46,8 +46,7 @@ class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
 
   @override
   Widget build(BuildContext context) {
-    final distanceUnit =
-        context.watch<MapSettingsCubit>().state.distanceUnit;
+    final distanceUnit = context.watch<MapSettingsCubit>().state.distanceUnit;
 
     return BlocProvider.value(
       value: _airportBloc,
@@ -96,7 +95,9 @@ class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF1565C0).withOpacity(0.1),
+                              color: const Color(
+                                0xFF1565C0,
+                              ).withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
