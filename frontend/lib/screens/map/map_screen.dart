@@ -103,355 +103,324 @@ class _MapScreenState extends State<MapScreen> {
         initialState: context.read<MapSettingsCubit>().state,
       ),
       child: Scaffold(
-        body: BlocConsumer<LocationBloc, LocationState>(
-          listener: (context, state) {
-            if (state is LocationLoaded && state.position != null) {
-              _mapController.move(
-                LatLng(state.position!.latitude, state.position!.longitude),
-                13.0,
-              );
-            }
-          },
-          builder: (context, locationState) {
-            if (locationState is LocationLoading) {
-              return const Center(child: CircularProgressIndicator());
-            }
+        body: MultiBlocListener(
+          listeners: [
+            BlocListener<LocationBloc, LocationState>(
+              listener: (context, state) {
+                if (state is LocationLoaded && state.position != null) {
+                  _mapController.move(
+                    LatLng(state.position!.latitude, state.position!.longitude),
+                    13.0,
+                  );
+                }
+              },
+            ),
+            BlocListener<TripBloc, TripState>(
+              listenWhen: (previous, current) =>
+                  previous.stops != current.stops &&
+                  current.stops.isNotEmpty &&
+                  !current.isOptimizing,
+              listener: (context, state) {
+                final bounds = LatLngBounds.fromPoints(
+                  state.stops.map((s) => s.location).toList(),
+                );
+                _mapController.fitCamera(
+                  CameraFit.bounds(
+                    bounds: bounds,
+                    padding: const EdgeInsets.all(50),
+                  ),
+                );
+              },
+            ),
+          ],
+          child: BlocBuilder<LocationBloc, LocationState>(
+            builder: (context, locationState) {
+              if (locationState is LocationLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-            LatLng center = const LatLng(37.7749, -122.4194); // Default SF
-            if (locationState is LocationLoaded &&
-                locationState.position != null) {
-              center = LatLng(
-                locationState.position!.latitude,
-                locationState.position!.longitude,
-              );
-            }
+              LatLng center = const LatLng(37.7749, -122.4194); // Default SF
+              if (locationState is LocationLoaded &&
+                  locationState.position != null) {
+                center = LatLng(
+                  locationState.position!.latitude,
+                  locationState.position!.longitude,
+                );
+              }
 
-            return BlocBuilder<PeopleBloc, PeopleState>(
-              builder: (context, peopleState) {
-                final airportState = context.watch<AirportBloc>().state;
-                final stationState = context.watch<StationBloc>().state;
+              return BlocBuilder<PeopleBloc, PeopleState>(
+                builder: (context, peopleState) {
+                  final airportState = context.watch<AirportBloc>().state;
+                  final stationState = context.watch<StationBloc>().state;
 
-                return BlocBuilder<LocalMapSettingsCubit, MapSettingsState>(
-                  builder: (context, settingsState) {
-                    List<Marker> markers = [];
-                    if (locationState is LocationLoaded &&
-                        locationState.position != null) {
-                      final profileState = context.watch<ProfileBloc>().state;
+                  return BlocBuilder<LocalMapSettingsCubit, MapSettingsState>(
+                    builder: (context, settingsState) {
+                      List<Marker> markers = [];
+                      if (locationState is LocationLoaded &&
+                          locationState.position != null) {
+                        final profileState = context.watch<ProfileBloc>().state;
 
-                      if (profileState is ProfileLoaded &&
-                          (profileState.pinColor != null ||
-                              profileState.pinStyle != null ||
-                              profileState.pinIconType != null)) {
-                        String initials = '';
-                        if (profileState.firstName != null &&
-                            profileState.firstName!.isNotEmpty) {
-                          initials += profileState.firstName![0];
-                        }
-                        if (profileState.lastName != null &&
-                            profileState.lastName!.isNotEmpty) {
-                          initials += profileState.lastName![0];
-                        }
+                        if (profileState is ProfileLoaded &&
+                            (profileState.pinColor != null ||
+                                profileState.pinStyle != null ||
+                                profileState.pinIconType != null)) {
+                          String initials = '';
+                          if (profileState.firstName != null &&
+                              profileState.firstName!.isNotEmpty) {
+                            initials += profileState.firstName![0];
+                          }
+                          if (profileState.lastName != null &&
+                              profileState.lastName!.isNotEmpty) {
+                            initials += profileState.lastName![0];
+                          }
 
-                        markers.add(
-                          Marker(
-                            point: center,
-                            width: 40,
-                            height: 40,
-                            child: CustomMapMarker(
-                              pinColorHex: profileState.pinColor ?? '#2196F3',
-                              pinStyle: profileState.pinStyle ?? 'teardrop',
-                              pinIconType: profileState.pinIconType ?? 'none',
-                              pinEmoji: profileState.pinEmoji,
-                              initials: initials,
-                              profileImageUrl: profileState.profileImageUrl,
+                          markers.add(
+                            Marker(
+                              point: center,
+                              width: 40,
+                              height: 40,
+                              child: CustomMapMarker(
+                                pinColorHex: profileState.pinColor ?? '#2196F3',
+                                pinStyle: profileState.pinStyle ?? 'teardrop',
+                                pinIconType: profileState.pinIconType ?? 'none',
+                                pinEmoji: profileState.pinEmoji,
+                                initials: initials,
+                                profileImageUrl: profileState.profileImageUrl,
+                              ),
                             ),
-                          ),
-                        );
-                      } else {
-                        markers.add(
-                          Marker(
-                            point: center,
-                            width: 40,
-                            height: 40,
-                            child: const Icon(
-                              Icons.my_location,
-                              color: Colors.blue,
-                              size: 40,
+                          );
+                        } else {
+                          markers.add(
+                            Marker(
+                              point: center,
+                              width: 40,
+                              height: 40,
+                              child: const Icon(
+                                Icons.my_location,
+                                color: Colors.blue,
+                                size: 40,
+                              ),
                             ),
-                          ),
+                          );
+                        }
+                      }
+
+                      if (peopleState is PeopleLoaded) {
+                        markers.addAll(
+                          peopleState.people
+                              .where(
+                                (p) =>
+                                    p.latitude != null && p.longitude != null,
+                              )
+                              .map(
+                                (p) => Marker(
+                                  key: ValueKey('person_${p.id}'),
+                                  point: LatLng(p.latitude!, p.longitude!),
+                                  width: 40,
+                                  height: 40,
+                                  child: PersonMapMarker(
+                                    person: p,
+                                    onTap: () {
+                                      showModalBottomSheet(
+                                        context: context,
+                                        backgroundColor: Colors.transparent,
+                                        builder: (context) =>
+                                            UnifiedClusterModal(items: [p]),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
                         );
                       }
-                    }
 
-                    if (peopleState is PeopleLoaded) {
-                      markers.addAll(
-                        peopleState.people
-                            .where(
-                              (p) => p.latitude != null && p.longitude != null,
-                            )
-                            .map(
-                              (p) => Marker(
-                                key: ValueKey('person_${p.id}'),
-                                point: LatLng(p.latitude!, p.longitude!),
-                                width: 40,
-                                height: 40,
-                                child: PersonMapMarker(
-                                  person: p,
-                                  onTap: () {
-                                    showModalBottomSheet(
-                                      context: context,
-                                      backgroundColor: Colors.transparent,
-                                      builder: (context) =>
-                                          UnifiedClusterModal(items: [p]),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                      );
-                    }
-
-                    if (settingsState.showAirports &&
-                        airportState is MapAirportsLoaded) {
-                      markers.addAll(
-                        airportState.airports
-                            .where((airport) {
-                              switch (settingsState.airportFilter) {
-                                case AirportFilter.international:
-                                  return airport.airportType == 'large_airport';
-                                case AirportFilter.regional:
-                                  return airport.airportType ==
-                                      'medium_airport';
-                                case AirportFilter.all:
-                                  return true;
-                              }
-                            })
-                            .map(
-                              (airport) => Marker(
-                                key: ValueKey('airport_${airport.iataCode}'),
-                                point: LatLng(
-                                  airport.latitude,
-                                  airport.longitude,
-                                ),
-                                width: 28,
-                                height: 28,
-                                child: _MarkerIcon(
-                                  icon: Icons.flight,
-                                  color: const Color(0xFF1565C0),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      );
-                    }
-
-                    if (settingsState.showStations &&
-                        stationState is MapStationsLoaded) {
-                      markers.addAll(
-                        stationState.stations
-                            .where((station) {
-                              switch (settingsState.stationFilter) {
-                                case StationFilter.major:
-                                  return station.stationType == 'major_station';
-                                case StationFilter.commuter:
-                                  return station.stationType ==
-                                      'commuter_rail_station';
-                                case StationFilter.subway:
-                                  return station.stationType ==
-                                      'subway_station';
-                                case StationFilter.regional:
-                                  return station.stationType ==
-                                      'regional_station';
-                                case StationFilter.all:
-                                  return true;
-                              }
-                            })
-                            .map((station) {
-                              IconData iconData = Icons.train;
-                              Color color = const Color(0xFFE65100); // Orange
-
-                              switch (station.stationType) {
-                                case 'major_station':
-                                  iconData = Icons.train;
-                                  color = const Color(0xFFE65100);
-                                  break;
-                                case 'commuter_rail_station':
-                                  iconData = Icons.directions_railway;
-                                  color = const Color(0xFF00695C); // Teal 800
-                                  break;
-                                case 'subway_station':
-                                  iconData = Icons.subway;
-                                  color = const Color(0xFF2E7D32); // Green 800
-                                  break;
-                                case 'regional_station':
-                                  iconData = Icons.train;
-                                  color = const Color(0xFF607D8B); // Blue Grey
-                                  break;
-                                default:
-                                  iconData = Icons.train;
-                                  color = const Color(0xFFE65100);
-                              }
-
-                              return Marker(
-                                key: ValueKey('station_${station.osmId}'),
-                                point: LatLng(
-                                  station.latitude,
-                                  station.longitude,
-                                ),
-                                width: 28,
-                                height: 28,
-                                child: _MarkerIcon(
-                                  icon: iconData,
-                                  color: color,
-                                ),
-                              );
-                            })
-                            .toList(),
-                      );
-                    }
-
-                    return Stack(
-                      children: [
-                        FlutterMap(
-                          mapController: _mapController,
-                          options: MapOptions(
-                            initialCenter: center,
-                            initialZoom: 13.0,
-                          ),
-                          children: [
-                            TileLayer(
-                              urlTemplate: _getTileUrl(context, settingsState),
-                              subdomains: const ['a', 'b', 'c'],
-                              userAgentPackageName: 'com.mapmyfriends.app',
-                              tileProvider: kIsWeb
-                                  ? NetworkTileProvider()
-                                  : FMTCTileProvider(
-                                      stores: const {
-                                        'mapStore': BrowseStoreStrategy
-                                            .readUpdateCreate,
-                                      },
-                                    ),
-                              tileBuilder: (context, widget, tile) {
-                                bool isStandard =
-                                    settingsState.mapType == MapType.standard;
-                                bool isDark = _isDark(context, settingsState);
-
-                                if (isStandard && isDark) {
-                                  return ColorFiltered(
-                                    colorFilter: const ColorFilter.matrix(
-                                      <double>[
-                                        -1,
-                                        0,
-                                        0,
-                                        0,
-                                        255,
-                                        0,
-                                        -1,
-                                        0,
-                                        0,
-                                        255,
-                                        0,
-                                        0,
-                                        -1,
-                                        0,
-                                        255,
-                                        0,
-                                        0,
-                                        0,
-                                        1,
-                                        0,
-                                      ],
-                                    ),
-                                    child: widget,
-                                  );
+                      if (settingsState.showAirports &&
+                          airportState is MapAirportsLoaded) {
+                        markers.addAll(
+                          airportState.airports
+                              .where((airport) {
+                                switch (settingsState.airportFilter) {
+                                  case AirportFilter.international:
+                                    return airport.airportType ==
+                                        'large_airport';
+                                  case AirportFilter.regional:
+                                    return airport.airportType ==
+                                        'medium_airport';
+                                  case AirportFilter.all:
+                                    return true;
                                 }
-                                return widget;
-                              },
-                            ),
-                            BlocBuilder<TripBloc, TripState>(
-                              builder: (context, state) {
-                                if (state.routePoints.isEmpty) {
-                                  return const SizedBox.shrink();
+                              })
+                              .map(
+                                (airport) => Marker(
+                                  key: ValueKey('airport_${airport.iataCode}'),
+                                  point: LatLng(
+                                    airport.latitude,
+                                    airport.longitude,
+                                  ),
+                                  width: 28,
+                                  height: 28,
+                                  child: _MarkerIcon(
+                                    icon: Icons.flight,
+                                    color: const Color(0xFF1565C0),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        );
+                      }
+
+                      if (settingsState.showStations &&
+                          stationState is MapStationsLoaded) {
+                        markers.addAll(
+                          stationState.stations
+                              .where((station) {
+                                switch (settingsState.stationFilter) {
+                                  case StationFilter.major:
+                                    return station.stationType ==
+                                        'major_station';
+                                  case StationFilter.commuter:
+                                    return station.stationType ==
+                                        'commuter_rail_station';
+                                  case StationFilter.subway:
+                                    return station.stationType ==
+                                        'subway_station';
+                                  case StationFilter.regional:
+                                    return station.stationType ==
+                                        'regional_station';
+                                  case StationFilter.all:
+                                    return true;
                                 }
-                                return PolylineLayer(
-                                  polylines: [
-                                    Polyline(
-                                      points: state.routePoints,
-                                      color: Colors.indigo.withValues(
-                                        alpha: 0.7,
-                                      ),
-                                      strokeWidth: 5,
-                                    ),
-                                  ],
+                              })
+                              .map((station) {
+                                IconData iconData = Icons.train;
+                                Color color = const Color(0xFFE65100); // Orange
+
+                                switch (station.stationType) {
+                                  case 'major_station':
+                                    iconData = Icons.train;
+                                    color = const Color(0xFFE65100);
+                                    break;
+                                  case 'commuter_rail_station':
+                                    iconData = Icons.directions_railway;
+                                    color = const Color(0xFF00695C); // Teal 800
+                                    break;
+                                  case 'subway_station':
+                                    iconData = Icons.subway;
+                                    color = const Color(0xFF2E7D32); // Green 800
+                                    break;
+                                  case 'regional_station':
+                                    iconData = Icons.train;
+                                    color = const Color(0xFF607D8B); // Blue Grey
+                                    break;
+                                  default:
+                                    iconData = Icons.train;
+                                    color = const Color(0xFFE65100);
+                                }
+
+                                return Marker(
+                                  key: ValueKey('station_${station.osmId}'),
+                                  point: LatLng(
+                                    station.latitude,
+                                    station.longitude,
+                                  ),
+                                  width: 28,
+                                  height: 28,
+                                  child: _MarkerIcon(
+                                    icon: iconData,
+                                    color: color,
+                                  ),
                                 );
-                              },
+                              })
+                              .toList(),
+                        );
+                      }
+
+                      return Stack(
+                        children: [
+                          FlutterMap(
+                            mapController: _mapController,
+                            options: MapOptions(
+                              initialCenter: center,
+                              initialZoom: 13.0,
                             ),
-                            MarkerClusterLayerWidget(
-                              options: MarkerClusterLayerOptions(
-                                maxClusterRadius: 45,
-                                size: const Size(120, 48),
-                                markers: markers,
-                                disableClusteringAtZoom: 19,
-                                spiderfyCluster: false,
-                                zoomToBoundsOnClick: false,
-                                onMarkerTap: (marker) {
-                                  if (marker.key is ValueKey<String>) {
-                                    final key =
-                                        (marker.key as ValueKey<String>).value;
-                                    if (key.startsWith('person_')) {
-                                      final id = key.substring(7);
-                                      if (peopleState is PeopleLoaded) {
-                                        final person = peopleState.people
-                                            .firstWhere((p) => p.id == id);
-                                        showModalBottomSheet(
-                                          context: context,
-                                          backgroundColor: Colors.transparent,
-                                          builder: (context) =>
-                                              UnifiedClusterModal(
-                                                items: [person],
-                                              ),
-                                        );
-                                      }
-                                    } else if (key.startsWith('airport_')) {
-                                      final iata = key.substring(8);
-                                      if (airportState is MapAirportsLoaded) {
-                                        final airport = airportState.airports
-                                            .firstWhere(
-                                              (a) => a.iataCode == iata,
-                                            );
-                                        showModalBottomSheet(
-                                          context: context,
-                                          backgroundColor: Colors.transparent,
-                                          builder: (context) =>
-                                              AirportBottomSheet(
-                                                airport: airport,
-                                              ),
-                                        );
-                                      }
-                                    } else if (key.startsWith('station_')) {
-                                      final osmId = int.tryParse(
-                                        key.substring(8),
-                                      );
-                                      if (stationState is MapStationsLoaded) {
-                                        final station = stationState.stations
-                                            .firstWhere(
-                                              (s) => s.osmId == osmId,
-                                            );
-                                        showModalBottomSheet(
-                                          context: context,
-                                          backgroundColor: Colors.transparent,
-                                          builder: (context) =>
-                                              StationBottomSheet(
-                                                station: station,
-                                              ),
-                                        );
-                                      }
-                                    }
+                            children: [
+                              TileLayer(
+                                urlTemplate:
+                                    _getTileUrl(context, settingsState),
+                                subdomains: const ['a', 'b', 'c'],
+                                userAgentPackageName: 'com.mapmyfriends.app',
+                                tileProvider: kIsWeb
+                                    ? NetworkTileProvider()
+                                    : FMTCTileProvider(
+                                        stores: const {
+                                          'mapStore': BrowseStoreStrategy
+                                              .readUpdateCreate,
+                                        },
+                                      ),
+                                tileBuilder: (context, widget, tile) {
+                                  bool isStandard =
+                                      settingsState.mapType == MapType.standard;
+                                  bool isDark = _isDark(context, settingsState);
+
+                                  if (isStandard && isDark) {
+                                    return ColorFiltered(
+                                      colorFilter: const ColorFilter.matrix(
+                                        <double>[
+                                          -1,
+                                          0,
+                                          0,
+                                          0,
+                                          255,
+                                          0,
+                                          -1,
+                                          0,
+                                          0,
+                                          255,
+                                          0,
+                                          0,
+                                          -1,
+                                          0,
+                                          255,
+                                          0,
+                                          0,
+                                          0,
+                                          1,
+                                          0,
+                                        ],
+                                      ),
+                                      child: widget,
+                                    );
                                   }
+                                  return widget;
                                 },
-                                onClusterTap: (clusterNode) {
-                                  List<dynamic> clusterItems = [];
-                                  for (var marker in clusterNode.markers) {
+                              ),
+                              BlocBuilder<TripBloc, TripState>(
+                                builder: (context, state) {
+                                  if (state.routePoints.isEmpty) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return PolylineLayer(
+                                    polylines: [
+                                      Polyline(
+                                        points: state.routePoints,
+                                        color: Colors.indigo.withValues(
+                                          alpha: 0.7,
+                                        ),
+                                        strokeWidth: 5,
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                              MarkerClusterLayerWidget(
+                                options: MarkerClusterLayerOptions(
+                                  maxClusterRadius: 45,
+                                  size: const Size(120, 48),
+                                  markers: markers,
+                                  disableClusteringAtZoom: 19,
+                                  spiderfyCluster: false,
+                                  zoomToBoundsOnClick: false,
+                                  onMarkerTap: (marker) {
                                     if (marker.key is ValueKey<String>) {
                                       final key =
                                           (marker.key as ValueKey<String>)
@@ -459,237 +428,310 @@ class _MapScreenState extends State<MapScreen> {
                                       if (key.startsWith('person_')) {
                                         final id = key.substring(7);
                                         if (peopleState is PeopleLoaded) {
-                                          try {
-                                            clusterItems.add(
-                                              peopleState.people.firstWhere(
-                                                (p) => p.id == id,
-                                              ),
-                                            );
-                                          } catch (_) {}
+                                          final person = peopleState.people
+                                              .firstWhere((p) => p.id == id);
+                                          showModalBottomSheet(
+                                            context: context,
+                                            backgroundColor: Colors.transparent,
+                                            builder: (context) =>
+                                                UnifiedClusterModal(
+                                                  items: [person],
+                                                ),
+                                          );
                                         }
                                       } else if (key.startsWith('airport_')) {
                                         final iata = key.substring(8);
                                         if (airportState is MapAirportsLoaded) {
-                                          try {
-                                            clusterItems.add(
-                                              airportState.airports.firstWhere(
+                                          final airport = airportState.airports
+                                              .firstWhere(
                                                 (a) => a.iataCode == iata,
-                                              ),
-                                            );
-                                          } catch (_) {}
+                                              );
+                                          showModalBottomSheet(
+                                            context: context,
+                                            backgroundColor: Colors.transparent,
+                                            builder: (context) =>
+                                                AirportBottomSheet(
+                                                  airport: airport,
+                                                ),
+                                          );
                                         }
                                       } else if (key.startsWith('station_')) {
-                                        final osmIdString = key.substring(8);
-                                        final osmId = int.tryParse(osmIdString);
+                                        final osmId = int.tryParse(
+                                          key.substring(8),
+                                        );
                                         if (stationState is MapStationsLoaded) {
-                                          try {
-                                            clusterItems.add(
-                                              stationState.stations.firstWhere(
+                                          final station = stationState.stations
+                                              .firstWhere(
                                                 (s) => s.osmId == osmId,
-                                              ),
-                                            );
-                                          } catch (_) {}
+                                              );
+                                          showModalBottomSheet(
+                                            context: context,
+                                            backgroundColor: Colors.transparent,
+                                            builder: (context) =>
+                                                StationBottomSheet(
+                                                  station: station,
+                                                ),
+                                          );
                                         }
                                       }
                                     }
-                                  }
-
-                                  if (clusterItems.isNotEmpty) {
-                                    showModalBottomSheet(
-                                      context: context,
-                                      backgroundColor: Colors.transparent,
-                                      builder: (context) => UnifiedClusterModal(
-                                        items: clusterItems,
-                                        onZoom: () {
-                                          Navigator.pop(context);
-                                          _mapController.fitCamera(
-                                            CameraFit.bounds(
-                                              bounds: clusterNode.bounds,
-                                              padding: const EdgeInsets.all(50),
-                                            ),
+                                  },
+                                  onClusterTap: (clusterNode) {
+                                    List<dynamic> clusterItems = [];
+                                    for (var marker in clusterNode.markers) {
+                                      if (marker.key is ValueKey<String>) {
+                                        final key =
+                                            (marker.key as ValueKey<String>)
+                                                .value;
+                                        if (key.startsWith('person_')) {
+                                          final id = key.substring(7);
+                                          if (peopleState is PeopleLoaded) {
+                                            try {
+                                              clusterItems.add(
+                                                peopleState.people.firstWhere(
+                                                  (p) => p.id == id,
+                                                ),
+                                              );
+                                            } catch (_) {}
+                                          }
+                                        } else if (key.startsWith('airport_')) {
+                                          final iata = key.substring(8);
+                                          if (airportState
+                                              is MapAirportsLoaded) {
+                                            try {
+                                              clusterItems.add(
+                                                airportState.airports
+                                                    .firstWhere(
+                                                      (a) => a.iataCode == iata,
+                                                    ),
+                                              );
+                                            } catch (_) {}
+                                          }
+                                        } else if (key.startsWith('station_')) {
+                                          final osmIdString = key.substring(8);
+                                          final osmId = int.tryParse(
+                                            osmIdString,
                                           );
-                                        },
-                                      ),
-                                    );
-                                  }
-                                },
-                                builder: (context, clusterMarkers) {
-                                  List<Widget> children = [];
-                                  int displayCount = clusterMarkers.length > 4
-                                      ? 3
-                                      : clusterMarkers.length;
-                                  bool hasExtra = clusterMarkers.length > 4;
-                                  double itemSize = 36.0;
-                                  double overlap = 20.0;
-                                  double totalWidth = 0;
-                                  if (displayCount > 0) {
-                                    totalWidth =
-                                        (displayCount - 1) * overlap + itemSize;
-                                    if (hasExtra) totalWidth += overlap;
-                                  }
-                                  for (int i = 0; i < displayCount; i++) {
-                                    children.add(
-                                      Positioned(
-                                        left: i * overlap,
-                                        child: SizedBox(
-                                          width: itemSize,
-                                          height: itemSize,
-                                          child: clusterMarkers[i].child,
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  if (hasExtra) {
-                                    int extraCount = clusterMarkers.length - 3;
-                                    children.add(
-                                      Positioned(
-                                        left: displayCount * overlap,
-                                        child: Container(
-                                          width: itemSize,
-                                          height: itemSize,
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.primaryContainer,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.primary,
-                                              width: 2,
+                                          if (stationState
+                                              is MapStationsLoaded) {
+                                            try {
+                                              clusterItems.add(
+                                                stationState.stations
+                                                    .firstWhere(
+                                                      (s) => s.osmId == osmId,
+                                                    ),
+                                              );
+                                            } catch (_) {}
+                                          }
+                                        }
+                                      }
+                                    }
+
+                                    if (clusterItems.isNotEmpty) {
+                                      showModalBottomSheet(
+                                        context: context,
+                                        backgroundColor: Colors.transparent,
+                                        builder: (context) =>
+                                            UnifiedClusterModal(
+                                              items: clusterItems,
+                                              onZoom: () {
+                                                Navigator.pop(context);
+                                                _mapController.fitCamera(
+                                                  CameraFit.bounds(
+                                                    bounds: clusterNode.bounds,
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                          50,
+                                                        ),
+                                                  ),
+                                                );
+                                              },
                                             ),
-                                            boxShadow: const [
-                                              BoxShadow(
-                                                color: Colors.black26,
-                                                blurRadius: 4,
-                                                offset: Offset(0, 2),
-                                              ),
-                                            ],
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: Text(
-                                            '+$extraCount',
-                                            style: TextStyle(
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.onPrimaryContainer,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  return Center(
-                                    child: Container(
-                                      width: totalWidth + 8,
-                                      height: itemSize + 8,
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(
-                                          context,
-                                        ).cardColor.withValues(alpha: 0.8),
-                                        borderRadius: BorderRadius.circular(24),
-                                        boxShadow: const [
-                                          BoxShadow(
-                                            color: Colors.black26,
-                                            blurRadius: 4,
-                                            offset: Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Stack(
-                                        clipBehavior: Clip.none,
-                                        children: [
-                                          Positioned(
-                                            left: 4,
-                                            top: 4,
-                                            width: totalWidth,
+                                      );
+                                    }
+                                  },
+                                  builder: (context, clusterMarkers) {
+                                    List<Widget> children = [];
+                                    int displayCount =
+                                        clusterMarkers.length > 4
+                                            ? 3
+                                            : clusterMarkers.length;
+                                    bool hasExtra = clusterMarkers.length > 4;
+                                    double itemSize = 36.0;
+                                    double overlap = 20.0;
+                                    double totalWidth = 0;
+                                    if (displayCount > 0) {
+                                      totalWidth =
+                                          (displayCount - 1) * overlap +
+                                          itemSize;
+                                      if (hasExtra) totalWidth += overlap;
+                                    }
+                                    for (int i = 0; i < displayCount; i++) {
+                                      children.add(
+                                        Positioned(
+                                          left: i * overlap,
+                                          child: SizedBox(
+                                            width: itemSize,
                                             height: itemSize,
-                                            child: IgnorePointer(
-                                              child: Stack(
-                                                clipBehavior: Clip.none,
-                                                children: children,
+                                            child: clusterMarkers[i].child,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    if (hasExtra) {
+                                      int extraCount =
+                                          clusterMarkers.length - 3;
+                                      children.add(
+                                        Positioned(
+                                          left: displayCount * overlap,
+                                          child: Container(
+                                            width: itemSize,
+                                            height: itemSize,
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.primaryContainer,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
+                                                width: 2,
+                                              ),
+                                              boxShadow: const [
+                                                BoxShadow(
+                                                  color: Colors.black26,
+                                                  blurRadius: 4,
+                                                  offset: Offset(0, 2),
+                                                ),
+                                              ],
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: Text(
+                                              '+$extraCount',
+                                              style: TextStyle(
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.onPrimaryContainer,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12,
                                               ),
                                             ),
                                           ),
-                                        ],
+                                        ),
+                                      );
+                                    }
+                                    return Center(
+                                      child: Container(
+                                        width: totalWidth + 8,
+                                        height: itemSize + 8,
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(
+                                            context,
+                                          ).cardColor.withValues(alpha: 0.8),
+                                          borderRadius:
+                                              BorderRadius.circular(24),
+                                          boxShadow: const [
+                                            BoxShadow(
+                                              color: Colors.black26,
+                                              blurRadius: 4,
+                                              offset: Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Stack(
+                                          clipBehavior: Clip.none,
+                                          children: [
+                                            Positioned(
+                                              left: 4,
+                                              top: 4,
+                                              width: totalWidth,
+                                              height: itemSize,
+                                              child: IgnorePointer(
+                                                child: Stack(
+                                                  clipBehavior: Clip.none,
+                                                  children: children,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
+                                    );
+                                  },
+                                ),
+                              ),
+                              BlocBuilder<TripBloc, TripState>(
+                                builder: (context, state) {
+                                  return MarkerLayer(
+                                    markers: state.stops.asMap().entries.map((
+                                      entry,
+                                    ) {
+                                      final idx = entry.key;
+                                      final stop = entry.value;
+                                      return Marker(
+                                        point: stop.location,
+                                        width: 30,
+                                        height: 30,
+                                        child: Container(
+                                          decoration: const BoxDecoration(
+                                            color: Colors.indigo,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              String.fromCharCode(65 + idx),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }).toList(),
                                   );
                                 },
                               ),
-                            ),
-                            BlocBuilder<TripBloc, TripState>(
-                              builder: (context, state) {
-                                return MarkerLayer(
-                                  markers: state.stops.asMap().entries.map((
-                                    entry,
-                                  ) {
-                                    final idx = entry.key;
-                                    final stop = entry.value;
-                                    return Marker(
-                                      point: stop.location,
-                                      width: 30,
-                                      height: 30,
-                                      child: Container(
-                                        decoration: const BoxDecoration(
-                                          color: Colors.indigo,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            String.fromCharCode(65 + idx),
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
+                              RichAttributionWidget(
+                                alignment: AttributionAlignment.bottomLeft,
+                                attributions: [
+                                  TextSourceAttribution(
+                                    'OpenStreetMap contributors',
+                                    onTap: () => launchUrl(
+                                      Uri.parse(
+                                        'https://openstreetmap.org/copyright',
                                       ),
-                                    );
-                                  }).toList(),
-                                );
-                              },
-                            ),
-                            RichAttributionWidget(
-                              alignment: AttributionAlignment.bottomLeft,
-                              attributions: [
-                                TextSourceAttribution(
-                                  'OpenStreetMap contributors',
-                                  onTap: () => launchUrl(
-                                    Uri.parse(
-                                      'https://openstreetmap.org/copyright',
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
+                            ],
+                          ),
+                          if (settingsState.showControls)
+                            MapControls(
+                              mapController: _mapController,
+                              onToggleTripPlanner: _toggleTripPlanner,
+                              showTripPlanner: _showTripPlanner,
                             ),
-                          ],
-                        ),
-                        if (settingsState.showControls)
-                          MapControls(
-                            mapController: _mapController,
-                            onToggleTripPlanner: _toggleTripPlanner,
-                            showTripPlanner: _showTripPlanner,
+                          const MapSettingsButton(),
+                          Positioned(
+                            top: MediaQuery.of(context).padding.top + 95,
+                            right: 20,
+                            child: _CompassIndicator(
+                              mapController: _mapController,
+                              onReset: _resetNorth,
+                            ),
                           ),
-                        const MapSettingsButton(),
-                        Positioned(
-                          top: MediaQuery.of(context).padding.top + 95,
-                          right: 20,
-                          child: _CompassIndicator(
-                            mapController: _mapController,
-                            onReset: _resetNorth,
-                          ),
-                        ),
-                        if (_showTripPlanner) const TripPlannerSheet(),
-                      ],
-                    );
-                  },
-                );
-              },
-            );
-          },
+                          if (_showTripPlanner) const TripPlannerSheet(),
+                        ],
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
         ),
       ),
     );

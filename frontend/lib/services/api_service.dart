@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/person.dart';
+import '../models/trip.dart';
 import 'api_config.dart';
 import 'auth_service.dart';
 
@@ -172,6 +173,65 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Failed to delete person: $e');
+    }
+  }
+
+  // Trip methods
+  Future<List<Trip>> getTrips() async {
+    try {
+      final response = await _dio.get('trips/');
+      if (response.statusCode == 200) {
+        final data = response.data;
+        final results = data is Map ? data['results'] as List : data as List;
+        return results
+            .map((json) => Trip.fromJson(json as Map<String, dynamic>))
+            .toList();
+      } else {
+        throw Exception('Failed to load trips');
+      }
+    } catch (e) {
+      throw Exception('Failed to load trips: $e');
+    }
+  }
+
+  Future<Trip> createTrip(Trip trip) async {
+    try {
+      final response = await _dio.post('trips/', data: trip.toJson());
+      if (response.statusCode == 201) {
+        return Trip.fromJson(response.data as Map<String, dynamic>);
+      } else {
+        throw Exception('Failed to create trip');
+      }
+    } catch (e) {
+      throw Exception('Failed to create trip: $e');
+    }
+  }
+
+  Future<Trip> updateTrip(Trip trip) async {
+    try {
+      if (trip.id == null) throw Exception('Trip ID is required for update');
+      final response = await _dio.patch(
+        'trips/${trip.id}/',
+        data: trip.toJson(),
+      );
+      if (response.statusCode == 200) {
+        return Trip.fromJson(response.data as Map<String, dynamic>);
+      } else {
+        throw Exception('Failed to update trip');
+      }
+    } catch (e) {
+      throw Exception('Failed to update trip: $e');
+    }
+  }
+
+  Future<void> deleteTrip(int id) async {
+    try {
+      final response = await _dio.delete('trips/$id/');
+      if (response.statusCode != 204) {
+        throw Exception('Failed to delete trip');
+      }
+    } catch (e) {
+      throw Exception('Failed to delete trip: $e');
     }
   }
 }

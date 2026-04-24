@@ -285,3 +285,20 @@ class TripApiTests(TestCase):
         response = self.client.delete(f'/api/trips/{trip.id}/')
         self.assertEqual(response.status_code, 204)
         self.assertFalse(Trip.objects.filter(id=trip.id).exists())
+
+    def test_trip_status_persistence(self):
+        payload = {
+            'name': 'Status Trip',
+            'date': '2026-08-15',
+            'status': 'BOOKED',
+            'stops': [],
+        }
+        response = self.client.post('/api/trips/', payload, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['status'], 'BOOKED')
+        
+        trip_id = response.data['id']
+        update_payload = {'status': 'CANCELLED'}
+        response = self.client.patch(f'/api/trips/{trip_id}/', update_payload, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['status'], 'CANCELLED')

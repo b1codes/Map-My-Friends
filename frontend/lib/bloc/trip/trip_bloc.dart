@@ -2,28 +2,34 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:latlong2/latlong.dart';
 import '../../models/trip.dart';
 import '../../services/routing_service.dart';
+import '../../services/api_service.dart';
 import 'trip_event.dart';
 import 'trip_state.dart';
 
 class TripBloc extends Bloc<TripEvent, TripState> {
   final RoutingService _routingService;
+  final ApiService _apiService;
   int _routingRequestId = 0;
 
-  TripBloc({RoutingService? routingService})
+  TripBloc({RoutingService? routingService, ApiService? apiService})
     : _routingService = routingService ?? RoutingService(),
+      _apiService = apiService ?? ApiService(),
       super(const TripState()) {
     on<AddStop>(_onAddStop);
     on<RemoveStop>(_onRemoveStop);
     on<ReorderStops>(_onReorderStops);
     on<ClearTrip>(_onClearTrip);
     on<OptimizeTrip>(_onOptimizeTrip);
+    on<SaveTrip>(_onSaveTrip);
+    on<FetchUserTrips>(_onFetchUserTrips);
+    on<LoadTrip>(_onLoadTrip);
+    on<DeleteTrip>(_onDeleteTrip);
   }
 
   Future<void> _onAddStop(AddStop event, Emitter<TripState> emit) async {
     if (event.person.latitude == null || event.person.longitude == null) return;
 
     final newStop = TripStop(
-      id: DateTime.now().toString(),
       person: event.person,
       location: LatLng(event.person.latitude!, event.person.longitude!),
       sequenceOrder: state.stops.length,
@@ -41,10 +47,11 @@ class TripBloc extends Bloc<TripEvent, TripState> {
 
   Future<void> _onRemoveStop(RemoveStop event, Emitter<TripState> emit) async {
     final newStops = List<TripStop>.from(state.stops)..removeAt(event.index);
-    emit(state.copyWith(stops: _resortStops(newStops), isOptimizing: true));
+    final sortedStops = _resortStops(newStops);
+    emit(state.copyWith(stops: sortedStops, isOptimizing: true));
 
     final requestId = ++_routingRequestId;
-    final route = await _routingService.getRoute(newStops);
+    final route = await _routingService.getRoute(sortedStops);
     if (requestId != _routingRequestId) return;
 
     emit(state.copyWith(routePoints: route, isOptimizing: false));
@@ -60,10 +67,11 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     final item = newStops.removeAt(event.oldIndex);
     newStops.insert(newIndex, item);
 
-    emit(state.copyWith(stops: _resortStops(newStops), isOptimizing: true));
+    final sortedStops = _resortStops(newStops);
+    emit(state.copyWith(stops: sortedStops, isOptimizing: true));
 
     final requestId = ++_routingRequestId;
-    final route = await _routingService.getRoute(newStops);
+    final route = await _routingService.getRoute(sortedStops);
     if (requestId != _routingRequestId) return;
 
     emit(state.copyWith(routePoints: route, isOptimizing: false));
@@ -71,7 +79,12 @@ class TripBloc extends Bloc<TripEvent, TripState> {
 
   void _onClearTrip(ClearTrip event, Emitter<TripState> emit) {
     _routingRequestId++; // Cancel any pending requests
-    emit(const TripState());
+    emit(state.copyWith(
+      stops: [],
+      routePoints: [],
+      isOptimizing: false,
+      clearCurrentTripId: true,
+    ));
   }
 
   Future<void> _onOptimizeTrip(
@@ -93,6 +106,75 @@ class TripBloc extends Bloc<TripEvent, TripState> {
         isOptimizing: false,
       ),
     );
+  }
+
+  Future<void> _onSaveTrip(SaveTrip event, Emitter<TripState> emit) async {
+    emit(state.copyWith(isLoading: true, clearError: true));
+    try {
+      final tripToSave = Trip(
+        id: state.currentTripId,
+        name: event.name,
+        date: event.date,
+        status: event.status,
+        stops: state.stops,
+      );
+
+      Trip savedTrip;
+      if (tripToSave.id != null) {
+        savedTrip = await _apiService.updateTrip(tripToSave);
+      } else {
+        savedTrip = await _apiService.createTrip(tripToSave);
+      }
+
+      emit(state.copyWith(
+        isLoading: false,
+        currentTripId: savedTrip.id,
+      ));
+      add(const FetchUserTrips());
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, error: e.toString()));
+    }
+  }
+
+  Future<void> _onFetchUserTrips(
+    FetchUserTrips event,
+    Emitter<TripState> emit,
+  ) async {
+    emit(state.copyWith(isLoading: true, clearError: true));
+    try {
+      final trips = await _apiService.getTrips();
+      emit(state.copyWith(isLoading: false, userTrips: trips));
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, error: e.toString()));
+    }
+  }
+
+  Future<void> _onLoadTrip(LoadTrip event, Emitter<TripState> emit) async {
+    emit(state.copyWith(
+      isLoading: true,
+      stops: event.trip.stops,
+      currentTripId: event.trip.id,
+      clearError: true,
+    ));
+
+    final requestId = ++_routingRequestId;
+    final route = await _routingService.getRoute(event.trip.stops);
+    if (requestId != _routingRequestId) return;
+
+    emit(state.copyWith(routePoints: route, isLoading: false));
+  }
+
+  Future<void> _onDeleteTrip(DeleteTrip event, Emitter<TripState> emit) async {
+    emit(state.copyWith(isLoading: true, clearError: true));
+    try {
+      await _apiService.deleteTrip(event.tripId);
+      if (state.currentTripId == event.tripId) {
+        add(const ClearTrip());
+      }
+      add(const FetchUserTrips());
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, error: e.toString()));
+    }
   }
 
   List<TripStop> _resortStops(List<TripStop> stops) {

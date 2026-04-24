@@ -24,7 +24,7 @@ class TripSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Trip
-        fields = ('id', 'name', 'date', 'stops')
+        fields = ('id', 'name', 'date', 'status', 'stops')
 
     def create(self, validated_data):
         with transaction.atomic():
@@ -37,8 +37,8 @@ class TripSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         with transaction.atomic():
             stops_data = validated_data.pop('stops', None)
-            instance.name = validated_data.get('name', instance.name)
-            instance.date = validated_data.get('date', instance.date)
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
             instance.save()
             if stops_data is not None:
                 instance.stops.all().delete()

@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../models/person.dart';
+import '../../models/trip.dart';
 
 abstract class TripEvent extends Equatable {
   const TripEvent();
@@ -35,4 +36,31 @@ class OptimizeTrip extends TripEvent {
 
 class ClearTrip extends TripEvent {
   const ClearTrip();
+}
+
+class SaveTrip extends TripEvent {
+  final String name;
+  final DateTime date;
+  final TripStatus status;
+  const SaveTrip({required this.name, required this.date, required this.status});
+  @override
+  List<Object?> get props => [name, date, status];
+}
+
+class FetchUserTrips extends TripEvent {
+  const FetchUserTrips();
+}
+
+class LoadTrip extends TripEvent {
+  final Trip trip;
+  const LoadTrip(this.trip);
+  @override
+  List<Object?> get props => [trip];
+}
+
+class DeleteTrip extends TripEvent {
+  final int tripId;
+  const DeleteTrip(this.tripId);
+  @override
+  List<Object?> get props => [tripId];
 }

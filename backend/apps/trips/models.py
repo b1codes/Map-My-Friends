@@ -3,6 +3,11 @@ from django.contrib.gis.db import models
 
 
 class Trip(models.Model):
+    class Status(models.TextChoices):
+        DRAFT = 'DRAFT', 'Draft'
+        BOOKED = 'BOOKED', 'Booked'
+        CANCELLED = 'CANCELLED', 'Cancelled'
+
     name = models.CharField(max_length=255)
     date = models.DateField()
     user = models.ForeignKey(
@@ -10,9 +15,14 @@ class Trip(models.Model):
         on_delete=models.CASCADE,
         related_name='trips',
     )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
+    )
 
     def __str__(self):
-        return f"{self.name} ({self.date})"
+        return f"{self.name} ({self.date}) - {self.get_status_display()}"
 
 
 class TripStop(models.Model):
