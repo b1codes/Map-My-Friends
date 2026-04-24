@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
@@ -322,12 +323,14 @@ class _MapScreenState extends State<MapScreen> {
                               urlTemplate: _getTileUrl(context, settingsState),
                               subdomains: const ['a', 'b', 'c'],
                               userAgentPackageName: 'com.mapmyfriends.app',
-                              tileProvider: FMTCTileProvider(
-                                stores: const {
-                                  'mapStore':
-                                      BrowseStoreStrategy.readUpdateCreate,
-                                },
-                              ),
+                              tileProvider: kIsWeb
+                                  ? NetworkTileProvider()
+                                  : FMTCTileProvider(
+                                      stores: const {
+                                        'mapStore': BrowseStoreStrategy
+                                            .readUpdateCreate,
+                                      },
+                                    ),
                               tileBuilder: (context, widget, tile) {
                                 bool isStandard =
                                     settingsState.mapType == MapType.standard;
