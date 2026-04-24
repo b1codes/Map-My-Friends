@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../bloc/station/station_bloc.dart';
 import '../../bloc/station/station_event.dart';
 import '../../bloc/station/station_state.dart';
+import '../../bloc/map/map_settings_cubit.dart';
+import '../../utils/unit_converter.dart';
 
 /// A reusable widget that shows the nearest train stations to a given coordinate.
 /// Used on both PersonDetailsScreen and MeScreen.
@@ -45,6 +47,9 @@ class _NearbyStationsSectionState extends State<NearbyStationsSection> {
 
   @override
   Widget build(BuildContext context) {
+    final distanceUnit =
+        context.watch<MapSettingsCubit>().state.distanceUnit;
+
     return BlocProvider.value(
       value: _stationBloc,
       child: BlocBuilder<StationBloc, StationState>(
@@ -140,7 +145,10 @@ class _NearbyStationsSectionState extends State<NearbyStationsSection> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                '${station.distanceKm!.round()} km',
+                                UnitConverter.formatDistance(
+                                  station.distanceKm,
+                                  distanceUnit,
+                                ),
                                 style: Theme.of(context).textTheme.labelSmall
                                     ?.copyWith(fontWeight: FontWeight.bold),
                               ),

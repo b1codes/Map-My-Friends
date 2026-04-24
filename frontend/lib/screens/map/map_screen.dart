@@ -59,6 +59,13 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     // Standard mode (OpenStreetMap)
+    final locale = Localizations.localeOf(context).languageCode;
+    if (locale == 'de') {
+      return 'https://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png';
+    } else if (locale == 'fr') {
+      return 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png';
+    }
+
     return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
   }
 

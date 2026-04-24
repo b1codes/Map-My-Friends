@@ -46,6 +46,7 @@ class _MeScreenState extends State<MeScreen> {
   String _pinStyle = 'teardrop';
   String _pinIconType = 'none';
   String? _pinEmoji;
+  String _distanceUnit = 'metric';
   bool _pinFieldsPopulated = false;
 
   @override
@@ -199,6 +200,7 @@ class _MeScreenState extends State<MeScreen> {
       if (state.pinStyle != null) _pinStyle = state.pinStyle!;
       if (state.pinIconType != null) _pinIconType = state.pinIconType!;
       _pinEmoji = state.pinEmoji ?? '😀';
+      if (state.distanceUnit != null) _distanceUnit = state.distanceUnit!;
       _pinFieldsPopulated = true;
     }
   }
@@ -459,6 +461,44 @@ class _MeScreenState extends State<MeScreen> {
                               ),
 
                               const SizedBox(height: 32),
+                              Text(
+                                'Preferences',
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Distance Unit',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: 8),
+                              SegmentedButton<String>(
+                                segments: const [
+                                  ButtonSegment(
+                                    value: 'metric',
+                                    label: Text('Metric (km)'),
+                                    icon: Icon(Icons.straighten),
+                                  ),
+                                  ButtonSegment(
+                                    value: 'imperial',
+                                    label: Text('Imperial (mi)'),
+                                    icon: Icon(Icons.architecture),
+                                  ),
+                                ],
+                                selected: {_distanceUnit},
+                                onSelectionChanged: (Set<String> newSelection) {
+                                  setState(() {
+                                    _distanceUnit = newSelection.first;
+                                  });
+                                },
+                                showSelectedIcon: false,
+                                style: const ButtonStyle(
+                                  visualDensity: VisualDensity.compact,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
+
+                              const SizedBox(height: 32),
 
                               // --- Map Pin Customization ---
                               Text(
@@ -672,6 +712,7 @@ class _MeScreenState extends State<MeScreen> {
                                                 pinStyle: _pinStyle,
                                                 pinIconType: _pinIconType,
                                                 pinEmoji: _pinEmoji,
+                                                distanceUnit: _distanceUnit,
                                               ),
                                             );
                                             ScaffoldMessenger.of(

@@ -38,6 +38,17 @@ class UserProfile(models.Model):
     pin_icon_type = models.CharField(max_length=20, choices=PIN_ICON_TYPE_CHOICES, default='none', help_text=_("What to display inside the pin"))
     pin_emoji = models.CharField(max_length=10, blank=True, null=True, help_text=_("Emoji to display if icon_type is 'emoji'"))
 
+    DISTANCE_UNIT_CHOICES = [
+        ('metric', _('Metric (km)')),
+        ('imperial', _('Imperial (miles)')),
+    ]
+    distance_unit = models.CharField(
+        max_length=10, 
+        choices=DISTANCE_UNIT_CHOICES, 
+        default='metric', 
+        help_text=_("Preferred distance unit for UI displays")
+    )
+
     def __str__(self):
         return f"Profile for {self.user.username}"
 

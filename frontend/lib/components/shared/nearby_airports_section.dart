@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../bloc/airport/airport_bloc.dart';
 import '../../bloc/airport/airport_event.dart';
 import '../../bloc/airport/airport_state.dart';
+import '../../bloc/map/map_settings_cubit.dart';
+import '../../utils/unit_converter.dart';
 
 /// A reusable widget that shows the nearest airports to a given coordinate.
 /// Used on both PersonDetailsScreen and MeScreen.
@@ -44,6 +46,9 @@ class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
 
   @override
   Widget build(BuildContext context) {
+    final distanceUnit =
+        context.watch<MapSettingsCubit>().state.distanceUnit;
+
     return BlocProvider.value(
       value: _airportBloc,
       child: BlocBuilder<AirportBloc, AirportState>(
@@ -156,7 +161,10 @@ class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                '${airport.distanceKm!.round()} km',
+                                UnitConverter.formatDistance(
+                                  airport.distanceKm,
+                                  distanceUnit,
+                                ),
                                 style: Theme.of(context).textTheme.labelSmall
                                     ?.copyWith(fontWeight: FontWeight.bold),
                               ),

@@ -143,7 +143,40 @@ class MapSettingsModal extends StatelessWidget {
                       ),
                     ],
                     const Divider(),
-                    ListTile(
+                    const ListTile(title: Text('Distance Unit')),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: SegmentedButton<DistanceUnit>(
+                        segments: const [
+                          ButtonSegment(
+                            value: DistanceUnit.metric,
+                            label: Text('Metric (km)'),
+                            icon: Icon(Icons.straighten),
+                          ),
+                          ButtonSegment(
+                            value: DistanceUnit.imperial,
+                            label: Text('Imperial (mi)'),
+                            icon: Icon(Icons.architecture),
+                          ),
+                        ],
+                        selected: {state.distanceUnit},
+                        onSelectionChanged: (Set<DistanceUnit> newSelection) {
+                          context.read<LocalMapSettingsCubit>().setDistanceUnit(
+                            newSelection.first,
+                          );
+                        },
+                        showSelectedIcon: false,
+                        style: ButtonStyle(
+                          visualDensity: VisualDensity.compact,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          side: WidgetStateProperty.all(
+                            BorderSide(color: Colors.grey.withOpacity(0.5)),
+                          ),
+                        ),
+                      ),
+                      ),
+                      const Divider(),
+                      ListTile(
                       title: const Text('Map Type'),
                       trailing: DropdownButton<MapType>(
                         value: state.mapType,

@@ -156,6 +156,31 @@ class SettingsScreen extends StatelessWidget {
                       },
                       contentPadding: EdgeInsets.zero,
                     ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Distance Unit',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    SegmentedButton<DistanceUnit>(
+                      segments: const [
+                        ButtonSegment(
+                          value: DistanceUnit.metric,
+                          label: Text('Metric (km)'),
+                        ),
+                        ButtonSegment(
+                          value: DistanceUnit.imperial,
+                          label: Text('Imperial (mi)'),
+                        ),
+                      ],
+                      selected: {state.distanceUnit},
+                      onSelectionChanged: (Set<DistanceUnit> newSelection) {
+                        context.read<MapSettingsCubit>().setDistanceUnit(
+                          newSelection.first,
+                        );
+                      },
+                      showSelectedIcon: false,
+                    ),
                   ],
                 );
               },

@@ -29,6 +29,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'pin_style',
             'pin_icon_type',
             'pin_emoji',
+            'distance_unit',
         ]
         read_only_fields = ['username', 'email']
 

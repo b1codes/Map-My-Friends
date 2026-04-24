@@ -36,4 +36,8 @@ class LocalMapSettingsCubit extends Cubit<MapSettingsState> {
   void setStationFilter(StationFilter filter) {
     emit(state.copyWith(stationFilter: filter));
   }
+
+  void setDistanceUnit(DistanceUnit unit) {
+    emit(state.copyWith(distanceUnit: unit));
+  }
 }

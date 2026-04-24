@@ -27,6 +27,7 @@ class ProfileLoaded extends ProfileState {
   final String? pinStyle;
   final String? pinIconType;
   final String? pinEmoji;
+  final String? distanceUnit;
 
   const ProfileLoaded({
     this.username,
@@ -44,6 +45,7 @@ class ProfileLoaded extends ProfileState {
     this.pinStyle,
     this.pinIconType,
     this.pinEmoji,
+    this.distanceUnit,
   });
 
   @override
@@ -63,6 +65,7 @@ class ProfileLoaded extends ProfileState {
     pinStyle,
     pinIconType,
     pinEmoji,
+    distanceUnit,
   ];
 
   ProfileLoaded copyWith({
@@ -81,6 +84,7 @@ class ProfileLoaded extends ProfileState {
     String? pinStyle,
     String? pinIconType,
     String? pinEmoji,
+    String? distanceUnit,
   }) {
     return ProfileLoaded(
       username: username ?? this.username,
@@ -98,6 +102,7 @@ class ProfileLoaded extends ProfileState {
       pinStyle: pinStyle ?? this.pinStyle,
       pinIconType: pinIconType ?? this.pinIconType,
       pinEmoji: pinEmoji ?? this.pinEmoji,
+      distanceUnit: distanceUnit ?? this.distanceUnit,
     );
   }
 }

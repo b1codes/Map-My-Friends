@@ -157,8 +157,24 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<ProfileBloc, ProfileState>(
+          listener: (context, state) {
+            if (state is ProfileLoaded && state.distanceUnit != null) {
+              final unit = state.distanceUnit == 'imperial'
+                  ? DistanceUnit.imperial
+                  : DistanceUnit.metric;
+              // Only update if different to avoid redundant pref writes
+              if (context.read<MapSettingsCubit>().state.distanceUnit != unit) {
+                context.read<MapSettingsCubit>().setDistanceUnit(unit);
+              }
+            }
+          },
+        ),
+      ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= 600;
 
         return Scaffold(

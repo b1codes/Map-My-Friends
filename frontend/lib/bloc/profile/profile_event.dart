@@ -25,6 +25,7 @@ class UpdateProfile extends ProfileEvent {
   final String? pinStyle;
   final String? pinIconType;
   final String? pinEmoji;
+  final String? distanceUnit;
 
   const UpdateProfile({
     this.firstName,
@@ -39,6 +40,7 @@ class UpdateProfile extends ProfileEvent {
     this.pinStyle,
     this.pinIconType,
     this.pinEmoji,
+    this.distanceUnit,
   });
 
   @override
@@ -55,6 +57,7 @@ class UpdateProfile extends ProfileEvent {
     pinStyle,
     pinIconType,
     pinEmoji,
+    distanceUnit,
   ];
 }
 

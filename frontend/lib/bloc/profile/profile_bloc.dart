@@ -39,6 +39,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
           pinStyle: profile['pin_style'],
           pinIconType: profile['pin_icon_type'],
           pinEmoji: profile['pin_emoji'],
+          distanceUnit: profile['distance_unit'],
         ),
       );
     } catch (e) {
@@ -67,6 +68,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         pinStyle: event.pinStyle,
         pinIconType: event.pinIconType,
         pinEmoji: event.pinEmoji,
+        distanceUnit: event.distanceUnit,
       );
       emit(
         ProfileLoaded(
@@ -85,6 +87,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
           pinStyle: profile['pin_style'],
           pinIconType: profile['pin_icon_type'],
           pinEmoji: profile['pin_emoji'],
+          distanceUnit: profile['distance_unit'],
         ),
       );
     } catch (e) {
@@ -124,6 +127,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
           pinStyle: profile['pin_style'],
           pinIconType: profile['pin_icon_type'],
           pinEmoji: profile['pin_emoji'],
+          distanceUnit: profile['distance_unit'],
         ),
       );
     } catch (e) {

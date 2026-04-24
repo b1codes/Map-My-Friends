@@ -202,6 +202,7 @@ class AuthService {
     String? pinStyle,
     String? pinIconType,
     String? pinEmoji,
+    String? distanceUnit,
   }) async {
     try {
       final dio = await _getAuthenticatedDio();
@@ -219,6 +220,7 @@ class AuthService {
       if (pinStyle != null) data['pin_style'] = pinStyle;
       if (pinIconType != null) data['pin_icon_type'] = pinIconType;
       if (pinEmoji != null) data['pin_emoji'] = pinEmoji;
+      if (distanceUnit != null) data['distance_unit'] = distanceUnit;
 
       final response = await dio.patch('user/profile/', data: data);
 
