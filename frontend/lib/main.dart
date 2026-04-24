@@ -18,6 +18,7 @@ import 'screens/auth/login_screen.dart';
 import 'screens/map/map_screen.dart';
 import 'screens/people/people_screen.dart';
 import 'screens/profile/me_screen.dart';
+import 'screens/trips/trips_screen.dart';
 import 'utils/app_theme.dart';
 import 'components/shared/glass_container.dart';
 import 'bloc/theme/theme_cubit.dart';
@@ -147,6 +148,8 @@ class _MainScreenState extends State<MainScreen> {
       case 1:
         return const PeopleScreen();
       case 2:
+        return TripsScreen(onNavigateToMap: () => _onItemTapped(0));
+      case 3:
         return const MeScreen();
       default:
         return const MapScreen();
@@ -229,11 +232,19 @@ class _MainScreenState extends State<MainScreen> {
                           ),
                           const SizedBox(height: 20),
                           _buildGlassNavItem(
+                            icon: Icons.route_outlined,
+                            selectedIcon: Icons.route,
+                            label: 'Trips',
+                            index: 2,
+                            isSelected: _selectedIndex == 2,
+                          ),
+                          const SizedBox(height: 20),
+                          _buildGlassNavItem(
                             icon: Icons.person_outline,
                             selectedIcon: Icons.person,
                             label: 'Me',
-                            index: 2,
-                            isSelected: _selectedIndex == 2,
+                            index: 3,
+                            isSelected: _selectedIndex == 3,
                           ),
                         ],
                       ),
@@ -268,10 +279,16 @@ class _MainScreenState extends State<MainScreen> {
                             isSelected: _selectedIndex == 1,
                           ),
                           _buildGlassNavItemMobile(
-                            icon: Icons.person,
-                            label: 'Me',
+                            icon: Icons.route,
+                            label: 'Trips',
                             index: 2,
                             isSelected: _selectedIndex == 2,
+                          ),
+                          _buildGlassNavItemMobile(
+                            icon: Icons.person,
+                            label: 'Me',
+                            index: 3,
+                            isSelected: _selectedIndex == 3,
                           ),
                         ],
                       ),
