@@ -9,12 +9,14 @@ class MapControls extends StatelessWidget {
   final MapController mapController;
   final VoidCallback onToggleTripPlanner;
   final bool showTripPlanner;
+  final bool isBottomModalVisible;
 
   const MapControls({
     super.key,
     required this.mapController,
     required this.onToggleTripPlanner,
     this.showTripPlanner = false,
+    required this.isBottomModalVisible,
   });
 
   void _zoomIn() {
@@ -95,8 +97,12 @@ class MapControls extends StatelessWidget {
               ),
             ),
             // Pan Controls Group
-            Positioned(
-              bottom: isDesktop ? 20 : 120, // Float above bottom nav on mobile
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              bottom: isBottomModalVisible
+                  ? (isDesktop ? 160 : 260)
+                  : (isDesktop ? 20 : 120),
               right: 20,
               child: GlassContainer(
                 padding: const EdgeInsets.all(4),
@@ -137,10 +143,12 @@ class MapControls extends StatelessWidget {
               ),
             ),
             // Zoom Controls Group
-            Positioned(
-              bottom: isDesktop
-                  ? 180
-                  : 280, // Positioned above the pan controls
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              bottom: isBottomModalVisible
+                  ? (isDesktop ? 320 : 420)
+                  : (isDesktop ? 180 : 280),
               right: 20,
               child: GlassContainer(
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
