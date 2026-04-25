@@ -7,15 +7,11 @@ import '../shared/glass_container.dart';
 
 class MapControls extends StatelessWidget {
   final MapController mapController;
-  final VoidCallback onToggleTripPlanner;
-  final bool showTripPlanner;
   final bool isBottomModalVisible;
 
   const MapControls({
     super.key,
     required this.mapController,
-    required this.onToggleTripPlanner,
-    this.showTripPlanner = false,
     required this.isBottomModalVisible,
   });
 
@@ -80,22 +76,6 @@ class MapControls extends StatelessWidget {
         final isDesktop = constraints.maxWidth >= 600;
         return Stack(
           children: [
-            // Trip Planner Toggle
-            Positioned(
-              top: 20,
-              right: 20,
-              child: GlassContainer(
-                padding: const EdgeInsets.all(4),
-                child: _buildGlassButton(
-                  onPressed: onToggleTripPlanner,
-                  icon: showTripPlanner ? Icons.map : Icons.route_outlined,
-                  tooltip: showTripPlanner
-                      ? 'Hide Trip Planner'
-                      : 'Show Trip Planner',
-                  color: showTripPlanner ? Colors.indigo : Colors.white70,
-                ),
-              ),
-            ),
             // Pan Controls Group
             AnimatedPositioned(
               duration: const Duration(milliseconds: 300),
