@@ -48,6 +48,21 @@ class Person(models.Model):
     
     pin_emoji = models.CharField(max_length=10, blank=True, null=True)
 
+    preferred_airport = models.ForeignKey(
+        'airports.Airport',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='preferred_by_people'
+    )
+    preferred_station = models.ForeignKey(
+        'stations.Station',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='preferred_by_people'
+    )
+
     def save(self, *args, **kwargs):
         if not self.location:
             from geopy.geocoders import Nominatim
