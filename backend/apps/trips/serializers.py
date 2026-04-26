@@ -2,13 +2,27 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework_gis.fields import GeometryField
 from apps.people.models import Person
+from apps.airports.models import Airport
+from apps.stations.models import Station
 from .models import Trip, TripStop
 
 
 class TripStopSerializer(serializers.ModelSerializer):
     location = GeometryField()
-    person = serializers.PrimaryKeyRelatedField(
+    people = serializers.PrimaryKeyRelatedField(
         queryset=Person.objects.all(),
+        many=True,
+        required=False,
+        default=[],
+    )
+    airport = serializers.PrimaryKeyRelatedField(
+        queryset=Airport.objects.all(),
+        allow_null=True,
+        required=False,
+        default=None,
+    )
+    station = serializers.PrimaryKeyRelatedField(
+        queryset=Station.objects.all(),
         allow_null=True,
         required=False,
         default=None,
@@ -16,7 +30,7 @@ class TripStopSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TripStop
-        fields = ('id', 'person', 'sequence_order', 'location')
+        fields = ('id', 'people', 'airport', 'station', 'sequence_order', 'location')
 
 
 class TripSerializer(serializers.ModelSerializer):
@@ -31,7 +45,9 @@ class TripSerializer(serializers.ModelSerializer):
             stops_data = validated_data.pop('stops')
             trip = Trip.objects.create(**validated_data)
             for stop_data in stops_data:
-                TripStop.objects.create(trip=trip, **stop_data)
+                people = stop_data.pop('people', [])
+                stop = TripStop.objects.create(trip=trip, **stop_data)
+                stop.people.set(people)
         return trip
 
     def update(self, instance, validated_data):
@@ -43,5 +59,7 @@ class TripSerializer(serializers.ModelSerializer):
             if stops_data is not None:
                 instance.stops.all().delete()
                 for stop_data in stops_data:
-                    TripStop.objects.create(trip=instance, **stop_data)
+                    people = stop_data.pop('people', [])
+                    stop = TripStop.objects.create(trip=instance, **stop_data)
+                    stop.people.set(people)
         return instance

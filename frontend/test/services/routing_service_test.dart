@@ -38,7 +38,7 @@ void main() {
 
     final stopA = TripStop(
       id: 's1',
-      person: personA,
+      people: [personA],
       location: const LatLng(10.0, 10.0),
       sequenceOrder: 0,
     );

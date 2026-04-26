@@ -665,54 +665,103 @@ class _MapScreenState extends State<MapScreen> {
                                             .map((entry) {
                                           final idx = entry.key;
                                           final stop = entry.value;
-                                          final isPerson = stop.person != null;
+                                          final hasPeople = stop.people.isNotEmpty;
+                                          final isAirport = stop.airport != null;
+                                          final isStation = stop.station != null;
+                                          final isPersonOnly = hasPeople && !isAirport && !isStation;
+
+                                          Color color = Colors.indigo;
+                                          if (isPersonOnly) {
+                                            color = Colors.amber;
+                                          } else if (isAirport) {
+                                            color = const Color(0xFF1565C0);
+                                          } else if (isStation) {
+                                            color = const Color(0xFFE65100);
+                                          }
 
                                           return Marker(
                                             point: stop.location,
-                                            width: isPerson ? 24 : 30,
-                                            height: isPerson ? 24 : 30,
-                                            alignment: isPerson
+                                            width: isPersonOnly ? 24 : 30,
+                                            height: isPersonOnly ? 24 : 30,
+                                            alignment: isPersonOnly
                                                 ? Alignment.bottomLeft
                                                 : Alignment.center,
-                                            child: Container(
-                                              decoration: BoxDecoration(
-                                                color: isPerson
-                                                    ? Colors.amber
-                                                    : Colors.indigo,
-                                                shape: BoxShape.circle,
-                                                border: isPerson
-                                                    ? Border.all(
-                                                        color: Colors.white,
-                                                        width: 2,
-                                                      )
-                                                    : null,
-                                                boxShadow: const [
-                                                  BoxShadow(
-                                                    color: Colors.black26,
-                                                    blurRadius: 4,
-                                                    offset: Offset(0, 2),
+                                            child: Stack(
+                                              clipBehavior: Clip.none,
+                                              children: [
+                                                Container(
+                                                  decoration: BoxDecoration(
+                                                    color: color,
+                                                    shape: BoxShape.circle,
+                                                    border: isPersonOnly
+                                                        ? Border.all(
+                                                            color: Colors.white,
+                                                            width: 2,
+                                                          )
+                                                        : null,
+                                                    boxShadow: const [
+                                                      BoxShadow(
+                                                        color: Colors.black26,
+                                                        blurRadius: 4,
+                                                        offset: Offset(0, 2),
+                                                      ),
+                                                    ],
                                                   ),
-                                                ],
-                                              ),
-                                              child: Center(
-                                                child: Text(
-                                                  String.fromCharCode(65 + idx),
-                                                  style: TextStyle(
-                                                    color: isPerson
-                                                        ? Colors.black87
-                                                        : Colors.white,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize:
-                                                        isPerson ? 12 : 14,
+                                                  child: Center(
+                                                    child: isAirport
+                                                        ? const Icon(Icons.flight,
+                                                            color: Colors.white,
+                                                            size: 16)
+                                                        : isStation
+                                                            ? const Icon(
+                                                                Icons.train,
+                                                                color: Colors.white,
+                                                                size: 16)
+                                                            : Text(
+                                                                String.fromCharCode(
+                                                                    65 + idx),
+                                                                style: TextStyle(
+                                                                  color: isPersonOnly
+                                                                      ? Colors.black87
+                                                                      : Colors.white,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  fontSize: isPersonOnly
+                                                                      ? 12
+                                                                      : 14,
+                                                                ),
+                                                              ),
                                                   ),
                                                 ),
-                                              ),
+                                                if (hasPeople && (isAirport || isStation))
+                                                  Positioned(
+                                                    right: -4,
+                                                    top: -4,
+                                                    child: Container(
+                                                      padding: const EdgeInsets.all(4),
+                                                      decoration: const BoxDecoration(
+                                                        color: Colors.amber,
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: Text(
+                                                        stop.people.length.toString(),
+                                                        style: const TextStyle(
+                                                          fontSize: 10,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: Colors.black87,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
                                             ),
                                           );
                                         }).toList(),
                                       );
                                     },
                                   ),
+
                                   RichAttributionWidget(
                                     alignment: AttributionAlignment.bottomLeft,
                                     attributions: [

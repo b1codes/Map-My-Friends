@@ -33,30 +33,78 @@ class HorizontalTripPlanner extends StatelessWidget {
                     itemCount: state.stops.length,
                     itemBuilder: (context, index) {
                       final stop = state.stops[index];
-                      final isPerson = stop.person != null;
+                      String name = 'Stop';
+                      IconData? icon;
+                      Color color = Colors.indigo;
+
+                      if (stop.airport != null) {
+                        name = stop.airport!.iataCode;
+                        icon = Icons.flight;
+                        color = const Color(0xFF1565C0);
+                      } else if (stop.station != null) {
+                        name = stop.station!.name;
+                        icon = Icons.train;
+                        color = const Color(0xFFE65100);
+                      } else if (stop.people.isNotEmpty) {
+                        name = stop.people.first.firstName;
+                        if (stop.people.length > 1) {
+                          name += ' +${stop.people.length - 1}';
+                        }
+                        color = Colors.amber;
+                      }
+
                       final letter = String.fromCharCode(65 + index);
 
                       return Container(
-                        width: 80,
+                        width: 100,
                         margin: const EdgeInsets.only(right: 8),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            CircleAvatar(
-                              backgroundColor: isPerson
-                                  ? Colors.amber
-                                  : Colors.indigo,
-                              child: Text(
-                                letter,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: color,
+                                  foregroundColor: color == Colors.amber
+                                      ? Colors.black87
+                                      : Colors.white,
+                                  child: icon != null
+                                      ? Icon(icon, size: 20)
+                                      : Text(
+                                          letter,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                 ),
-                              ),
+                                if (stop.people.isNotEmpty &&
+                                    (stop.airport != null ||
+                                        stop.station != null))
+                                  Positioned(
+                                    right: -4,
+                                    top: -4,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(
+                                        color: Colors.amber,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Text(
+                                        stop.people.length.toString(),
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              stop.person?.firstName ?? "Stop",
+                              name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.center,
@@ -66,6 +114,42 @@ class HorizontalTripPlanner extends StatelessWidget {
                                 color: Colors.white,
                               ),
                             ),
+                            if (stop.people.isNotEmpty &&
+                                (stop.airport != null || stop.station != null))
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Wrap(
+                                  spacing: -8,
+                                  children: stop.people.take(3).map((p) {
+                                    return Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white24,
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: CircleAvatar(
+                                        radius: 10,
+                                        backgroundImage:
+                                            p.profileImageUrl != null
+                                                ? NetworkImage(
+                                                    p.profileImageUrl!,
+                                                  )
+                                                : null,
+                                        child: p.profileImageUrl == null
+                                            ? Text(
+                                                p.firstName[0],
+                                                style: const TextStyle(
+                                                  fontSize: 8,
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
                           ],
                         ),
                       );

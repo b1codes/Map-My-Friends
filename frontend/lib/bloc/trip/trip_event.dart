@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 import '../../models/person.dart';
+import '../../models/airport.dart';
+import '../../models/station.dart';
 import '../../models/trip.dart';
 
 abstract class TripEvent extends Equatable {
@@ -13,6 +15,28 @@ class AddStop extends TripEvent {
   const AddStop(this.person);
   @override
   List<Object?> get props => [person];
+}
+
+class AddAirportStop extends TripEvent {
+  final Airport airport;
+  const AddAirportStop(this.airport);
+  @override
+  List<Object?> get props => [airport];
+}
+
+class AddStationStop extends TripEvent {
+  final Station station;
+  const AddStationStop(this.station);
+  @override
+  List<Object?> get props => [station];
+}
+
+class LinkPersonToStop extends TripEvent {
+  final Person person;
+  final int stopIndex;
+  const LinkPersonToStop(this.person, this.stopIndex);
+  @override
+  List<Object?> get props => [person, stopIndex];
 }
 
 class RemoveStop extends TripEvent {

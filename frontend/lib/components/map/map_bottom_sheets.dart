@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../models/airport.dart';
 import '../../models/station.dart';
+import '../../bloc/trip/trip_bloc.dart';
+import '../../bloc/trip/trip_event.dart';
 
 class AirportBottomSheet extends StatelessWidget {
   final Airport airport;
@@ -17,6 +20,13 @@ class AirportBottomSheet extends StatelessWidget {
       subtitle: airport.iataCode,
       location: '${airport.city}, ${airport.country}',
       label: typeLabel,
+      onAddToTrip: () {
+        context.read<TripBloc>().add(AddAirportStop(airport));
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Added ${airport.name} to trip')),
+        );
+      },
     );
   }
 }
@@ -65,6 +75,13 @@ class StationBottomSheet extends StatelessWidget {
       location:
           '${station.city ?? "Unknown City"}, ${station.country ?? "Unknown Country"}',
       label: label,
+      onAddToTrip: () {
+        context.read<TripBloc>().add(AddStationStop(station));
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Added ${station.name} to trip')),
+        );
+      },
     );
   }
 }
@@ -76,6 +93,8 @@ class BaseBottomSheet extends StatelessWidget {
   final String? subtitle;
   final String location;
   final String label;
+  final VoidCallback? onAddToTrip;
+
   const BaseBottomSheet({
     super.key,
     required this.icon,
@@ -84,6 +103,7 @@ class BaseBottomSheet extends StatelessWidget {
     this.subtitle,
     required this.location,
     required this.label,
+    this.onAddToTrip,
   });
   @override
   Widget build(BuildContext context) {
@@ -147,6 +167,22 @@ class BaseBottomSheet extends StatelessWidget {
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
+            if (onAddToTrip != null) ...[
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: onAddToTrip,
+                  icon: const Icon(Icons.add_location_alt_outlined),
+                  label: const Text('Add to Trip'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: color,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

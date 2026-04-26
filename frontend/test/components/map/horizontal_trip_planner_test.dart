@@ -32,7 +32,7 @@ void main() {
   );
 
   final stops = [
-    TripStop(location: const LatLng(0, 0), sequenceOrder: 0, person: person),
+    TripStop(location: const LatLng(0, 0), sequenceOrder: 0, people: [person]),
     const TripStop(location: LatLng(1, 1), sequenceOrder: 1),
   ];
 

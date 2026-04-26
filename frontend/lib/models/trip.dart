@@ -1,6 +1,8 @@
 import 'package:equatable/equatable.dart';
 import 'package:latlong2/latlong.dart';
 import 'person.dart';
+import 'airport.dart';
+import 'station.dart';
 
 enum TripStatus {
   draft('DRAFT'),
@@ -20,21 +22,27 @@ enum TripStatus {
 
 class TripStop extends Equatable {
   final String? id;
-  final Person? person;
+  final List<Person> people;
+  final Airport? airport;
+  final Station? station;
   final LatLng location;
   final int sequenceOrder;
 
   const TripStop({
     this.id,
-    this.person,
+    this.people = const [],
+    this.airport,
+    this.station,
     required this.location,
     required this.sequenceOrder,
   });
 
-  TripStop copyWith({int? sequenceOrder}) {
+  TripStop copyWith({int? sequenceOrder, List<Person>? people}) {
     return TripStop(
       id: id,
-      person: person,
+      people: people ?? this.people,
+      airport: airport,
+      station: station,
       location: location,
       sequenceOrder: sequenceOrder ?? this.sequenceOrder,
     );
@@ -42,7 +50,9 @@ class TripStop extends Equatable {
 
   Map<String, dynamic> toJson() {
     return {
-      'person': person?.id,
+      'people': people.map((p) => p.id).toList(),
+      'airport': airport?.id,
+      'station': station?.id,
       'sequence_order': sequenceOrder,
       'location': {
         'type': 'Point',
@@ -54,16 +64,34 @@ class TripStop extends Equatable {
   factory TripStop.fromJson(Map<String, dynamic> json) {
     final locationData = json['location'] as Map<String, dynamic>;
     final coordinates = locationData['coordinates'] as List;
+
+    List<Person> peopleList = [];
+    if (json['people_detail'] != null) {
+      peopleList = (json['people_detail'] as List)
+          .map((p) => Person.fromJson(p as Map<String, dynamic>))
+          .toList();
+    } else if (json['person_detail'] != null) {
+      // Legacy support/fallback
+      peopleList = [Person.fromJson(json['person_detail'])];
+    }
+
     return TripStop(
       id: json['id']?.toString(),
-      person: json['person_detail'] != null ? Person.fromJson(json['person_detail']) : null,
+      people: peopleList,
+      airport: json['airport_detail'] != null
+          ? Airport.fromGeoJson(json['airport_detail'])
+          : null,
+      station: json['station_detail'] != null
+          ? Station.fromGeoJson(json['station_detail'])
+          : null,
       location: LatLng(coordinates[1] as double, coordinates[0] as double),
       sequenceOrder: json['sequence_order'] as int,
     );
   }
 
   @override
-  List<Object?> get props => [id, person, location, sequenceOrder];
+  List<Object?> get props =>
+      [id, people, airport, station, location, sequenceOrder];
 }
 
 class Trip extends Equatable {

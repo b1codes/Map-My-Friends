@@ -6,6 +6,7 @@ import '../../models/station.dart';
 import '../../screens/people/person_details_screen.dart';
 import '../../bloc/trip/trip_bloc.dart';
 import '../../bloc/trip/trip_event.dart';
+import '../../bloc/trip/trip_state.dart';
 
 import '../../components/map/map_bottom_sheets.dart';
 
@@ -85,54 +86,97 @@ class UnifiedClusterModal extends StatelessWidget {
   }
 
   Widget _buildPersonTile(BuildContext context, Person p) {
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        backgroundImage: p.profileImageUrl != null
-            ? NetworkImage(p.profileImageUrl!)
-            : null,
-        child: p.profileImageUrl == null
-            ? Text(
-                (p.firstName.isNotEmpty ? p.firstName[0] : '') +
-                    (p.lastName.isNotEmpty ? p.lastName[0] : ''),
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.bold,
-                ),
-              )
-            : null,
-      ),
-      title: Text('${p.firstName} ${p.lastName}'),
-      subtitle: Text(p.relationshipTag, style: const TextStyle(fontSize: 12)),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: const Icon(
-              Icons.add_location_alt_outlined,
-              color: Colors.indigo,
-            ),
-            tooltip: 'Add to Trip',
-            onPressed: () {
-              context.read<TripBloc>().add(AddStop(p));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Added ${p.firstName} to trip'),
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            },
+    return BlocBuilder<TripBloc, TripState>(
+      builder: (context, state) {
+        final existingStopIndex = state.stops.indexWhere(
+          (s) => s.people.any((person) => person.id == p.id),
+        );
+
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            backgroundImage: p.profileImageUrl != null
+                ? NetworkImage(p.profileImageUrl!)
+                : null,
+            child: p.profileImageUrl == null
+                ? Text(
+                    (p.firstName.isNotEmpty ? p.firstName[0] : '') +
+                        (p.lastName.isNotEmpty ? p.lastName[0] : ''),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  )
+                : null,
           ),
-          const Icon(Icons.chevron_right),
-        ],
-      ),
-      onTap: () {
-        Navigator.pop(context); // close modal
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PersonDetailsScreen(personId: p.id),
+          title: Text('${p.firstName} ${p.lastName}'),
+          subtitle:
+              Text(p.relationshipTag, style: const TextStyle(fontSize: 12)),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (existingStopIndex == -1)
+                IconButton(
+                  icon: const Icon(
+                    Icons.add_location_alt_outlined,
+                    color: Colors.indigo,
+                  ),
+                  tooltip: 'Add as New Stop',
+                  onPressed: () {
+                    context.read<TripBloc>().add(AddStop(p));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Added ${p.firstName} as new stop'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                ),
+              // Link to existing airport/station stop if one exists
+              if (state.stops.any((s) => s.airport != null || s.station != null))
+                PopupMenuButton<int>(
+                  icon: const Icon(Icons.link, color: Colors.amber),
+                  tooltip: 'Link to Stop',
+                  onSelected: (index) {
+                    context.read<TripBloc>().add(LinkPersonToStop(p, index));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Linked ${p.firstName} to stop ${String.fromCharCode(65 + index)}'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  itemBuilder: (context) {
+                    return state.stops
+                        .asMap()
+                        .entries
+                        .where((e) =>
+                            e.value.airport != null || e.value.station != null)
+                        .map((e) {
+                      final stop = e.value;
+                      final label = stop.airport != null
+                          ? 'Airport ${stop.airport!.iataCode}'
+                          : 'Station ${stop.station!.name}';
+                      return PopupMenuItem<int>(
+                        value: e.key,
+                        child:
+                            Text('${String.fromCharCode(65 + e.key)}: $label'),
+                      );
+                    }).toList();
+                  },
+                ),
+              const Icon(Icons.chevron_right),
+            ],
           ),
+          onTap: () {
+            Navigator.pop(context); // close modal
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PersonDetailsScreen(personId: p.id),
+              ),
+            );
+          },
         );
       },
     );
@@ -153,7 +197,28 @@ class UnifiedClusterModal extends StatelessWidget {
         '${a.iataCode} • ${a.city}, ${a.country}',
         style: const TextStyle(fontSize: 12),
       ),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(
+              Icons.add_location_alt_outlined,
+              color: Colors.indigo,
+            ),
+            tooltip: 'Add to Trip',
+            onPressed: () {
+              context.read<TripBloc>().add(AddAirportStop(a));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Added ${a.name} to trip'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
+          const Icon(Icons.chevron_right),
+        ],
+      ),
       onTap: () {
         Navigator.pop(context); // close modal
         showModalBottomSheet(
@@ -209,7 +274,28 @@ class UnifiedClusterModal extends StatelessWidget {
         '$label • ${s.city ?? "Unknown City"}',
         style: const TextStyle(fontSize: 12),
       ),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(
+              Icons.add_location_alt_outlined,
+              color: Colors.indigo,
+            ),
+            tooltip: 'Add to Trip',
+            onPressed: () {
+              context.read<TripBloc>().add(AddStationStop(s));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Added ${s.name} to trip'),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
+          const Icon(Icons.chevron_right),
+        ],
+      ),
       onTap: () {
         Navigator.pop(context); // close modal
         showModalBottomSheet(

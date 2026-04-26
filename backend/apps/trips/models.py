@@ -27,7 +27,9 @@ class Trip(models.Model):
 
 class TripStop(models.Model):
     trip = models.ForeignKey(Trip, on_delete=models.CASCADE, related_name='stops')
-    person = models.ForeignKey('people.Person', on_delete=models.SET_NULL, null=True)
+    people = models.ManyToManyField('people.Person', blank=True)
+    airport = models.ForeignKey('airports.Airport', on_delete=models.SET_NULL, null=True, blank=True)
+    station = models.ForeignKey('stations.Station', on_delete=models.SET_NULL, null=True, blank=True)
     sequence_order = models.PositiveIntegerField()
     location = models.PointField()
 

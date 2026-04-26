@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:latlong2/latlong.dart';
 import '../../models/trip.dart';
+import '../../models/person.dart';
 import '../../services/routing_service.dart';
 import '../../services/api_service.dart';
 import 'trip_event.dart';
@@ -16,6 +17,9 @@ class TripBloc extends Bloc<TripEvent, TripState> {
       _apiService = apiService ?? ApiService(),
       super(const TripState()) {
     on<AddStop>(_onAddStop);
+    on<AddAirportStop>(_onAddAirportStop);
+    on<AddStationStop>(_onAddStationStop);
+    on<LinkPersonToStop>(_onLinkPersonToStop);
     on<RemoveStop>(_onRemoveStop);
     on<ReorderStops>(_onReorderStops);
     on<ClearTrip>(_onClearTrip);
@@ -30,12 +34,57 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     if (event.person.latitude == null || event.person.longitude == null) return;
 
     final newStop = TripStop(
-      person: event.person,
+      people: [event.person],
       location: LatLng(event.person.latitude!, event.person.longitude!),
       sequenceOrder: state.stops.length,
     );
 
-    final newStops = List<TripStop>.from(state.stops)..add(newStop);
+    await _handleAddStop(newStop, emit);
+  }
+
+  Future<void> _onAddAirportStop(
+    AddAirportStop event,
+    Emitter<TripState> emit,
+  ) async {
+    final newStop = TripStop(
+      airport: event.airport,
+      location: LatLng(event.airport.latitude, event.airport.longitude),
+      sequenceOrder: state.stops.length,
+    );
+
+    await _handleAddStop(newStop, emit);
+  }
+
+  Future<void> _onAddStationStop(
+    AddStationStop event,
+    Emitter<TripState> emit,
+  ) async {
+    final newStop = TripStop(
+      station: event.station,
+      location: LatLng(event.station.latitude, event.station.longitude),
+      sequenceOrder: state.stops.length,
+    );
+
+    await _handleAddStop(newStop, emit);
+  }
+
+  void _onLinkPersonToStop(LinkPersonToStop event, Emitter<TripState> emit) {
+    if (event.stopIndex < 0 || event.stopIndex >= state.stops.length) return;
+
+    final stop = state.stops[event.stopIndex];
+    if (stop.people.any((p) => p.id == event.person.id)) return;
+
+    final newPeople = List<Person>.from(stop.people)..add(event.person);
+    final updatedStop = stop.copyWith(people: newPeople);
+
+    final newStops = List<TripStop>.from(state.stops);
+    newStops[event.stopIndex] = updatedStop;
+
+    emit(state.copyWith(stops: newStops));
+  }
+
+  Future<void> _handleAddStop(TripStop stop, Emitter<TripState> emit) async {
+    final newStops = List<TripStop>.from(state.stops)..add(stop);
     emit(state.copyWith(stops: newStops, isOptimizing: true));
 
     final requestId = ++_routingRequestId;
