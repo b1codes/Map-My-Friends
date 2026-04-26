@@ -36,18 +36,18 @@ class TripModelTests(TestCase):
             date=datetime.date(2026, 7, 4),
             user=self.user,
         )
-        TripStop.objects.create(
+        stop2 = TripStop.objects.create(
             trip=trip,
-            person=self.person,
             sequence_order=2,
             location=Point(-73.9857, 40.7484, srid=4326),
         )
-        TripStop.objects.create(
+        stop2.people.set([self.person])
+        stop1 = TripStop.objects.create(
             trip=trip,
-            person=self.person,
             sequence_order=1,
             location=Point(-87.6298, 41.8781, srid=4326),
         )
+        stop1.people.set([self.person])
         stops = list(trip.stops.all())
         self.assertEqual(stops[0].sequence_order, 1)
         self.assertEqual(stops[1].sequence_order, 2)
@@ -58,12 +58,12 @@ class TripModelTests(TestCase):
             date=datetime.date(2026, 7, 4),
             user=self.user,
         )
-        TripStop.objects.create(
+        stop = TripStop.objects.create(
             trip=trip,
-            person=self.person,
             sequence_order=1,
             location=Point(-87.6298, 41.8781, srid=4326),
         )
+        stop.people.set([self.person])
         trip_id = trip.id
         trip.delete()
         self.assertFalse(TripStop.objects.filter(trip_id=trip_id).exists())
@@ -88,14 +88,16 @@ class TripSerializerTests(TestCase):
             date=datetime.date(2026, 8, 1),
             user=self.user,
         )
-        TripStop.objects.create(
-            trip=trip, person=self.person, sequence_order=2,
+        s2 = TripStop.objects.create(
+            trip=trip, sequence_order=2,
             location=Point(-73.9857, 40.7484, srid=4326),
         )
-        TripStop.objects.create(
-            trip=trip, person=self.person, sequence_order=1,
+        s2.people.set([self.person])
+        s1 = TripStop.objects.create(
+            trip=trip, sequence_order=1,
             location=Point(-87.6298, 41.8781, srid=4326),
         )
+        s1.people.set([self.person])
         serializer = TripSerializer(trip)
         data = serializer.data
         self.assertEqual(data['name'], 'My Trip')
@@ -109,7 +111,7 @@ class TripSerializerTests(TestCase):
             'date': '2026-09-01',
             'stops': [
                 {
-                    'person': self.person.id,
+                    'people': [self.person.id],
                     'sequence_order': 1,
                     'location': {'type': 'Point', 'coordinates': [-87.6298, 41.8781]},
                 },
@@ -127,21 +129,22 @@ class TripSerializerTests(TestCase):
             date=datetime.date(2026, 8, 1),
             user=self.user,
         )
-        TripStop.objects.create(
-            trip=trip, person=self.person, sequence_order=1,
+        s = TripStop.objects.create(
+            trip=trip, sequence_order=1,
             location=Point(-87.6298, 41.8781, srid=4326),
         )
+        s.people.set([self.person])
         data = {
             'name': 'Updated Trip',
             'date': '2026-09-15',
             'stops': [
                 {
-                    'person': self.person.id,
+                    'people': [self.person.id],
                     'sequence_order': 1,
                     'location': {'type': 'Point', 'coordinates': [-73.9857, 40.7484]},
                 },
                 {
-                    'person': self.person.id,
+                    'people': [self.person.id],
                     'sequence_order': 2,
                     'location': {'type': 'Point', 'coordinates': [-87.6298, 41.8781]},
                 },
@@ -159,26 +162,28 @@ class TripSerializerTests(TestCase):
             date=datetime.date(2026, 8, 1),
             user=self.user,
         )
-        TripStop.objects.create(
-            trip=trip, person=self.person, sequence_order=1,
+        s1 = TripStop.objects.create(
+            trip=trip, sequence_order=1,
             location=Point(-87.6298, 41.8781, srid=4326),
         )
-        TripStop.objects.create(
-            trip=trip, person=self.person, sequence_order=2,
+        s1.people.set([self.person])
+        s2 = TripStop.objects.create(
+            trip=trip, sequence_order=2,
             location=Point(-73.9857, 40.7484, srid=4326),
         )
+        s2.people.set([self.person])
         # Update with stops where sequence_order 2 overlaps with old stop 2 but is a different stop
         data = {
             'name': 'Overlap Trip',
             'date': '2026-08-01',
             'stops': [
                 {
-                    'person': self.person.id,
+                    'people': [self.person.id],
                     'sequence_order': 2,
                     'location': {'type': 'Point', 'coordinates': [-87.6298, 41.8781]},
                 },
                 {
-                    'person': self.person.id,
+                    'people': [self.person.id],
                     'sequence_order': 3,
                     'location': {'type': 'Point', 'coordinates': [-73.9857, 40.7484]},
                 },
@@ -228,12 +233,12 @@ class TripApiTests(TestCase):
             'date': '2026-08-15',
             'stops': [
                 {
-                    'person': self.person.id,
+                    'people': [self.person.id],
                     'sequence_order': 1,
                     'location': {'type': 'Point', 'coordinates': [-87.6298, 41.8781]},
                 },
                 {
-                    'person': self.person.id,
+                    'people': [self.person.id],
                     'sequence_order': 2,
                     'location': {'type': 'Point', 'coordinates': [-73.9857, 40.7484]},
                 },
@@ -247,21 +252,22 @@ class TripApiTests(TestCase):
 
     def test_update_replaces_stops(self):
         trip = Trip.objects.create(name='Old', date='2026-07-01', user=self.user)
-        TripStop.objects.create(
-            trip=trip, person=self.person, sequence_order=1,
+        s = TripStop.objects.create(
+            trip=trip, sequence_order=1,
             location=Point(-87.6298, 41.8781, srid=4326),
         )
+        s.people.set([self.person])
         payload = {
             'name': 'Updated',
             'date': '2026-09-01',
             'stops': [
                 {
-                    'person': self.person.id,
+                    'people': [self.person.id],
                     'sequence_order': 1,
                     'location': {'type': 'Point', 'coordinates': [-73.9857, 40.7484]},
                 },
                 {
-                    'person': self.person.id,
+                    'people': [self.person.id],
                     'sequence_order': 2,
                     'location': {'type': 'Point', 'coordinates': [-87.6298, 41.8781]},
                 },
