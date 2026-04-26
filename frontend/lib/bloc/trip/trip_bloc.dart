@@ -33,9 +33,22 @@ class TripBloc extends Bloc<TripEvent, TripState> {
   Future<void> _onAddStop(AddStop event, Emitter<TripState> emit) async {
     if (event.person.latitude == null || event.person.longitude == null) return;
 
+    // Auto-fill hub if available
+    Airport? preferredAirport = event.person.preferredAirport;
+    Station? preferredStation = event.person.preferredStation;
+
+    LatLng location = LatLng(event.person.latitude!, event.person.longitude!);
+    if (preferredAirport != null) {
+      location = LatLng(preferredAirport.latitude, preferredAirport.longitude);
+    } else if (preferredStation != null) {
+      location = LatLng(preferredStation.latitude, preferredStation.longitude);
+    }
+
     final newStop = TripStop(
       people: [event.person],
-      location: LatLng(event.person.latitude!, event.person.longitude!),
+      airport: preferredAirport,
+      station: preferredStation,
+      location: location,
       sequenceOrder: state.stops.length,
     );
 
@@ -75,7 +88,28 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     if (stop.people.any((p) => p.id == event.person.id)) return;
 
     final newPeople = List<Person>.from(stop.people)..add(event.person);
-    final updatedStop = stop.copyWith(people: newPeople);
+
+    // Auto-fill hub if stop has none
+    Airport? newAirport = stop.airport;
+    Station? newStation = stop.station;
+    LatLng newLocation = stop.location;
+
+    if (newAirport == null && newStation == null) {
+      if (event.person.preferredAirport != null) {
+        newAirport = event.person.preferredAirport;
+        newLocation = LatLng(newAirport!.latitude, newAirport.longitude);
+      } else if (event.person.preferredStation != null) {
+        newStation = event.person.preferredStation;
+        newLocation = LatLng(newStation!.latitude, newStation.longitude);
+      }
+    }
+
+    final updatedStop = stop.copyWith(
+      people: newPeople,
+      airport: newAirport,
+      station: newStation,
+      location: newLocation,
+    );
 
     final newStops = List<TripStop>.from(state.stops);
     newStops[event.stopIndex] = updatedStop;

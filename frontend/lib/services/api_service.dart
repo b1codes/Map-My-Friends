@@ -3,6 +3,8 @@ import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/person.dart';
 import '../models/trip.dart';
+import '../models/airport.dart';
+import '../models/station.dart';
 import 'api_config.dart';
 import 'auth_service.dart';
 
@@ -232,6 +234,41 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Failed to delete trip: $e');
+    }
+  }
+
+  // Hub methods
+  Future<List<Airport>> getNearestAirports(double lat, double lon, {int count = 5}) async {
+    try {
+      final response = await _dio.get(
+        'airports/nearest/',
+        queryParameters: {'lat': lat, 'lon': lon, 'count': count},
+      );
+      if (response.statusCode == 200) {
+        final features = response.data['features'] as List;
+        return features.map((json) => Airport.fromGeoJson(json)).toList();
+      } else {
+        throw Exception('Failed to load nearest airports');
+      }
+    } catch (e) {
+      throw Exception('Failed to load nearest airports: $e');
+    }
+  }
+
+  Future<List<Station>> getNearestStations(double lat, double lon, {int count = 5}) async {
+    try {
+      final response = await _dio.get(
+        'stations/nearest/',
+        queryParameters: {'lat': lat, 'lon': lon, 'count': count},
+      );
+      if (response.statusCode == 200) {
+        final features = response.data['features'] as List;
+        return features.map((json) => Station.fromGeoJson(json)).toList();
+      } else {
+        throw Exception('Failed to load nearest stations');
+      }
+    } catch (e) {
+      throw Exception('Failed to load nearest stations: $e');
     }
   }
 }

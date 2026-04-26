@@ -138,11 +138,28 @@ class UnifiedClusterModal extends StatelessWidget {
                   icon: const Icon(Icons.link, color: Colors.amber),
                   tooltip: 'Link to Stop',
                   onSelected: (index) {
+                    final stop = state.stops[index];
                     context.read<TripBloc>().add(LinkPersonToStop(p, index));
+
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Linked ${p.firstName} to stop ${String.fromCharCode(65 + index)}'),
-                        duration: const Duration(seconds: 2),
+                        content: Text(
+                            'Linked ${p.firstName} to stop ${String.fromCharCode(65 + index)}'),
+                        duration: const Duration(seconds: 4),
+                        action: SnackBarAction(
+                          label: 'Set as Preferred',
+                          onPressed: () {
+                            final updatedPerson = p.copyWith(
+                              preferredAirportId: stop.airport?.id?.toString(),
+                              preferredStationId: stop.station?.id?.toString(),
+                              preferredAirport: stop.airport,
+                              preferredStation: stop.station,
+                            );
+                            context.read<PeopleBloc>().add(
+                                  UpdatePerson(updatedPerson),
+                                );
+                          },
+                        ),
                       ),
                     );
                   },

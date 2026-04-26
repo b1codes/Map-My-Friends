@@ -37,13 +37,19 @@ class TripStop extends Equatable {
     required this.sequenceOrder,
   });
 
-  TripStop copyWith({int? sequenceOrder, List<Person>? people}) {
+  TripStop copyWith({
+    int? sequenceOrder,
+    List<Person>? people,
+    Airport? airport,
+    Station? station,
+    LatLng? location,
+  }) {
     return TripStop(
       id: id,
       people: people ?? this.people,
-      airport: airport,
-      station: station,
-      location: location,
+      airport: airport ?? this.airport,
+      station: station ?? this.station,
+      location: location ?? this.location,
       sequenceOrder: sequenceOrder ?? this.sequenceOrder,
     );
   }

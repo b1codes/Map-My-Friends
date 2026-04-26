@@ -14,6 +14,9 @@ import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import '../../components/shared/image_editor_modal.dart';
 import '../../components/shared/custom_text_form_field.dart';
 import '../../components/map/custom_map_marker.dart';
+import '../../models/airport.dart';
+import '../../models/station.dart';
+import '../../services/api_service.dart';
 
 class AddEditPersonScreen extends StatefulWidget {
   final Person? person;
@@ -40,6 +43,12 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
   XFile? _selectedImage;
   Uint8List? _selectedImageBytes;
   String? _existingImageUrl;
+
+  Airport? _preferredAirport;
+  Station? _preferredStation;
+  List<Airport> _nearbyAirports = [];
+  List<Station> _nearbyStations = [];
+  bool _isLoadingHubs = false;
 
   String _pinColor = '#F44336';
   String _pinStyle = 'teardrop';
@@ -72,10 +81,49 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
     _birthday = widget.person?.birthday;
     _existingImageUrl = widget.person?.profileImageUrl;
 
+    _preferredAirport = widget.person?.preferredAirport;
+    _preferredStation = widget.person?.preferredStation;
+
     _pinColor = widget.person?.pinColor ?? '#F44336';
     _pinStyle = widget.person?.pinStyle ?? 'teardrop';
     _pinIconType = widget.person?.pinIconType ?? 'none';
     _pinEmoji = widget.person?.pinEmoji ?? '😀';
+
+    if (widget.person != null) {
+      _fetchNearbyHubs();
+    }
+  }
+
+  Future<void> _fetchNearbyHubs() async {
+    if (widget.person?.latitude == null || widget.person?.longitude == null) {
+      return;
+    }
+
+    setState(() => _isLoadingHubs = true);
+    try {
+      final apiService = ApiService();
+      final airports = await apiService.getNearestAirports(
+        widget.person!.latitude!,
+        widget.person!.longitude!,
+      );
+      final stations = await apiService.getNearestStations(
+        widget.person!.latitude!,
+        widget.person!.longitude!,
+      );
+
+      setState(() {
+        _nearbyAirports = airports;
+        _nearbyStations = stations;
+        _isLoadingHubs = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingHubs = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load hubs: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -250,6 +298,10 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
         pinStyle: _pinStyle,
         pinIconType: _pinIconType,
         pinEmoji: _pinIconType == 'emoji' ? _pinEmoji : null,
+        preferredAirportId: _preferredAirport?.id?.toString(),
+        preferredStationId: _preferredStation?.id?.toString(),
+        preferredAirport: _preferredAirport,
+        preferredStation: _preferredStation,
       );
 
       if (widget.person != null) {
@@ -607,6 +659,8 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                         ),
                       ),
 
+                      _buildHubSelection(),
+
                       const SizedBox(height: 32),
 
                       Text(
@@ -795,5 +849,85 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
       initials += _lastNameController.text[0];
     }
     return initials;
+  }
+
+  Widget _buildHubSelection() {
+    if (widget.person == null || widget.person?.latitude == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 32),
+        Text(
+          'Preferred Transit Hubs',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+        ),
+        const SizedBox(height: 16),
+        if (_isLoadingHubs)
+          const Center(child: CircularProgressIndicator())
+        else ...[
+          // Airport selection
+          DropdownButtonFormField<Airport>(
+            value: _preferredAirport != null &&
+                    _nearbyAirports.any((a) => a.id == _preferredAirport?.id)
+                ? _nearbyAirports
+                    .firstWhere((a) => a.id == _preferredAirport?.id)
+                : null,
+            hint: Text(_preferredAirport?.name ?? 'Select Preferred Airport'),
+            items: _nearbyAirports.map((airport) {
+              return DropdownMenuItem(
+                value: airport,
+                child: Text('${airport.name} (${airport.iataCode})'),
+              );
+            }).toList(),
+            onChanged: (val) => setState(() => _preferredAirport = val),
+            decoration: InputDecoration(
+              labelText: 'Preferred Airport',
+              prefixIcon: const Icon(Icons.airplanemode_active),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Station selection
+          DropdownButtonFormField<Station>(
+            value: _preferredStation != null &&
+                    _nearbyStations.any((s) => s.id == _preferredStation?.id)
+                ? _nearbyStations
+                    .firstWhere((s) => s.id == _preferredStation?.id)
+                : null,
+            hint: Text(_preferredStation?.name ?? 'Select Preferred Station'),
+            items: _nearbyStations.map((station) {
+              return DropdownMenuItem(
+                value: station,
+                child: Text(station.name),
+              );
+            }).toList(),
+            onChanged: (val) => setState(() => _preferredStation = val),
+            decoration: InputDecoration(
+              labelText: 'Preferred Train Station',
+              prefixIcon: const Icon(Icons.train),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _fetchNearbyHubs,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh Nearby Hubs'),
+          ),
+        ],
+      ],
+    );
   }
 }
