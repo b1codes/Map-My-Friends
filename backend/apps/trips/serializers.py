@@ -30,7 +30,8 @@ class TripStopSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = TripStop
-        fields = ('id', 'people', 'airport', 'station', 'sequence_order', 'location')
+        fields = ('id', 'people', 'airport', 'station', 'sequence_order', 'location', 'snapshot_address', 'snapshot_metadata')
+        read_only_fields = ('snapshot_address', 'snapshot_metadata')
 
 
 class TripSerializer(serializers.ModelSerializer):

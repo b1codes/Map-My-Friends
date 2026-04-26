@@ -68,6 +68,33 @@ class TripModelTests(TestCase):
         trip.delete()
         self.assertFalse(TripStop.objects.filter(trip_id=trip_id).exists())
 
+    def test_trip_snapshotting_on_status_change(self):
+        trip = Trip.objects.create(
+            name='Snapshot Trip',
+            date=datetime.date(2026, 7, 4),
+            user=self.user,
+            status=Trip.Status.DRAFT,
+        )
+        stop = TripStop.objects.create(
+            trip=trip,
+            sequence_order=1,
+            location=Point(-87.6298, 41.8781, srid=4326),
+        )
+        stop.people.set([self.person])
+        
+        # Initially snapshots should be empty
+        self.assertEqual(stop.snapshot_address, '')
+        self.assertEqual(stop.snapshot_metadata, {})
+
+        # Transition to BOOKED
+        trip.status = Trip.Status.BOOKED
+        trip.save()
+
+        stop.refresh_from_db()
+        self.assertIn('Jane Doe', stop.snapshot_address)
+        self.assertIn('Chicago', stop.snapshot_address)
+        self.assertEqual(stop.snapshot_metadata['people'][0]['first_name'], 'Jane')
+
 
 class TripSerializerTests(TestCase):
     def setUp(self):
