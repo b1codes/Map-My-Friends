@@ -27,6 +27,8 @@ class TripStop extends Equatable {
   final Station? station;
   final LatLng location;
   final int sequenceOrder;
+  final String? snapshotAddress;
+  final Map<String, dynamic>? snapshotMetadata;
 
   const TripStop({
     this.id,
@@ -35,6 +37,8 @@ class TripStop extends Equatable {
     this.station,
     required this.location,
     required this.sequenceOrder,
+    this.snapshotAddress,
+    this.snapshotMetadata,
   });
 
   TripStop copyWith({
@@ -43,6 +47,8 @@ class TripStop extends Equatable {
     Airport? airport,
     Station? station,
     LatLng? location,
+    String? snapshotAddress,
+    Map<String, dynamic>? snapshotMetadata,
   }) {
     return TripStop(
       id: id,
@@ -51,6 +57,8 @@ class TripStop extends Equatable {
       station: station ?? this.station,
       location: location ?? this.location,
       sequenceOrder: sequenceOrder ?? this.sequenceOrder,
+      snapshotAddress: snapshotAddress ?? this.snapshotAddress,
+      snapshotMetadata: snapshotMetadata ?? this.snapshotMetadata,
     );
   }
 
@@ -64,6 +72,8 @@ class TripStop extends Equatable {
         'type': 'Point',
         'coordinates': [location.longitude, location.latitude],
       },
+      'snapshot_address': snapshotAddress,
+      'snapshot_metadata': snapshotMetadata,
     };
   }
 
@@ -92,12 +102,22 @@ class TripStop extends Equatable {
           : null,
       location: LatLng(coordinates[1] as double, coordinates[0] as double),
       sequenceOrder: json['sequence_order'] as int,
+      snapshotAddress: json['snapshot_address'] as String?,
+      snapshotMetadata: json['snapshot_metadata'] as Map<String, dynamic>?,
     );
   }
 
   @override
-  List<Object?> get props =>
-      [id, people, airport, station, location, sequenceOrder];
+  List<Object?> get props => [
+        id,
+        people,
+        airport,
+        station,
+        location,
+        sequenceOrder,
+        snapshotAddress,
+        snapshotMetadata
+      ];
 }
 
 class Trip extends Equatable {

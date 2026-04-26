@@ -93,7 +93,41 @@ class TripModelTests(TestCase):
         stop.refresh_from_db()
         self.assertIn('Jane Doe', stop.snapshot_address)
         self.assertIn('Chicago', stop.snapshot_address)
-        self.assertEqual(stop.snapshot_metadata['people'][0]['first_name'], 'Jane')
+        self.assertEqual(stop.snapshot_metadata['people'][0]['name'], 'Jane Doe')
+
+    def test_trip_snapshot_remains_frozen(self):
+        trip = Trip.objects.create(
+            name='Frozen Trip',
+            date=datetime.date(2026, 7, 4),
+            user=self.user,
+            status=Trip.Status.DRAFT,
+        )
+        stop = TripStop.objects.create(
+            trip=trip,
+            sequence_order=1,
+            location=Point(-87.6298, 41.8781, srid=4326),
+        )
+        stop.people.set([self.person])
+
+        # Transition to BOOKED to trigger snapshot
+        trip.status = Trip.Status.BOOKED
+        trip.save()
+        
+        stop.refresh_from_db()
+        original_address = stop.snapshot_address
+        original_name = stop.snapshot_metadata['people'][0]['name']
+
+        # Modify Person
+        self.person.first_name = 'Janet'
+        self.person.city = 'New York'
+        self.person.save()
+
+        # Re-verify snapshot hasn't changed
+        stop.refresh_from_db()
+        self.assertEqual(stop.snapshot_address, original_address)
+        self.assertEqual(stop.snapshot_metadata['people'][0]['name'], original_name)
+        self.assertIn('Jane Doe', stop.snapshot_address)
+        self.assertIn('Chicago', stop.snapshot_address)
 
 
 class TripSerializerTests(TestCase):

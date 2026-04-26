@@ -31,51 +31,7 @@ class Trip(models.Model):
 
     def _create_stops_snapshots(self):
         for stop in self.stops.all():
-            metadata = {
-                'people': [],
-                'airport': None,
-                'station': None
-            }
-            address_parts = []
-
-            # Snapshot People
-            for person in stop.people.all():
-                metadata['people'].append({
-                    'id': person.id,
-                    'first_name': person.first_name,
-                    'last_name': person.last_name,
-                    'city': person.city,
-                    'state': person.state,
-                    'country': person.country,
-                    'street': person.street,
-                })
-                person_addr = ", ".join(filter(None, [f"{person.first_name} {person.last_name}", person.street, person.city, person.state, person.country]))
-                address_parts.append(person_addr)
-
-            # Snapshot Airport
-            if stop.airport:
-                metadata['airport'] = {
-                    'id': stop.airport.id,
-                    'name': stop.airport.name,
-                    'iata_code': stop.airport.iata_code,
-                    'city': stop.airport.city,
-                    'country': stop.airport.country,
-                }
-                address_parts.append(f"{stop.airport.name} ({stop.airport.iata_code})")
-
-            # Snapshot Station
-            if stop.station:
-                metadata['station'] = {
-                    'id': stop.station.id,
-                    'name': stop.station.name,
-                    'city': stop.station.city,
-                    'country': stop.station.country,
-                }
-                address_parts.append(stop.station.name)
-
-            stop.snapshot_address = ", ".join(address_parts)
-            stop.snapshot_metadata = metadata
-            stop.save()
+            stop.perform_snapshot()
 
     def __str__(self):
         return f"{self.name} ({self.date}) - {self.get_status_display()}"
@@ -95,5 +51,48 @@ class TripStop(models.Model):
         ordering = ['sequence_order']
         unique_together = [('trip', 'sequence_order')]
 
+    def perform_snapshot(self):
+        metadata = {
+            'people': [],
+            'hub': None
+        }
+        address_parts = []
+
+        # Snapshot People
+        for person in self.people.all():
+            metadata['people'].append({
+                'id': person.id,
+                'name': f"{person.first_name} {person.last_name}",
+            })
+            person_addr = ", ".join(filter(None, [
+                f"{person.first_name} {person.last_name}",
+                person.street,
+                person.city,
+                person.state,
+                person.country
+            ]))
+            address_parts.append(person_addr)
+
+        # Snapshot Hub (Airport or Station)
+        if self.airport:
+            metadata['hub'] = {
+                'name': self.airport.name,
+                'code': self.airport.iata_code,
+                'type': 'AIRPORT'
+            }
+            address_parts.append(f"{self.airport.name} ({self.airport.iata_code})")
+        elif self.station:
+            metadata['hub'] = {
+                'name': self.station.name,
+                'code': self.station.uic_ref or str(self.station.osm_id),
+                'type': 'STATION'
+            }
+            address_parts.append(self.station.name)
+
+        self.snapshot_address = ", ".join(address_parts)
+        self.snapshot_metadata = metadata
+        self.save()
+
     def __str__(self):
         return f"Stop {self.sequence_order} on {self.trip}"
+
