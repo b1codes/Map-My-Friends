@@ -201,11 +201,13 @@ class _ActionGroup extends StatelessWidget {
           icon: const Icon(Icons.check_circle, color: Colors.greenAccent),
           onPressed: onSave,
           tooltip: 'Save Trip',
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
         ),
         IconButton(
           icon: const Icon(Icons.layers_clear, color: Colors.redAccent),
           onPressed: onClear,
           tooltip: 'Clear Trip',
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
         ),
       ],
     );

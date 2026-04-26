@@ -63,6 +63,7 @@ class MapControls extends StatelessWidget {
       onPressed: onPressed,
       icon: Icon(icon, color: color ?? Colors.indigo),
       tooltip: tooltip,
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
       style: IconButton.styleFrom(
         hoverColor: (color ?? Colors.indigo).withValues(alpha: 0.1),
       ),

@@ -7,6 +7,7 @@ import '../../screens/people/person_details_screen.dart';
 import '../../bloc/trip/trip_bloc.dart';
 import '../../bloc/trip/trip_event.dart';
 import '../../bloc/trip/trip_state.dart';
+import '../../bloc/people/people_bloc.dart';
 
 import '../../components/map/map_bottom_sheets.dart';
 

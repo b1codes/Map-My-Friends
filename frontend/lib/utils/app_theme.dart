@@ -5,6 +5,96 @@ class AppTheme {
   static const Color _brandColor = Colors.indigo;
   static const Color _secondaryColor = Colors.pinkAccent;
 
+  // Standardized Text Theme
+  static TextTheme _buildTextTheme(Color color) {
+    return TextTheme(
+      displayLarge: TextStyle(
+        fontSize: 57,
+        fontWeight: FontWeight.bold,
+        color: color,
+        letterSpacing: -0.25,
+      ),
+      displayMedium: TextStyle(
+        fontSize: 45,
+        fontWeight: FontWeight.bold,
+        color: color,
+      ),
+      displaySmall: TextStyle(
+        fontSize: 36,
+        fontWeight: FontWeight.bold,
+        color: color,
+      ),
+      headlineLarge: TextStyle(
+        fontSize: 32,
+        fontWeight: FontWeight.bold,
+        color: color,
+      ),
+      headlineMedium: TextStyle(
+        fontSize: 28,
+        fontWeight: FontWeight.w600,
+        color: color,
+      ),
+      headlineSmall: TextStyle(
+        fontSize: 24,
+        fontWeight: FontWeight.w600,
+        color: color,
+      ),
+      titleLarge: TextStyle(
+        fontSize: 22,
+        fontWeight: FontWeight.bold,
+        color: color,
+      ),
+      titleMedium: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        color: color,
+        letterSpacing: 0.15,
+      ),
+      titleSmall: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: color,
+        letterSpacing: 0.1,
+      ),
+      bodyLarge: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.normal,
+        color: color,
+        letterSpacing: 0.5,
+      ),
+      bodyMedium: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.normal,
+        color: color,
+        letterSpacing: 0.25,
+      ),
+      bodySmall: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.normal,
+        color: color,
+        letterSpacing: 0.4,
+      ),
+      labelLarge: TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: color,
+        letterSpacing: 0.1,
+      ),
+      labelMedium: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: color,
+        letterSpacing: 0.5,
+      ),
+      labelSmall: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w500,
+        color: color,
+        letterSpacing: 0.5,
+      ),
+    );
+  }
+
   // Light Theme
   static final ThemeData lightTheme = ThemeData(
     useMaterial3: true,
@@ -12,7 +102,13 @@ class AppTheme {
       seedColor: _brandColor,
       brightness: Brightness.light,
       secondary: _secondaryColor,
+    ).copyWith(
+      onSurface: Colors.black87,
+      onPrimaryContainer: Colors.indigo.shade900,
+      onSecondaryContainer: const Color(0xFF4D002B), // High contrast pink
     ),
+    textTheme: _buildTextTheme(Colors.black87),
+    iconTheme: const IconThemeData(color: Colors.black87, size: 24),
     scaffoldBackgroundColor: Colors.grey[50],
     appBarTheme: const AppBarTheme(
       centerTitle: true,
@@ -64,7 +160,13 @@ class AppTheme {
       seedColor: _brandColor,
       brightness: Brightness.dark,
       secondary: _secondaryColor,
+    ).copyWith(
+      onSurface: Colors.white,
+      onPrimaryContainer: const Color(0xFFE8EAF6), // Indigo 50
+      onSecondaryContainer: const Color(0xFFFFE1F0), // Pink 50
     ),
+    textTheme: _buildTextTheme(Colors.white),
+    iconTheme: const IconThemeData(color: Colors.white, size: 24),
     appBarTheme: const AppBarTheme(
       centerTitle: true,
       elevation: 0,

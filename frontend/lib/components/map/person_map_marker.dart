@@ -22,6 +22,7 @@ class PersonMapMarker extends StatelessWidget {
       pinEmoji: person.pinEmoji,
       initials: initials,
       profileImageUrl: person.profileImageUrl,
+      semanticsLabel: 'Friend: ${person.firstName} ${person.lastName}',
       onTap:
           onTap ??
           () {

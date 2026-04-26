@@ -2,6 +2,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:latlong2/latlong.dart';
 import '../../models/trip.dart';
 import '../../models/person.dart';
+import '../../models/airport.dart';
+import '../../models/station.dart';
 import '../../services/routing_service.dart';
 import '../../services/api_service.dart';
 import 'trip_event.dart';

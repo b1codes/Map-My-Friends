@@ -252,9 +252,14 @@ class _MapScreenState extends State<MapScreen> {
                                   ),
                                   width: 28,
                                   height: 28,
-                                  child: _MarkerIcon(
-                                    icon: Icons.flight,
-                                    color: const Color(0xFF1565C0),
+                                  child: Semantics(
+                                    label:
+                                        'Airport: ${airport.name} (${airport.iataCode})',
+                                    button: true,
+                                    child: _MarkerIcon(
+                                      icon: Icons.flight,
+                                      color: const Color(0xFF1565C0),
+                                    ),
                                   ),
                                 ),
                               )
@@ -318,9 +323,13 @@ class _MapScreenState extends State<MapScreen> {
                                   ),
                                   width: 28,
                                   height: 28,
-                                  child: _MarkerIcon(
-                                    icon: iconData,
-                                    color: color,
+                                  child: Semantics(
+                                    label: 'Station: ${station.name}',
+                                    button: true,
+                                    child: _MarkerIcon(
+                                      icon: iconData,
+                                      color: color,
+                                    ),
                                   ),
                                 );
                               })

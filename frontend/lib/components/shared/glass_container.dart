@@ -26,6 +26,25 @@ class GlassContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool highContrast = MediaQuery.of(context).highContrast;
+
+    if (highContrast) {
+      return Container(
+        width: width,
+        height: height,
+        padding: padding,
+        decoration: BoxDecoration(
+          color: color ?? Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(borderRadius),
+          border: Border.all(
+            color: Theme.of(context).dividerColor,
+            width: 1.0,
+          ),
+        ),
+        child: child,
+      );
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: BackdropFilter(

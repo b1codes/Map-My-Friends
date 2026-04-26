@@ -9,6 +9,7 @@ class CustomMapMarker extends StatelessWidget {
   final String? profileImageUrl;
   final String initials;
   final VoidCallback? onTap;
+  final String? semanticsLabel;
 
   const CustomMapMarker({
     super.key,
@@ -19,6 +20,7 @@ class CustomMapMarker extends StatelessWidget {
     this.profileImageUrl,
     this.initials = '',
     this.onTap,
+    this.semanticsLabel,
   });
 
   Color _parseColor(String hexColor) {
@@ -176,9 +178,13 @@ class CustomMapMarker extends StatelessWidget {
     final color = _parseColor(pinColorHex);
     final innerContent = _buildInnerContent();
 
-    return GestureDetector(
-      onTap: onTap,
-      child: _buildShape(color, innerContent),
+    return Semantics(
+      label: semanticsLabel,
+      button: onTap != null,
+      child: GestureDetector(
+        onTap: onTap,
+        child: _buildShape(color, innerContent),
+      ),
     );
   }
 }
