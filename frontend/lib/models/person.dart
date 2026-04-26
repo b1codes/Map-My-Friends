@@ -1,3 +1,6 @@
+import 'airport.dart';
+import 'station.dart';
+
 class Person {
   final String id;
   final String firstName;
@@ -17,6 +20,10 @@ class Person {
   final String pinStyle;
   final String pinIconType;
   final String? pinEmoji;
+  final String? preferredAirportId;
+  final String? preferredStationId;
+  final Airport? preferredAirport;
+  final Station? preferredStation;
 
   Person({
     required this.id,
@@ -37,6 +44,10 @@ class Person {
     this.pinStyle = 'teardrop',
     this.pinIconType = 'none',
     this.pinEmoji,
+    this.preferredAirportId,
+    this.preferredStationId,
+    this.preferredAirport,
+    this.preferredStation,
   });
 
   factory Person.fromJson(Map<String, dynamic> json) {
@@ -61,6 +72,14 @@ class Person {
       pinStyle: json['pin_style'] as String? ?? 'teardrop',
       pinIconType: json['pin_icon_type'] as String? ?? 'none',
       pinEmoji: json['pin_emoji'] as String?,
+      preferredAirportId: json['preferred_airport']?.toString(),
+      preferredStationId: json['preferred_station']?.toString(),
+      preferredAirport: json['preferred_airport_detail'] != null
+          ? Airport.fromGeoJson(json['preferred_airport_detail'])
+          : null,
+      preferredStation: json['preferred_station_detail'] != null
+          ? Station.fromGeoJson(json['preferred_station_detail'])
+          : null,
     );
   }
 
@@ -93,6 +112,14 @@ class Person {
       pinStyle: properties['pin_style'] as String? ?? 'teardrop',
       pinIconType: properties['pin_icon_type'] as String? ?? 'none',
       pinEmoji: properties['pin_emoji'] as String?,
+      preferredAirportId: properties['preferred_airport']?.toString(),
+      preferredStationId: properties['preferred_station']?.toString(),
+      preferredAirport: properties['preferred_airport_detail'] != null
+          ? Airport.fromGeoJson(properties['preferred_airport_detail'])
+          : null,
+      preferredStation: properties['preferred_station_detail'] != null
+          ? Station.fromGeoJson(properties['preferred_station_detail'])
+          : null,
     );
   }
 
@@ -114,6 +141,8 @@ class Person {
     if (birthday != null) data['birthday'] = birthday!.toIso8601String();
     if (phoneNumber != null) data['phone_number'] = phoneNumber;
     if (pinEmoji != null) data['pin_emoji'] = pinEmoji;
+    if (preferredAirportId != null) data['preferred_airport'] = preferredAirportId;
+    if (preferredStationId != null) data['preferred_station'] = preferredStationId;
     return data;
   }
 
@@ -136,6 +165,10 @@ class Person {
     String? pinStyle,
     String? pinIconType,
     String? pinEmoji,
+    String? preferredAirportId,
+    String? preferredStationId,
+    Airport? preferredAirport,
+    Station? preferredStation,
   }) {
     return Person(
       id: id ?? this.id,
@@ -156,6 +189,10 @@ class Person {
       pinStyle: pinStyle ?? this.pinStyle,
       pinIconType: pinIconType ?? this.pinIconType,
       pinEmoji: pinEmoji ?? this.pinEmoji,
+      preferredAirportId: preferredAirportId ?? this.preferredAirportId,
+      preferredStationId: preferredStationId ?? this.preferredStationId,
+      preferredAirport: preferredAirport ?? this.preferredAirport,
+      preferredStation: preferredStation ?? this.preferredStation,
     );
   }
 }
