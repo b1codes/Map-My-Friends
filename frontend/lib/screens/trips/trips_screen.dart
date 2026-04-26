@@ -6,6 +6,7 @@ import '../../bloc/trip/trip_event.dart';
 import '../../bloc/trip/trip_state.dart';
 import '../../models/trip.dart';
 import '../../components/shared/glass_container.dart';
+import 'trip_details_screen.dart';
 
 class TripsScreen extends StatelessWidget {
   final VoidCallback onNavigateToMap;
@@ -146,8 +147,17 @@ class TripsScreen extends StatelessWidget {
             ],
           ),
           onTap: () {
-            context.read<TripBloc>().add(LoadTrip(trip));
-            onNavigateToMap();
+            if (trip.status == TripStatus.booked) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TripDetailsScreen(trip: trip),
+                ),
+              );
+            } else {
+              context.read<TripBloc>().add(LoadTrip(trip));
+              onNavigateToMap();
+            }
           },
         ),
       ),
