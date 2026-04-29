@@ -44,15 +44,24 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   String _getTileUrl(BuildContext context, MapSettingsState settings) {
+    final isDark = _isDark(context, settings);
+
     if (settings.mapType == MapType.satellite) {
       return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
     }
 
     if (settings.mapType == MapType.minimal) {
-      return _getMinimalMapUrl(context, settings);
+      return isDark
+          ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+          : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
     }
 
-    // Standard mode (OpenStreetMap)
+    // Standard mode
+    if (isDark) {
+      return 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
+    }
+
+    // Standard mode (OpenStreetMap) - Light
     final locale = Localizations.localeOf(context).languageCode;
     if (locale == 'de') {
       return 'https://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png';
@@ -61,25 +70,6 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-  }
-
-  String _getMinimalMapUrl(BuildContext context, MapSettingsState settings) {
-    ThemeMode mode = settings.themeMode;
-    Brightness brightness;
-
-    if (mode == ThemeMode.system) {
-      brightness = Theme.of(context).brightness;
-    } else if (mode == ThemeMode.light) {
-      brightness = Brightness.light;
-    } else {
-      brightness = Brightness.dark;
-    }
-
-    if (brightness == Brightness.dark) {
-      return 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
-    } else {
-      return 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
-    }
   }
 
   bool _isDark(BuildContext context, MapSettingsState settings) {
@@ -370,46 +360,6 @@ class _MapScreenState extends State<MapScreen> {
                                                   .readUpdateCreate,
                                             },
                                           ),
-                                    tileBuilder: (context, widget, tile) {
-                                      bool isStandard =
-                                          settingsState.mapType ==
-                                          MapType.standard;
-                                      bool isDark = _isDark(
-                                        context,
-                                        settingsState,
-                                      );
-
-                                      if (isStandard && isDark) {
-                                        return ColorFiltered(
-                                          colorFilter: const ColorFilter.matrix(
-                                            <double>[
-                                              -1,
-                                              0,
-                                              0,
-                                              0,
-                                              255,
-                                              0,
-                                              -1,
-                                              0,
-                                              0,
-                                              255,
-                                              0,
-                                              0,
-                                              -1,
-                                              0,
-                                              255,
-                                              0,
-                                              0,
-                                              0,
-                                              1,
-                                              0,
-                                            ],
-                                          ),
-                                          child: widget,
-                                        );
-                                      }
-                                      return widget;
-                                    },
                                   ),
                                   BlocBuilder<TripBloc, TripState>(
                                     builder: (context, state) {
@@ -847,6 +797,17 @@ class _MapScreenState extends State<MapScreen> {
                                           ),
                                         ),
                                       ),
+                                      if (settingsState.mapType ==
+                                              MapType.minimal ||
+                                          _isDark(context, settingsState))
+                                        TextSourceAttribution(
+                                          '© CartoDB',
+                                          onTap: () => launchUrl(
+                                            Uri.parse(
+                                              'https://carto.com/attributions',
+                                            ),
+                                          ),
+                                        ),
                                     ],
                                   ),
                                 ],
