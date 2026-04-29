@@ -142,7 +142,7 @@ class TripsScreen extends StatelessWidget {
             ),
           ),
           subtitle: Text(
-            '${DateFormat('MMM d, yyyy').format(trip.date)} • ${trip.stops.length} stops',
+            '${DateFormat('MMM d').format(trip.startDate ?? trip.date)}${trip.endDate != null && trip.endDate != trip.startDate ? ' - ${DateFormat('MMM d').format(trip.endDate!)}' : ''} • ${trip.stops.length} stops',
             style: const TextStyle(color: Colors.white70),
           ),
           trailing: PopupMenuButton<String>(
@@ -254,7 +254,12 @@ class TripsScreen extends StatelessWidget {
                     groupValue: trip.status,
                     onChanged: (v) {
                       context.read<TripBloc>().add(
-                        SaveTrip(name: trip.name, date: trip.date, status: v!),
+                        SaveTrip(
+                          name: trip.name, 
+                          startDate: trip.startDate, 
+                          endDate: trip.endDate, 
+                          status: v!,
+                        ),
                       );
                       Navigator.pop(context);
                     },
@@ -263,7 +268,8 @@ class TripsScreen extends StatelessWidget {
                     context.read<TripBloc>().add(
                       SaveTrip(
                         name: trip.name,
-                        date: trip.date,
+                        startDate: trip.startDate,
+                        endDate: trip.endDate,
                         status: status,
                       ),
                     );

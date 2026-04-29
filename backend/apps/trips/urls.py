@@ -1,8 +1,9 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import TripViewSet
+from .views import TripViewSet, TripLegViewSet
 
 router = DefaultRouter()
+router.register(r'legs', TripLegViewSet, basename='tripleg')
 router.register(r'', TripViewSet, basename='trip')
 
 urlpatterns = [

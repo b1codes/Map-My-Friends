@@ -64,15 +64,24 @@ class ClearTrip extends TripEvent {
 
 class SaveTrip extends TripEvent {
   final String name;
-  final DateTime date;
+  final DateTime? startDate;
+  final DateTime? endDate;
   final TripStatus status;
   const SaveTrip({
     required this.name,
-    required this.date,
+    this.startDate,
+    this.endDate,
     required this.status,
   });
   @override
-  List<Object?> get props => [name, date, status];
+  List<Object?> get props => [name, startDate, endDate, status];
+}
+
+class UpdateLegDetails extends TripEvent {
+  final TripLeg leg;
+  const UpdateLegDetails(this.leg);
+  @override
+  List<Object?> get props => [leg];
 }
 
 class FetchUserTrips extends TripEvent {

@@ -209,27 +209,119 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
   }
 
   Widget _buildStopsList(BuildContext context) {
+    final List<dynamic> timelineItems = [];
+    for (int i = 0; i < widget.trip.stops.length; i++) {
+      timelineItems.add(widget.trip.stops[i]);
+      // Find leg that starts at this stop
+      final leg = widget.trip.legs
+          .where(
+            (l) =>
+                l.departureStopId ==
+                int.tryParse(widget.trip.stops[i].id ?? ''),
+          )
+          .firstOrNull;
+      if (leg != null) {
+        timelineItems.add(leg);
+      } else if (i < widget.trip.stops.length - 1) {
+        // Fallback for missing legs in draft
+        timelineItems.add(
+          TripLeg(
+            departureStopId: int.tryParse(widget.trip.stops[i].id ?? '') ?? 0,
+            arrivalStopId: int.tryParse(widget.trip.stops[i + 1].id ?? '') ?? 0,
+          ),
+        );
+      }
+    }
+
     return Container(
-      height: MediaQuery.of(context).size.height * 0.4,
+      height: MediaQuery.of(context).size.height * 0.5,
       padding: const EdgeInsets.only(bottom: 20),
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: widget.trip.stops.length,
+        itemCount: timelineItems.length,
         itemBuilder: (context, index) {
-          final stop = widget.trip.stops[index];
-          return _buildStopItem(context, stop, index);
+          final item = timelineItems[index];
+          if (item is TripStop) {
+            return _buildStopItem(
+              context,
+              item,
+              widget.trip.stops.indexOf(item),
+            );
+          } else if (item is TripLeg) {
+            return _buildLegItem(context, item);
+          }
+          return const SizedBox.shrink();
         },
       ),
     );
   }
 
+  Widget _buildLegItem(BuildContext context, TripLeg leg) {
+    IconData transportIcon;
+    switch (leg.transportType) {
+      case 'FLIGHT':
+        transportIcon = Icons.flight_takeoff;
+        break;
+      case 'TRAIN':
+        transportIcon = Icons.train;
+        break;
+      case 'BUS':
+        transportIcon = Icons.directions_bus;
+        break;
+      default:
+        transportIcon = Icons.directions_car;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      child: Row(
+        children: [
+          const SizedBox(width: 16),
+          Column(
+            children: [
+              Container(width: 2, height: 20, color: Colors.white24),
+              InkWell(
+                onTap: () => _showLegDetails(context, leg),
+                child: GlassContainer(
+                  padding: const EdgeInsets.all(8),
+                  borderRadius: 20,
+                  child: Icon(transportIcon, color: Colors.white70, size: 20),
+                ),
+              ),
+              Container(width: 2, height: 20, color: Colors.white24),
+            ],
+          ),
+          const SizedBox(width: 16),
+          if (leg.bookingReference.isNotEmpty)
+            Text(
+              'Ref: ${leg.bookingReference}',
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showLegDetails(BuildContext context, TripLeg leg) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _LegDetailsSheet(leg: leg),
+    );
+  }
+
   Widget _buildStopItem(BuildContext context, TripStop stop, int index) {
+    // ... (existing code)
     String name = '';
     String address = stop.snapshotAddress ?? '';
 
     if (stop.snapshotMetadata != null) {
-      if (stop.snapshotMetadata!['people'] != null) {
-        name = stop.snapshotMetadata!['people'];
+      if (stop.snapshotMetadata!['people'] != null &&
+          (stop.snapshotMetadata!['people'] as List).isNotEmpty) {
+        name = (stop.snapshotMetadata!['people'] as List)
+            .map((p) => p['name'])
+            .join(', ');
       } else if (stop.snapshotMetadata!['hub'] != null) {
         name = stop.snapshotMetadata!['hub']['name'];
       }
@@ -299,6 +391,99 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LegDetailsSheet extends StatelessWidget {
+  final TripLeg leg;
+
+  const _LegDetailsSheet({required this.leg});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: GlassContainer(
+        borderRadius: 24,
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Leg Details',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            _buildInfoRow('Transport Type', leg.transportType),
+            _buildInfoRow(
+              'Booking Ref',
+              leg.bookingReference.isEmpty ? 'Not set' : leg.bookingReference,
+            ),
+            if (leg.departureTime != null)
+              _buildInfoRow(
+                'Departure',
+                DateFormat('HH:mm, MMM d').format(leg.departureTime!),
+              ),
+            if (leg.arrivalTime != null)
+              _buildInfoRow(
+                'Arrival',
+                DateFormat('HH:mm, MMM d').format(leg.arrivalTime!),
+              ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  // TODO: Implement editing
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Editing will be implemented in the next iteration.',
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.edit),
+                label: const Text('Edit Details'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.white70)),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }

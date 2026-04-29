@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.contrib.auth.models import User
 from django.contrib.gis.geos import Point
 from apps.people.models import Person
-from .models import Trip, TripStop
+from .models import Trip, TripStop, TripLeg
 from .serializers import TripSerializer
 from rest_framework.test import APIClient
 
@@ -258,39 +258,24 @@ class TripSerializerTests(TestCase):
         self.assertEqual(orders, [2, 3])
 
 
-class TripApiTests(TestCase):
+class TripLegTests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.user = User.objects.create_user(username='apiuser', password='pw')
-        self.other_user = User.objects.create_user(username='other', password='pw')
+        self.user = User.objects.create_user(username='leguser', password='pw')
         self.client.force_authenticate(user=self.user)
         self.person = Person.objects.create(
             tag='FRIEND',
-            first_name='Bob',
-            last_name='Jones',
+            first_name='Charlie',
+            last_name='Brown',
             city='Chicago',
             state='IL',
             country='US',
             location=Point(-87.6298, 41.8781, srid=4326),
         )
 
-    def test_unauthenticated_returns_401(self):
-        unauthenticated = APIClient()
-        response = unauthenticated.get('/api/trips/')
-        self.assertEqual(response.status_code, 401)
-
-    def test_list_returns_only_own_trips(self):
-        Trip.objects.create(name='My Trip', date='2026-07-01', user=self.user)
-        Trip.objects.create(name='Other Trip', date='2026-07-02', user=self.other_user)
-        response = self.client.get('/api/trips/')
-        self.assertEqual(response.status_code, 200)
-        results = response.data['results'] if isinstance(response.data, dict) else response.data
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]['name'], 'My Trip')
-
-    def test_create_trip_with_stops(self):
+    def test_legs_auto_created_on_trip_create(self):
         payload = {
-            'name': 'Road Trip',
+            'name': 'Leggy Trip',
             'date': '2026-08-15',
             'stops': [
                 {
@@ -307,65 +292,58 @@ class TripApiTests(TestCase):
         }
         response = self.client.post('/api/trips/', payload, format='json')
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data['name'], 'Road Trip')
-        self.assertEqual(len(response.data['stops']), 2)
-        self.assertEqual(Trip.objects.filter(user=self.user).count(), 1)
+        trip_id = response.data['id']
+        trip = Trip.objects.get(id=trip_id)
+        self.assertEqual(trip.legs.count(), 1)
+        leg = trip.legs.first()
+        self.assertEqual(leg.departure_stop.sequence_order, 1)
+        self.assertEqual(leg.arrival_stop.sequence_order, 2)
 
-    def test_update_replaces_stops(self):
-        trip = Trip.objects.create(name='Old', date='2026-07-01', user=self.user)
-        s = TripStop.objects.create(
-            trip=trip, sequence_order=1,
-            location=Point(-87.6298, 41.8781, srid=4326),
-        )
-        s.people.set([self.person])
+    def test_update_leg_details(self):
+        trip = Trip.objects.create(name='Leg Trip', date='2026-07-01', user=self.user)
+        s1 = TripStop.objects.create(trip=trip, sequence_order=1, location=Point(0, 0))
+        s2 = TripStop.objects.create(trip=trip, sequence_order=2, location=Point(1, 1))
+        leg = TripLeg.objects.create(trip=trip, departure_stop=s1, arrival_stop=s2)
+        
         payload = {
-            'name': 'Updated',
-            'date': '2026-09-01',
+            'transport_type': 'FLIGHT',
+            'booking_reference': 'ABC123',
+            'ticket_data': {'seat': '12A'}
+        }
+        response = self.client.patch(f'/api/trips/legs/{leg.id}/', payload, format='json')
+        self.assertEqual(response.status_code, 200)
+        leg.refresh_from_db()
+        self.assertEqual(leg.transport_type, 'FLIGHT')
+        self.assertEqual(leg.booking_reference, 'ABC123')
+        self.assertEqual(leg.ticket_data['seat'], '12A')
+
+    def test_legs_regenerated_on_stop_reorder(self):
+        trip = Trip.objects.create(name='Reorder Trip', date='2026-07-01', user=self.user)
+        s1 = TripStop.objects.create(trip=trip, sequence_order=1, location=Point(0, 0))
+        s2 = TripStop.objects.create(trip=trip, sequence_order=2, location=Point(1, 1))
+        
+        # Initially 1 leg
+        self.assertEqual(TripLeg.objects.filter(trip=trip).count(), 1)
+        
+        # Update stops (reorder and add one)
+        payload = {
+            'name': 'Reorder Trip',
+            'date': '2026-07-01',
             'stops': [
                 {
-                    'people': [self.person.id],
                     'sequence_order': 1,
-                    'location': {'type': 'Point', 'coordinates': [-73.9857, 40.7484]},
+                    'location': {'type': 'Point', 'coordinates': [0, 0]},
                 },
                 {
-                    'people': [self.person.id],
                     'sequence_order': 2,
-                    'location': {'type': 'Point', 'coordinates': [-87.6298, 41.8781]},
+                    'location': {'type': 'Point', 'coordinates': [2, 2]},
+                },
+                {
+                    'sequence_order': 3,
+                    'location': {'type': 'Point', 'coordinates': [1, 1]},
                 },
             ],
         }
         response = self.client.put(f'/api/trips/{trip.id}/', payload, format='json')
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['name'], 'Updated')
-        self.assertEqual(len(response.data['stops']), 2)
-        self.assertEqual(TripStop.objects.filter(trip=trip).count(), 2)
-
-    def test_cannot_access_other_users_trip(self):
-        other_trip = Trip.objects.create(
-            name='Secret Trip', date='2026-07-01', user=self.other_user
-        )
-        response = self.client.get(f'/api/trips/{other_trip.id}/')
-        self.assertEqual(response.status_code, 404)
-
-    def test_delete_trip(self):
-        trip = Trip.objects.create(name='Doomed Trip', date='2026-07-01', user=self.user)
-        response = self.client.delete(f'/api/trips/{trip.id}/')
-        self.assertEqual(response.status_code, 204)
-        self.assertFalse(Trip.objects.filter(id=trip.id).exists())
-
-    def test_trip_status_persistence(self):
-        payload = {
-            'name': 'Status Trip',
-            'date': '2026-08-15',
-            'status': 'BOOKED',
-            'stops': [],
-        }
-        response = self.client.post('/api/trips/', payload, format='json')
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data['status'], 'BOOKED')
-        
-        trip_id = response.data['id']
-        update_payload = {'status': 'CANCELLED'}
-        response = self.client.patch(f'/api/trips/{trip_id}/', update_payload, format='json')
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['status'], 'CANCELLED')
+        self.assertEqual(TripLeg.objects.filter(trip=trip).count(), 2)

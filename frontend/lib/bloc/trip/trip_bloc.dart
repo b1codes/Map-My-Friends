@@ -27,6 +27,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     on<ClearTrip>(_onClearTrip);
     on<OptimizeTrip>(_onOptimizeTrip);
     on<SaveTrip>(_onSaveTrip);
+    on<UpdateLegDetails>(_onUpdateLegDetails);
     on<FetchUserTrips>(_onFetchUserTrips);
     on<LoadTrip>(_onLoadTrip);
     on<DeleteTrip>(_onDeleteTrip);
@@ -195,15 +196,33 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     );
   }
 
+  void _onUpdateLegDetails(UpdateLegDetails event, Emitter<TripState> emit) {
+    final newLegs = state.legs.map((l) {
+      if (l.id != null && l.id == event.leg.id) {
+        return event.leg;
+      }
+      if (l.departureStopId == event.leg.departureStopId &&
+          l.arrivalStopId == event.leg.arrivalStopId) {
+        return event.leg;
+      }
+      return l;
+    }).toList();
+
+    emit(state.copyWith(legs: newLegs));
+  }
+
   Future<void> _onSaveTrip(SaveTrip event, Emitter<TripState> emit) async {
     emit(state.copyWith(isLoading: true, clearError: true));
     try {
       final tripToSave = Trip(
         id: state.currentTripId,
         name: event.name,
-        date: event.date,
+        date: event.startDate ?? DateTime.now(),
+        startDate: event.startDate,
+        endDate: event.endDate,
         status: event.status,
         stops: state.stops,
+        legs: state.legs,
       );
 
       Trip savedTrip;
@@ -213,7 +232,14 @@ class TripBloc extends Bloc<TripEvent, TripState> {
         savedTrip = await _apiService.createTrip(tripToSave);
       }
 
-      emit(state.copyWith(isLoading: false, currentTripId: savedTrip.id));
+      emit(
+        state.copyWith(
+          isLoading: false,
+          currentTripId: savedTrip.id,
+          stops: savedTrip.stops,
+          legs: savedTrip.legs,
+        ),
+      );
       add(const FetchUserTrips());
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString()));
@@ -238,6 +264,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
       state.copyWith(
         isLoading: true,
         stops: event.trip.stops,
+        legs: event.trip.legs,
         currentTripId: event.trip.id,
         clearError: true,
       ),

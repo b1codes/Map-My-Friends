@@ -166,7 +166,8 @@ class HorizontalTripPlanner extends StatelessWidget {
                     context.read<TripBloc>().add(
                       SaveTrip(
                         name: "Draft Trip $dateStr",
-                        date: now,
+                        startDate: now,
+                        endDate: now,
                         status: TripStatus.draft,
                       ),
                     );
