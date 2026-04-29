@@ -164,12 +164,14 @@ class TripBloc extends Bloc<TripEvent, TripState> {
 
   void _onClearTrip(ClearTrip event, Emitter<TripState> emit) {
     _routingRequestId++; // Cancel any pending requests
-    emit(state.copyWith(
-      stops: [],
-      routePoints: [],
-      isOptimizing: false,
-      clearCurrentTripId: true,
-    ));
+    emit(
+      state.copyWith(
+        stops: [],
+        routePoints: [],
+        isOptimizing: false,
+        clearCurrentTripId: true,
+      ),
+    );
   }
 
   Future<void> _onOptimizeTrip(
@@ -211,10 +213,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
         savedTrip = await _apiService.createTrip(tripToSave);
       }
 
-      emit(state.copyWith(
-        isLoading: false,
-        currentTripId: savedTrip.id,
-      ));
+      emit(state.copyWith(isLoading: false, currentTripId: savedTrip.id));
       add(const FetchUserTrips());
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString()));
@@ -235,12 +234,14 @@ class TripBloc extends Bloc<TripEvent, TripState> {
   }
 
   Future<void> _onLoadTrip(LoadTrip event, Emitter<TripState> emit) async {
-    emit(state.copyWith(
-      isLoading: true,
-      stops: event.trip.stops,
-      currentTripId: event.trip.id,
-      clearError: true,
-    ));
+    emit(
+      state.copyWith(
+        isLoading: true,
+        stops: event.trip.stops,
+        currentTripId: event.trip.id,
+        clearError: true,
+      ),
+    );
 
     final requestId = ++_routingRequestId;
     final route = await _routingService.getRoute(event.trip.stops);

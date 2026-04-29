@@ -39,16 +39,16 @@ class TripsScreen extends StatelessWidget {
         Text(
           'My Trips',
           style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
         const SizedBox(height: 8),
         Text(
           'Manage your planned and booked adventures',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white70,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
         ),
       ],
     );
@@ -66,16 +66,23 @@ class TripsScreen extends StatelessWidget {
         }
 
         // Group trips by status
-        final booked = state.userTrips.where((t) => t.status == TripStatus.booked).toList();
-        final drafts = state.userTrips.where((t) => t.status == TripStatus.draft).toList();
-        final cancelled = state.userTrips.where((t) => t.status == TripStatus.cancelled).toList();
+        final booked = state.userTrips
+            .where((t) => t.status == TripStatus.booked)
+            .toList();
+        final drafts = state.userTrips
+            .where((t) => t.status == TripStatus.draft)
+            .toList();
+        final cancelled = state.userTrips
+            .where((t) => t.status == TripStatus.cancelled)
+            .toList();
 
         return ListView(
           padding: const EdgeInsets.only(bottom: 100),
           children: [
             if (booked.isNotEmpty) _buildSection(context, 'Booked', booked),
             if (drafts.isNotEmpty) _buildSection(context, 'Drafts', drafts),
-            if (cancelled.isNotEmpty) _buildSection(context, 'Cancelled', cancelled),
+            if (cancelled.isNotEmpty)
+              _buildSection(context, 'Cancelled', cancelled),
           ],
         );
       },
@@ -91,9 +98,9 @@ class TripsScreen extends StatelessWidget {
           child: Text(
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
         ),
         ...trips.map((trip) => _buildTripCard(context, trip)),
@@ -102,7 +109,8 @@ class TripsScreen extends StatelessWidget {
   }
 
   Widget _buildTripCard(BuildContext context, Trip trip) {
-    final bool isCurrent = context.watch<TripBloc>().state.currentTripId == trip.id;
+    final bool isCurrent =
+        context.watch<TripBloc>().state.currentTripId == trip.id;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
@@ -110,7 +118,10 @@ class TripsScreen extends StatelessWidget {
         padding: EdgeInsets.zero,
         borderRadius: 16,
         child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 12,
+          ),
           leading: Container(
             width: 48,
             height: 48,
@@ -126,9 +137,9 @@ class TripsScreen extends StatelessWidget {
           title: Text(
             trip.name,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.white,
-                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                ),
+              color: Colors.white,
+              fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+            ),
           ),
           subtitle: Text(
             '${DateFormat('MMM d, yyyy').format(trip.date)} • ${trip.stops.length} stops',
@@ -139,7 +150,10 @@ class TripsScreen extends StatelessWidget {
             onSelected: (value) => _handleMenuAction(context, value, trip),
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'load', child: Text('View on Map')),
-              const PopupMenuItem(value: 'status', child: Text('Update Status')),
+              const PopupMenuItem(
+                value: 'status',
+                child: Text('Update Status'),
+              ),
               const PopupMenuItem(
                 value: 'delete',
                 child: Text('Delete', style: TextStyle(color: Colors.red)),
@@ -193,8 +207,13 @@ class TripsScreen extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               child: const Text('Start Planning'),
             ),
@@ -226,29 +245,33 @@ class TripsScreen extends StatelessWidget {
         title: const Text('Update Trip Status'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          children: TripStatus.values.map((status) => ListTile(
-            title: Text(status.name.toUpperCase()),
-            leading: Radio<TripStatus>(
-              value: status,
-              groupValue: trip.status,
-              onChanged: (v) {
-                context.read<TripBloc>().add(SaveTrip(
-                  name: trip.name,
-                  date: trip.date,
-                  status: v!,
-                ));
-                Navigator.pop(context);
-              },
-            ),
-            onTap: () {
-              context.read<TripBloc>().add(SaveTrip(
-                name: trip.name,
-                date: trip.date,
-                status: status,
-              ));
-              Navigator.pop(context);
-            },
-          )).toList(),
+          children: TripStatus.values
+              .map(
+                (status) => ListTile(
+                  title: Text(status.name.toUpperCase()),
+                  leading: Radio<TripStatus>(
+                    value: status,
+                    groupValue: trip.status,
+                    onChanged: (v) {
+                      context.read<TripBloc>().add(
+                        SaveTrip(name: trip.name, date: trip.date, status: v!),
+                      );
+                      Navigator.pop(context);
+                    },
+                  ),
+                  onTap: () {
+                    context.read<TripBloc>().add(
+                      SaveTrip(
+                        name: trip.name,
+                        date: trip.date,
+                        status: status,
+                      ),
+                    );
+                    Navigator.pop(context);
+                  },
+                ),
+              )
+              .toList(),
         ),
       ),
     );
@@ -279,17 +302,23 @@ class TripsScreen extends StatelessWidget {
 
   IconData _getStatusIcon(TripStatus status) {
     switch (status) {
-      case TripStatus.booked: return Icons.check_circle_outline;
-      case TripStatus.cancelled: return Icons.cancel_outlined;
-      default: return Icons.edit_note;
+      case TripStatus.booked:
+        return Icons.check_circle_outline;
+      case TripStatus.cancelled:
+        return Icons.cancel_outlined;
+      default:
+        return Icons.edit_note;
     }
   }
 
   Color _getStatusColor(TripStatus status) {
     switch (status) {
-      case TripStatus.booked: return Colors.greenAccent;
-      case TripStatus.cancelled: return Colors.redAccent;
-      default: return Colors.orangeAccent;
+      case TripStatus.booked:
+        return Colors.greenAccent;
+      case TripStatus.cancelled:
+        return Colors.redAccent;
+      default:
+        return Colors.orangeAccent;
     }
   }
 }

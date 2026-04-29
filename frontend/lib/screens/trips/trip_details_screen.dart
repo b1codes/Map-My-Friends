@@ -70,7 +70,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
       future: _routeFuture,
       builder: (context, snapshot) {
         final List<LatLng> points = snapshot.data ?? [];
-        
+
         // Calculate bounds to center the map
         LatLngBounds? bounds;
         if (widget.trip.stops.length > 1) {
@@ -81,12 +81,15 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
         return FlutterMap(
           options: MapOptions(
-            initialCameraFit: bounds != null 
-              ? CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(100))
-              : null,
-            initialCenter: widget.trip.stops.isNotEmpty 
-              ? widget.trip.stops.first.location 
-              : const LatLng(0, 0),
+            initialCameraFit: bounds != null
+                ? CameraFit.bounds(
+                    bounds: bounds,
+                    padding: const EdgeInsets.all(100),
+                  )
+                : null,
+            initialCenter: widget.trip.stops.isNotEmpty
+                ? widget.trip.stops.first.location
+                : const LatLng(0, 0),
             initialZoom: 10,
             interactionOptions: const InteractionOptions(
               flags: InteractiveFlag.none,
@@ -155,9 +158,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                   child: Text(
                     widget.trip.name,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
                 _buildStatusBadge(widget.trip.status),
@@ -234,7 +237,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
     if (name.isEmpty) {
       if (stop.people.isNotEmpty) {
-        name = stop.people.map((p) => '${p.firstName} ${p.lastName}').join(', ');
+        name = stop.people
+            .map((p) => '${p.firstName} ${p.lastName}')
+            .join(', ');
       } else if (stop.airport != null) {
         name = stop.airport!.name;
       } else if (stop.station != null) {

@@ -109,15 +109,15 @@ class TripStop extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        people,
-        airport,
-        station,
-        location,
-        sequenceOrder,
-        snapshotAddress,
-        snapshotMetadata
-      ];
+    id,
+    people,
+    airport,
+    station,
+    location,
+    sequenceOrder,
+    snapshotAddress,
+    snapshotMetadata,
+  ];
 }
 
 class Trip extends Equatable {

@@ -66,7 +66,11 @@ class SaveTrip extends TripEvent {
   final String name;
   final DateTime date;
   final TripStatus status;
-  const SaveTrip({required this.name, required this.date, required this.status});
+  const SaveTrip({
+    required this.name,
+    required this.date,
+    required this.status,
+  });
   @override
   List<Object?> get props => [name, date, status];
 }

@@ -141,8 +141,10 @@ class Person {
     if (birthday != null) data['birthday'] = birthday!.toIso8601String();
     if (phoneNumber != null) data['phone_number'] = phoneNumber;
     if (pinEmoji != null) data['pin_emoji'] = pinEmoji;
-    if (preferredAirportId != null) data['preferred_airport'] = preferredAirportId;
-    if (preferredStationId != null) data['preferred_station'] = preferredStationId;
+    if (preferredAirportId != null)
+      data['preferred_airport'] = preferredAirportId;
+    if (preferredStationId != null)
+      data['preferred_station'] = preferredStationId;
     return data;
   }
 

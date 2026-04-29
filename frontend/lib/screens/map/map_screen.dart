@@ -304,11 +304,15 @@ class _MapScreenState extends State<MapScreen> {
                                     break;
                                   case 'subway_station':
                                     iconData = Icons.subway;
-                                    color = const Color(0xFF2E7D32); // Green 800
+                                    color = const Color(
+                                      0xFF2E7D32,
+                                    ); // Green 800
                                     break;
                                   case 'regional_station':
                                     iconData = Icons.train;
-                                    color = const Color(0xFF607D8B); // Blue Grey
+                                    color = const Color(
+                                      0xFF607D8B,
+                                    ); // Blue Grey
                                     break;
                                   default:
                                     iconData = Icons.train;
@@ -351,10 +355,13 @@ class _MapScreenState extends State<MapScreen> {
                                 ),
                                 children: [
                                   TileLayer(
-                                    urlTemplate:
-                                        _getTileUrl(context, settingsState),
+                                    urlTemplate: _getTileUrl(
+                                      context,
+                                      settingsState,
+                                    ),
                                     subdomains: const ['a', 'b', 'c'],
-                                    userAgentPackageName: 'com.mapmyfriends.app',
+                                    userAgentPackageName:
+                                        'com.mapmyfriends.app',
                                     tileProvider: kIsWeb
                                         ? NetworkTileProvider()
                                         : FMTCTileProvider(
@@ -364,19 +371,38 @@ class _MapScreenState extends State<MapScreen> {
                                             },
                                           ),
                                     tileBuilder: (context, widget, tile) {
-                                      bool isStandard = settingsState.mapType ==
+                                      bool isStandard =
+                                          settingsState.mapType ==
                                           MapType.standard;
-                                      bool isDark =
-                                          _isDark(context, settingsState);
+                                      bool isDark = _isDark(
+                                        context,
+                                        settingsState,
+                                      );
 
                                       if (isStandard && isDark) {
                                         return ColorFiltered(
                                           colorFilter: const ColorFilter.matrix(
                                             <double>[
-                                              -1, 0, 0, 0, 255,
-                                              0, -1, 0, 0, 255,
-                                              0, 0, -1, 0, 255,
-                                              0, 0, 0, 1, 0,
+                                              -1,
+                                              0,
+                                              0,
+                                              0,
+                                              255,
+                                              0,
+                                              -1,
+                                              0,
+                                              0,
+                                              255,
+                                              0,
+                                              0,
+                                              -1,
+                                              0,
+                                              255,
+                                              0,
+                                              0,
+                                              0,
+                                              1,
+                                              0,
                                             ],
                                           ),
                                           child: widget,
@@ -422,56 +448,64 @@ class _MapScreenState extends State<MapScreen> {
                                                 final person = peopleState
                                                     .people
                                                     .firstWhere(
-                                                        (p) => p.id == id);
+                                                      (p) => p.id == id,
+                                                    );
                                                 showModalBottomSheet(
                                                   context: context,
                                                   backgroundColor:
                                                       Colors.transparent,
                                                   builder: (context) =>
                                                       UnifiedClusterModal(
-                                                    items: [person],
-                                                  ),
+                                                        items: [person],
+                                                      ),
                                                 );
                                               } catch (_) {}
                                             }
-                                          } else if (keyValue
-                                              .startsWith('airport_')) {
+                                          } else if (keyValue.startsWith(
+                                            'airport_',
+                                          )) {
                                             final iata = keyValue.substring(8);
                                             if (airportState
                                                 is MapAirportsLoaded) {
                                               try {
                                                 final airport = airportState
                                                     .airports
-                                                    .firstWhere((a) =>
-                                                        a.iataCode == iata);
+                                                    .firstWhere(
+                                                      (a) => a.iataCode == iata,
+                                                    );
                                                 showModalBottomSheet(
                                                   context: context,
                                                   backgroundColor:
                                                       Colors.transparent,
                                                   builder: (context) =>
                                                       AirportBottomSheet(
-                                                          airport: airport),
+                                                        airport: airport,
+                                                      ),
                                                 );
                                               } catch (_) {}
                                             }
-                                          } else if (keyValue
-                                              .startsWith('station_')) {
+                                          } else if (keyValue.startsWith(
+                                            'station_',
+                                          )) {
                                             final osmId = int.tryParse(
-                                                keyValue.substring(8));
+                                              keyValue.substring(8),
+                                            );
                                             if (stationState
                                                 is MapStationsLoaded) {
                                               try {
                                                 final station = stationState
                                                     .stations
-                                                    .firstWhere((s) =>
-                                                        s.osmId == osmId);
+                                                    .firstWhere(
+                                                      (s) => s.osmId == osmId,
+                                                    );
                                                 showModalBottomSheet(
                                                   context: context,
                                                   backgroundColor:
                                                       Colors.transparent,
                                                   builder: (context) =>
                                                       StationBottomSheet(
-                                                          station: station),
+                                                        station: station,
+                                                      ),
                                                 );
                                               } catch (_) {}
                                             }
@@ -480,7 +514,8 @@ class _MapScreenState extends State<MapScreen> {
                                       },
                                       onClusterTap: (clusterNode) {
                                         List<dynamic> clusterItems = [];
-                                        for (var marker in clusterNode.markers) {
+                                        for (var marker
+                                            in clusterNode.markers) {
                                           if (marker.key is ValueKey<String>) {
                                             final key =
                                                 (marker.key as ValueKey<String>)
@@ -492,13 +527,14 @@ class _MapScreenState extends State<MapScreen> {
                                                   clusterItems.add(
                                                     peopleState.people
                                                         .firstWhere(
-                                                      (p) => p.id == id,
-                                                    ),
+                                                          (p) => p.id == id,
+                                                        ),
                                                   );
                                                 } catch (_) {}
                                               }
-                                            } else if (key
-                                                .startsWith('airport_')) {
+                                            } else if (key.startsWith(
+                                              'airport_',
+                                            )) {
                                               final iata = key.substring(8);
                                               if (airportState
                                                   is MapAirportsLoaded) {
@@ -506,15 +542,19 @@ class _MapScreenState extends State<MapScreen> {
                                                   clusterItems.add(
                                                     airportState.airports
                                                         .firstWhere(
-                                                      (a) => a.iataCode == iata,
-                                                    ),
+                                                          (a) =>
+                                                              a.iataCode ==
+                                                              iata,
+                                                        ),
                                                   );
                                                 } catch (_) {}
                                               }
-                                            } else if (key
-                                                .startsWith('station_')) {
-                                              final osmIdString =
-                                                  key.substring(8);
+                                            } else if (key.startsWith(
+                                              'station_',
+                                            )) {
+                                              final osmIdString = key.substring(
+                                                8,
+                                              );
                                               final osmId = int.tryParse(
                                                 osmIdString,
                                               );
@@ -524,8 +564,9 @@ class _MapScreenState extends State<MapScreen> {
                                                   clusterItems.add(
                                                     stationState.stations
                                                         .firstWhere(
-                                                      (s) => s.osmId == osmId,
-                                                    ),
+                                                          (s) =>
+                                                              s.osmId == osmId,
+                                                        ),
                                                   );
                                                 } catch (_) {}
                                               }
@@ -539,17 +580,21 @@ class _MapScreenState extends State<MapScreen> {
                                             backgroundColor: Colors.transparent,
                                             builder: (context) =>
                                                 UnifiedClusterModal(
-                                              items: clusterItems,
-                                              onZoom: () {
-                                                Navigator.pop(context);
-                                                _mapController.fitCamera(
-                                                  CameraFit.bounds(
-                                                    bounds: clusterNode.bounds,
-                                                    padding: const EdgeInsets.all(50),
-                                                  ),
-                                                );
-                                              },
-                                            ),
+                                                  items: clusterItems,
+                                                  onZoom: () {
+                                                    Navigator.pop(context);
+                                                    _mapController.fitCamera(
+                                                      CameraFit.bounds(
+                                                        bounds:
+                                                            clusterNode.bounds,
+                                                        padding:
+                                                            const EdgeInsets.all(
+                                                              50,
+                                                            ),
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
                                           );
                                         }
                                       },
@@ -557,8 +602,8 @@ class _MapScreenState extends State<MapScreen> {
                                         List<Widget> children = [];
                                         int displayCount =
                                             clusterMarkers.length > 4
-                                                ? 3
-                                                : clusterMarkers.length;
+                                            ? 3
+                                            : clusterMarkers.length;
                                         bool hasExtra =
                                             clusterMarkers.length > 4;
                                         double itemSize = 36.0;
@@ -567,7 +612,7 @@ class _MapScreenState extends State<MapScreen> {
                                         if (displayCount > 0) {
                                           totalWidth =
                                               (displayCount - 1) * overlap +
-                                                  itemSize;
+                                              itemSize;
                                           if (hasExtra) totalWidth += overlap;
                                         }
                                         for (int i = 0; i < displayCount; i++) {
@@ -597,9 +642,9 @@ class _MapScreenState extends State<MapScreen> {
                                                       .primaryContainer,
                                                   shape: BoxShape.circle,
                                                   border: Border.all(
-                                                    color: Theme.of(context)
-                                                        .colorScheme
-                                                        .primary,
+                                                    color: Theme.of(
+                                                      context,
+                                                    ).colorScheme.primary,
                                                     width: 2,
                                                   ),
                                                   boxShadow: const [
@@ -630,8 +675,7 @@ class _MapScreenState extends State<MapScreen> {
                                             width: totalWidth + 8,
                                             height: itemSize + 8,
                                             decoration: BoxDecoration(
-                                              color: Theme.of(context)
-                                                  .cardColor
+                                              color: Theme.of(context).cardColor
                                                   .withValues(alpha: 0.8),
                                               borderRadius:
                                                   BorderRadius.circular(24),
@@ -668,16 +712,21 @@ class _MapScreenState extends State<MapScreen> {
                                   BlocBuilder<TripBloc, TripState>(
                                     builder: (context, state) {
                                       return MarkerLayer(
-                                        markers: state.stops
-                                            .asMap()
-                                            .entries
-                                            .map((entry) {
+                                        markers: state.stops.asMap().entries.map((
+                                          entry,
+                                        ) {
                                           final idx = entry.key;
                                           final stop = entry.value;
-                                          final hasPeople = stop.people.isNotEmpty;
-                                          final isAirport = stop.airport != null;
-                                          final isStation = stop.station != null;
-                                          final isPersonOnly = hasPeople && !isAirport && !isStation;
+                                          final hasPeople =
+                                              stop.people.isNotEmpty;
+                                          final isAirport =
+                                              stop.airport != null;
+                                          final isStation =
+                                              stop.station != null;
+                                          final isPersonOnly =
+                                              hasPeople &&
+                                              !isAirport &&
+                                              !isStation;
 
                                           Color color = Colors.indigo;
                                           if (isPersonOnly) {
@@ -718,46 +767,62 @@ class _MapScreenState extends State<MapScreen> {
                                                   ),
                                                   child: Center(
                                                     child: isAirport
-                                                        ? const Icon(Icons.flight,
+                                                        ? const Icon(
+                                                            Icons.flight,
                                                             color: Colors.white,
-                                                            size: 16)
+                                                            size: 16,
+                                                          )
                                                         : isStation
-                                                            ? const Icon(
-                                                                Icons.train,
-                                                                color: Colors.white,
-                                                                size: 16)
-                                                            : Text(
-                                                                String.fromCharCode(
-                                                                    65 + idx),
-                                                                style: TextStyle(
-                                                                  color: isPersonOnly
-                                                                      ? Colors.black87
-                                                                      : Colors.white,
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                  fontSize: isPersonOnly
-                                                                      ? 12
-                                                                      : 14,
-                                                                ),
-                                                              ),
+                                                        ? const Icon(
+                                                            Icons.train,
+                                                            color: Colors.white,
+                                                            size: 16,
+                                                          )
+                                                        : Text(
+                                                            String.fromCharCode(
+                                                              65 + idx,
+                                                            ),
+                                                            style: TextStyle(
+                                                              color:
+                                                                  isPersonOnly
+                                                                  ? Colors
+                                                                        .black87
+                                                                  : Colors
+                                                                        .white,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                              fontSize:
+                                                                  isPersonOnly
+                                                                  ? 12
+                                                                  : 14,
+                                                            ),
+                                                          ),
                                                   ),
                                                 ),
-                                                if (hasPeople && (isAirport || isStation))
+                                                if (hasPeople &&
+                                                    (isAirport || isStation))
                                                   Positioned(
                                                     right: -4,
                                                     top: -4,
                                                     child: Container(
-                                                      padding: const EdgeInsets.all(4),
-                                                      decoration: const BoxDecoration(
-                                                        color: Colors.amber,
-                                                        shape: BoxShape.circle,
-                                                      ),
+                                                      padding:
+                                                          const EdgeInsets.all(
+                                                            4,
+                                                          ),
+                                                      decoration:
+                                                          const BoxDecoration(
+                                                            color: Colors.amber,
+                                                            shape:
+                                                                BoxShape.circle,
+                                                          ),
                                                       child: Text(
-                                                        stop.people.length.toString(),
+                                                        stop.people.length
+                                                            .toString(),
                                                         style: const TextStyle(
                                                           fontSize: 10,
-                                                          fontWeight: FontWeight.bold,
+                                                          fontWeight:
+                                                              FontWeight.bold,
                                                           color: Colors.black87,
                                                         ),
                                                       ),

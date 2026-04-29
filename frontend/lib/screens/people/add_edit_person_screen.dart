@@ -119,9 +119,9 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
     } catch (e) {
       setState(() => _isLoadingHubs = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load hubs: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to load hubs: $e')));
       }
     }
   }
@@ -863,9 +863,9 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
         Text(
           'Preferred Transit Hubs',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.primary,
+          ),
         ),
         const SizedBox(height: 16),
         if (_isLoadingHubs)
@@ -873,10 +873,12 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
         else ...[
           // Airport selection
           DropdownButtonFormField<Airport>(
-            value: _preferredAirport != null &&
+            value:
+                _preferredAirport != null &&
                     _nearbyAirports.any((a) => a.id == _preferredAirport?.id)
-                ? _nearbyAirports
-                    .firstWhere((a) => a.id == _preferredAirport?.id)
+                ? _nearbyAirports.firstWhere(
+                    (a) => a.id == _preferredAirport?.id,
+                  )
                 : null,
             hint: Text(_preferredAirport?.name ?? 'Select Preferred Airport'),
             items: _nearbyAirports.map((airport) {
@@ -889,8 +891,9 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
             decoration: InputDecoration(
               labelText: 'Preferred Airport',
               prefixIcon: const Icon(Icons.airplanemode_active),
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               filled: true,
               fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
             ),
@@ -898,10 +901,12 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
           const SizedBox(height: 16),
           // Station selection
           DropdownButtonFormField<Station>(
-            value: _preferredStation != null &&
+            value:
+                _preferredStation != null &&
                     _nearbyStations.any((s) => s.id == _preferredStation?.id)
-                ? _nearbyStations
-                    .firstWhere((s) => s.id == _preferredStation?.id)
+                ? _nearbyStations.firstWhere(
+                    (s) => s.id == _preferredStation?.id,
+                  )
                 : null,
             hint: Text(_preferredStation?.name ?? 'Select Preferred Station'),
             items: _nearbyStations.map((station) {
@@ -914,8 +919,9 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
             decoration: InputDecoration(
               labelText: 'Preferred Train Station',
               prefixIcon: const Icon(Icons.train),
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               filled: true,
               fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
             ),

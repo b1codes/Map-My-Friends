@@ -28,7 +28,9 @@ class RoutingService {
       // Segment between people-only stops: Request OSRM v1/driving route.
       // (Segments involving Airport/Station are assumed to be flight/train - straight lines)
       final startIsPersonOnly =
-          start.people.isNotEmpty && start.airport == null && start.station == null;
+          start.people.isNotEmpty &&
+          start.airport == null &&
+          start.station == null;
       final endIsPersonOnly =
           end.people.isNotEmpty && end.airport == null && end.station == null;
 

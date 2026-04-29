@@ -238,7 +238,11 @@ class ApiService {
   }
 
   // Hub methods
-  Future<List<Airport>> getNearestAirports(double lat, double lon, {int count = 5}) async {
+  Future<List<Airport>> getNearestAirports(
+    double lat,
+    double lon, {
+    int count = 5,
+  }) async {
     try {
       final response = await _dio.get(
         'airports/nearest/',
@@ -255,7 +259,11 @@ class ApiService {
     }
   }
 
-  Future<List<Station>> getNearestStations(double lat, double lon, {int count = 5}) async {
+  Future<List<Station>> getNearestStations(
+    double lat,
+    double lon, {
+    int count = 5,
+  }) async {
     try {
       final response = await _dio.get(
         'stations/nearest/',

@@ -39,18 +39,20 @@ class TripState extends Equatable {
       userTrips: userTrips ?? this.userTrips,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
-      currentTripId: clearCurrentTripId ? null : (currentTripId ?? this.currentTripId),
+      currentTripId: clearCurrentTripId
+          ? null
+          : (currentTripId ?? this.currentTripId),
     );
   }
 
   @override
   List<Object?> get props => [
-        stops,
-        routePoints,
-        isOptimizing,
-        userTrips,
-        isLoading,
-        error,
-        currentTripId,
-      ];
+    stops,
+    routePoints,
+    isOptimizing,
+    userTrips,
+    isLoading,
+    error,
+    currentTripId,
+  ];
 }

@@ -133,10 +133,8 @@ class HorizontalTripPlanner extends StatelessWidget {
                                         radius: 10,
                                         backgroundImage:
                                             p.profileImageUrl != null
-                                                ? NetworkImage(
-                                                    p.profileImageUrl!,
-                                                  )
-                                                : null,
+                                            ? NetworkImage(p.profileImageUrl!)
+                                            : null,
                                         child: p.profileImageUrl == null
                                             ? Text(
                                                 p.firstName[0],

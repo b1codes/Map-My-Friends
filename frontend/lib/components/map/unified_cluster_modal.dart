@@ -111,8 +111,10 @@ class UnifiedClusterModal extends StatelessWidget {
                 : null,
           ),
           title: Text('${p.firstName} ${p.lastName}'),
-          subtitle:
-              Text(p.relationshipTag, style: const TextStyle(fontSize: 12)),
+          subtitle: Text(
+            p.relationshipTag,
+            style: const TextStyle(fontSize: 12),
+          ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -134,7 +136,9 @@ class UnifiedClusterModal extends StatelessWidget {
                   },
                 ),
               // Link to existing airport/station stop if one exists
-              if (state.stops.any((s) => s.airport != null || s.station != null))
+              if (state.stops.any(
+                (s) => s.airport != null || s.station != null,
+              ))
                 PopupMenuButton<int>(
                   icon: const Icon(Icons.link, color: Colors.amber),
                   tooltip: 'Link to Stop',
@@ -145,7 +149,8 @@ class UnifiedClusterModal extends StatelessWidget {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                            'Linked ${p.firstName} to stop ${String.fromCharCode(65 + index)}'),
+                          'Linked ${p.firstName} to stop ${String.fromCharCode(65 + index)}',
+                        ),
                         duration: const Duration(seconds: 4),
                         action: SnackBarAction(
                           label: 'Set as Preferred',
@@ -157,8 +162,8 @@ class UnifiedClusterModal extends StatelessWidget {
                               preferredStation: stop.station,
                             );
                             context.read<PeopleBloc>().add(
-                                  UpdatePerson(updatedPerson),
-                                );
+                              UpdatePerson(updatedPerson),
+                            );
                           },
                         ),
                       ),
@@ -168,19 +173,24 @@ class UnifiedClusterModal extends StatelessWidget {
                     return state.stops
                         .asMap()
                         .entries
-                        .where((e) =>
-                            e.value.airport != null || e.value.station != null)
+                        .where(
+                          (e) =>
+                              e.value.airport != null ||
+                              e.value.station != null,
+                        )
                         .map((e) {
-                      final stop = e.value;
-                      final label = stop.airport != null
-                          ? 'Airport ${stop.airport!.iataCode}'
-                          : 'Station ${stop.station!.name}';
-                      return PopupMenuItem<int>(
-                        value: e.key,
-                        child:
-                            Text('${String.fromCharCode(65 + e.key)}: $label'),
-                      );
-                    }).toList();
+                          final stop = e.value;
+                          final label = stop.airport != null
+                              ? 'Airport ${stop.airport!.iataCode}'
+                              : 'Station ${stop.station!.name}';
+                          return PopupMenuItem<int>(
+                            value: e.key,
+                            child: Text(
+                              '${String.fromCharCode(65 + e.key)}: $label',
+                            ),
+                          );
+                        })
+                        .toList();
                   },
                 ),
               const Icon(Icons.chevron_right),

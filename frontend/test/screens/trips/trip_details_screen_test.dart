@@ -5,7 +5,9 @@ import 'package:map_my_friends/models/trip.dart';
 import 'package:map_my_friends/screens/trips/trip_details_screen.dart';
 
 void main() {
-  testWidgets('TripDetailsScreen builds successfully', (WidgetTester tester) async {
+  testWidgets('TripDetailsScreen builds successfully', (
+    WidgetTester tester,
+  ) async {
     final trip = Trip(
       id: 1,
       name: 'Test Trip',
@@ -29,11 +31,7 @@ void main() {
       ],
     );
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: TripDetailsScreen(trip: trip),
-      ),
-    );
+    await tester.pumpWidget(MaterialApp(home: TripDetailsScreen(trip: trip)));
 
     expect(find.text('Test Trip'), findsOneWidget);
     expect(find.text('BOOKED'), findsOneWidget);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'a11y_constants.dart';
 
 class AppTheme {
   // Brand Colors
@@ -98,15 +99,16 @@ class AppTheme {
   // Light Theme
   static final ThemeData lightTheme = ThemeData(
     useMaterial3: true,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: _brandColor,
-      brightness: Brightness.light,
-      secondary: _secondaryColor,
-    ).copyWith(
-      onSurface: Colors.black87,
-      onPrimaryContainer: Colors.indigo.shade900,
-      onSecondaryContainer: const Color(0xFF4D002B), // High contrast pink
-    ),
+    colorScheme:
+        ColorScheme.fromSeed(
+          seedColor: _brandColor,
+          brightness: Brightness.light,
+          secondary: _secondaryColor,
+        ).copyWith(
+          onSurface: Colors.black87,
+          onPrimaryContainer: Colors.indigo.shade900,
+          onSecondaryContainer: const Color(0xFF4D002B), // High contrast pink
+        ),
     textTheme: _buildTextTheme(Colors.black87),
     iconTheme: const IconThemeData(color: Colors.black87, size: 24),
     scaffoldBackgroundColor: Colors.grey[50],
@@ -124,10 +126,20 @@ class AppTheme {
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
+        minimumSize: A11yConstants.minTouchSize,
         elevation: 2,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(minimumSize: A11yConstants.minTouchSize),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(minimumSize: A11yConstants.minTouchSize),
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(minimumSize: A11yConstants.minTouchSize),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -156,15 +168,16 @@ class AppTheme {
   // Dark Theme
   static final ThemeData darkTheme = ThemeData(
     useMaterial3: true,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: _brandColor,
-      brightness: Brightness.dark,
-      secondary: _secondaryColor,
-    ).copyWith(
-      onSurface: Colors.white,
-      onPrimaryContainer: const Color(0xFFE8EAF6), // Indigo 50
-      onSecondaryContainer: const Color(0xFFFFE1F0), // Pink 50
-    ),
+    colorScheme:
+        ColorScheme.fromSeed(
+          seedColor: _brandColor,
+          brightness: Brightness.dark,
+          secondary: _secondaryColor,
+        ).copyWith(
+          onSurface: Colors.white,
+          onPrimaryContainer: const Color(0xFFE8EAF6), // Indigo 50
+          onSecondaryContainer: const Color(0xFFFFE1F0), // Pink 50
+        ),
     textTheme: _buildTextTheme(Colors.white),
     iconTheme: const IconThemeData(color: Colors.white, size: 24),
     appBarTheme: const AppBarTheme(
@@ -175,10 +188,20 @@ class AppTheme {
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
+        minimumSize: A11yConstants.minTouchSize,
         elevation: 2,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(minimumSize: A11yConstants.minTouchSize),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(minimumSize: A11yConstants.minTouchSize),
+    ),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(minimumSize: A11yConstants.minTouchSize),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
