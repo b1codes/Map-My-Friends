@@ -27,6 +27,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -38,7 +39,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
             padding: EdgeInsets.zero,
             borderRadius: 12,
             child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              icon: Icon(Icons.arrow_back, color: theme.colorScheme.onSurface),
               onPressed: () => Navigator.pop(context),
             ),
           ),
@@ -144,6 +145,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: GlassContainer(
@@ -157,9 +161,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                 Expanded(
                   child: Text(
                     widget.trip.name,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: onSurface,
                     ),
                   ),
                 ),
@@ -169,7 +173,10 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
             const SizedBox(height: 8),
             Text(
               DateFormat('MMMM d, yyyy').format(widget.trip.date),
-              style: const TextStyle(color: Colors.white70, fontSize: 16),
+              style: TextStyle(
+                color: onSurface.withValues(alpha: 0.7),
+                fontSize: 16,
+              ),
             ),
           ],
         ),
@@ -257,6 +264,8 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
   }
 
   Widget _buildLegItem(BuildContext context, TripLeg leg) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
     IconData transportIcon;
     switch (leg.transportType) {
       case 'FLIGHT':
@@ -279,23 +288,38 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
           const SizedBox(width: 16),
           Column(
             children: [
-              Container(width: 2, height: 20, color: Colors.white24),
+              Container(
+                width: 2,
+                height: 20,
+                color: onSurface.withValues(alpha: 0.2),
+              ),
               InkWell(
                 onTap: () => _showLegDetails(context, leg),
                 child: GlassContainer(
                   padding: const EdgeInsets.all(8),
                   borderRadius: 20,
-                  child: Icon(transportIcon, color: Colors.white70, size: 20),
+                  child: Icon(
+                    transportIcon,
+                    color: onSurface.withValues(alpha: 0.7),
+                    size: 20,
+                  ),
                 ),
               ),
-              Container(width: 2, height: 20, color: Colors.white24),
+              Container(
+                width: 2,
+                height: 20,
+                color: onSurface.withValues(alpha: 0.2),
+              ),
             ],
           ),
           const SizedBox(width: 16),
           if (leg.bookingReference.isNotEmpty)
             Text(
               'Ref: ${leg.bookingReference}',
-              style: const TextStyle(color: Colors.white54, fontSize: 12),
+              style: TextStyle(
+                color: onSurface.withValues(alpha: 0.5),
+                fontSize: 12,
+              ),
             ),
         ],
       ),
@@ -312,7 +336,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
   }
 
   Widget _buildStopItem(BuildContext context, TripStop stop, int index) {
-    // ... (existing code)
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+
     String name = '';
     String address = stop.snapshotAddress ?? '';
 
@@ -370,8 +396,8 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                 children: [
                   Text(
                     name,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: onSurface,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
@@ -379,8 +405,8 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                   if (address.isNotEmpty)
                     Text(
                       address,
-                      style: const TextStyle(
-                        color: Colors.white70,
+                      style: TextStyle(
+                        color: onSurface.withValues(alpha: 0.7),
                         fontSize: 12,
                       ),
                       maxLines: 1,
@@ -403,6 +429,9 @@ class _LegDetailsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: GlassContainer(
@@ -417,30 +446,33 @@ class _LegDetailsSheet extends StatelessWidget {
               children: [
                 Text(
                   'Leg Details',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    color: onSurface,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
+                  icon: Icon(Icons.close, color: onSurface),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
             ),
             const SizedBox(height: 20),
-            _buildInfoRow('Transport Type', leg.transportType),
+            _buildInfoRow(context, 'Transport Type', leg.transportType),
             _buildInfoRow(
+              context,
               'Booking Ref',
               leg.bookingReference.isEmpty ? 'Not set' : leg.bookingReference,
             ),
             if (leg.departureTime != null)
               _buildInfoRow(
+                context,
                 'Departure',
                 DateFormat('HH:mm, MMM d').format(leg.departureTime!),
               ),
             if (leg.arrivalTime != null)
               _buildInfoRow(
+                context,
                 'Arrival',
                 DateFormat('HH:mm, MMM d').format(leg.arrivalTime!),
               ),
@@ -469,17 +501,21 @@ class _LegDetailsSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(BuildContext context, String label, String value) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white70)),
+          Text(
+            label,
+            style: TextStyle(color: onSurface.withValues(alpha: 0.7)),
+          ),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: onSurface,
               fontWeight: FontWeight.bold,
             ),
           ),

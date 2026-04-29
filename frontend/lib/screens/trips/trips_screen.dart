@@ -33,22 +33,25 @@ class TripsScreen extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'My Trips',
-          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+          style: theme.textTheme.headlineLarge?.copyWith(
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: onSurface,
           ),
         ),
         const SizedBox(height: 8),
         Text(
           'Manage your planned and booked adventures',
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: onSurface.withValues(alpha: 0.7),
+          ),
         ),
       ],
     );
@@ -90,6 +93,9 @@ class TripsScreen extends StatelessWidget {
   }
 
   Widget _buildSection(BuildContext context, String title, List<Trip> trips) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -97,9 +103,9 @@ class TripsScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 16.0),
           child: Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: onSurface,
             ),
           ),
         ),
@@ -109,6 +115,8 @@ class TripsScreen extends StatelessWidget {
   }
 
   Widget _buildTripCard(BuildContext context, Trip trip) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
     final bool isCurrent =
         context.watch<TripBloc>().state.currentTripId == trip.id;
 
@@ -136,17 +144,17 @@ class TripsScreen extends StatelessWidget {
           ),
           title: Text(
             trip.name,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Colors.white,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: onSurface,
               fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
             ),
           ),
           subtitle: Text(
             '${DateFormat('MMM d').format(trip.startDate ?? trip.date)}${trip.endDate != null && trip.endDate != trip.startDate ? ' - ${DateFormat('MMM d').format(trip.endDate!)}' : ''} • ${trip.stops.length} stops',
-            style: const TextStyle(color: Colors.white70),
+            style: TextStyle(color: onSurface.withValues(alpha: 0.7)),
           ),
           trailing: PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: Colors.white70),
+            icon: Icon(Icons.more_vert, color: onSurface.withValues(alpha: 0.7)),
             onSelected: (value) => _handleMenuAction(context, value, trip),
             itemBuilder: (context) => [
               const PopupMenuItem(value: 'load', child: Text('View on Map')),
@@ -179,33 +187,40 @@ class TripsScreen extends StatelessWidget {
   }
 
   Widget _buildEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+
     return Center(
       child: GlassContainer(
         padding: const EdgeInsets.all(40),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.route_outlined, size: 64, color: Colors.white24),
+            Icon(
+              Icons.route_outlined,
+              size: 64,
+              color: onSurface.withValues(alpha: 0.2),
+            ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'No Trips Yet',
               style: TextStyle(
-                color: Colors.white,
+                color: onSurface,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Plan your first route on the map!',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white70),
+              style: TextStyle(color: onSurface.withValues(alpha: 0.7)),
             ),
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: onNavigateToMap,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.primary,
+                backgroundColor: theme.colorScheme.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 32,
