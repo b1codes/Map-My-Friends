@@ -5,9 +5,15 @@ import '../../bloc/airport/airport_event.dart';
 import '../../bloc/airport/airport_state.dart';
 import '../../bloc/map/map_settings_cubit.dart';
 import '../../utils/unit_converter.dart';
+import '../../utils/app_theme.dart';
+import 'glass_inlay.dart';
+import 'nearby_blocs.dart';
+import 'chromatic_pulse.dart';
 
 /// A reusable widget that shows the nearest airports to a given coordinate.
 /// Used on both PersonDetailsScreen and MeScreen.
+///
+/// Loads its own bloc unless a [NearbyBlocs] is provided above it.
 class NearbyAirportsSection extends StatefulWidget {
   final double latitude;
   final double longitude;
@@ -23,14 +29,18 @@ class NearbyAirportsSection extends StatefulWidget {
 }
 
 class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
-  late final AirportBloc _airportBloc;
+  /// Created on first build, and only if no [NearbyBlocs] is provided.
+  AirportBloc? _ownBloc;
 
-  @override
-  void initState() {
-    super.initState();
-    // Create a separate bloc instance for nearest airports
-    _airportBloc = AirportBloc();
-    _airportBloc.add(
+  AirportBloc _createOwnBloc() {
+    // A separate bloc instance from the map's, for the nearest airports
+    final bloc = AirportBloc();
+    _load(bloc);
+    return bloc;
+  }
+
+  void _load(AirportBloc bloc) {
+    bloc.add(
       LoadNearestAirports(
         latitude: widget.latitude,
         longitude: widget.longitude,
@@ -39,29 +49,39 @@ class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
   }
 
   @override
+  void didUpdateWidget(NearbyAirportsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The person's address was edited, or the device moved.
+    final own = _ownBloc;
+    if (own != null &&
+        (widget.latitude != oldWidget.latitude ||
+            widget.longitude != oldWidget.longitude)) {
+      _load(own);
+    }
+  }
+
+  @override
   void dispose() {
-    _airportBloc.close();
+    _ownBloc?.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final distanceUnit = context.watch<MapSettingsCubit>().state.distanceUnit;
+    // Watched, so a provided bloc that changes is picked up.
+    final bloc =
+        context.watch<NearbyBlocs?>()?.airports ??
+        (_ownBloc ??= _createOwnBloc());
 
     return BlocProvider.value(
-      value: _airportBloc,
+      value: bloc,
       child: BlocBuilder<AirportBloc, AirportState>(
         builder: (context, state) {
           if (state is AirportLoading) {
             return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
+              padding: EdgeInsets.symmetric(vertical: MapSpacing.sm),
+              child: PulseIndicator(size: 24),
             );
           }
 
@@ -78,31 +98,20 @@ class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
                 ),
                 const SizedBox(height: 8),
                 ...state.airports.map(
-                  (airport) => Card(
-                    elevation: 0,
-                    color: Theme.of(context).colorScheme.surfaceContainerLowest,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(
-                        color: Theme.of(context).colorScheme.outlineVariant,
-                      ),
-                    ),
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+                  (airport) => Padding(
+                    padding: const EdgeInsets.only(bottom: MapSpacing.xs),
+                    child: GlassInlay(
                       child: Row(
                         children: [
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(
-                                0xFF1565C0,
-                              ).withValues(alpha: 0.1),
+                              color: MapPalette.airport.withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
                               Icons.flight,
-                              color: Color(0xFF1565C0),
+                              color: MapPalette.airport,
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -119,7 +128,7 @@ class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
                                           .titleSmall
                                           ?.copyWith(
                                             fontWeight: FontWeight.bold,
-                                            color: const Color(0xFF1565C0),
+                                            color: MapPalette.airport,
                                           ),
                                     ),
                                     const SizedBox(width: 8),
@@ -156,10 +165,12 @@ class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(12),
+                                color: MapGlass.inlayFillStrong(
+                                  Theme.of(context).brightness,
+                                ),
+                                borderRadius: BorderRadius.circular(
+                                  MapGlass.radiusSm,
+                                ),
                               ),
                               child: Text(
                                 UnitConverter.formatDistance(

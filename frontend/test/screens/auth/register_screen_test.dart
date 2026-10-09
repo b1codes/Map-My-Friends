@@ -7,6 +7,7 @@ import 'package:map_my_friends/bloc/auth/auth_bloc.dart';
 import 'package:map_my_friends/bloc/auth/auth_event.dart';
 import 'package:map_my_friends/bloc/auth/auth_state.dart';
 import 'package:map_my_friends/screens/auth/register_screen.dart';
+import 'package:map_my_friends/components/shared/chromatic_pulse.dart';
 
 class MockAuthBloc extends Mock implements AuthBloc {}
 
@@ -117,7 +118,9 @@ void main() {
 
       await tester.pumpWidget(createWidgetUnderTest());
 
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      // The app's loading state is the Chromatic Pulse, not Material's
+      // spinner — `llc-standards/context/chromatic-pulse.md`.
+      expect(find.byType(ChromaticPulse), findsOneWidget);
     });
 
     testWidgets('shows snackbar on AuthError', (tester) async {

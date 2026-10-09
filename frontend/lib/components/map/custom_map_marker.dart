@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../utils/app_theme.dart';
 
 class CustomMapMarker extends StatelessWidget {
   final String pinColorHex;
@@ -85,7 +86,7 @@ class CustomMapMarker extends StatelessWidget {
           height: size,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(MapGlass.radiusSm),
             border: Border.all(color: Colors.white, width: 2),
           ),
           alignment: Alignment.center,

@@ -10,6 +10,11 @@ import '../../components/pulse/contact_roster_tile.dart';
 import '../../components/pulse/log_contact_sheet.dart';
 import '../../components/shared/glass_empty_state.dart';
 import '../../utils/window_size.dart';
+import '../../utils/app_theme.dart';
+import '../../components/shared/glass_container.dart';
+import '../../components/shared/chromatic_pulse.dart';
+import '../../components/shared/glass_surfaces.dart';
+import '../../components/shared/glass_header.dart';
 
 /// Keep-in-Touch ("Pulse") screen: a relationship calendar plus a roster that
 /// color-codes each person by how overdue a touchpoint is, along the app's
@@ -78,7 +83,6 @@ class _PulseScreenState extends State<PulseScreen> {
 
   void _openLogSheet(Person person, ContactRecency recency) {
     final bloc = context.read<PulseBloc>();
-    final messenger = ScaffoldMessenger.of(context);
     LogContactSheet.show(
       context,
       person: person,
@@ -92,13 +96,10 @@ class _PulseScreenState extends State<PulseScreen> {
             note: note,
           ),
         );
-        messenger.showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            content: Text(
-              'Logged ${channel.label.toLowerCase()} with ${person.firstName}',
-            ),
-          ),
+        if (!mounted) return;
+        GlassToast.success(
+          context,
+          'Logged ${channel.label.toLowerCase()} with ${person.firstName}',
         );
       },
       onSetCadence: (days) {
@@ -110,44 +111,43 @@ class _PulseScreenState extends State<PulseScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Keep in Touch'), centerTitle: true),
-      body: SafeArea(
-        child: BlocConsumer<PulseBloc, PulseState>(
-          listenWhen: (prev, curr) =>
-              curr is PulseLoaded && curr.actionNonce != _lastNonce,
-          listener: (context, state) {
-            if (state is PulseLoaded) {
-              _lastNonce = state.actionNonce;
-              if (state.actionError != null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: Theme.of(context).colorScheme.error,
-                    content: Text(state.actionError!),
-                  ),
-                );
-              }
-            }
-          },
-          builder: (context, state) {
-            if (state is PulseLoading || state is PulseInitial) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (state is PulseError) {
-              return _ErrorView(
-                message: state.message,
-                onRetry: () => context.read<PulseBloc>().add(LoadPulse()),
-              );
-            }
-            if (state is PulseLoaded) {
-              if (state.people.isEmpty) {
-                return const _EmptyPeopleView();
-              }
-              return _buildLoaded(context, state);
-            }
-            return const SizedBox.shrink();
-          },
-        ),
+      backgroundColor: Colors.transparent,
+      body: Column(
+        children: <Widget>[
+          const GlassHeader(title: 'Keep in Touch', showBack: false),
+          Expanded(
+            child: BlocConsumer<PulseBloc, PulseState>(
+              listenWhen: (prev, curr) =>
+                  curr is PulseLoaded && curr.actionNonce != _lastNonce,
+              listener: (context, state) {
+                if (state is PulseLoaded) {
+                  _lastNonce = state.actionNonce;
+                  if (state.actionError != null) {
+                    GlassToast.failure(context, state.actionError!);
+                  }
+                }
+              },
+              builder: (context, state) {
+                if (state is PulseLoading || state is PulseInitial) {
+                  return const PulseIndicator();
+                }
+                if (state is PulseError) {
+                  return _ErrorView(
+                    message: state.message,
+                    onRetry: () => context.read<PulseBloc>().add(LoadPulse()),
+                  );
+                }
+                if (state is PulseLoaded) {
+                  if (state.people.isEmpty) {
+                    return const _EmptyPeopleView();
+                  }
+                  return _buildLoaded(context, state);
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -265,9 +265,10 @@ class _SummaryHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bool caughtUp = attentionCount == 0;
-    final Color accent = caughtUp
-        ? const Color(0xFF14B8A6)
-        : const Color(0xFFFF5A1F);
+    // The same spectrum the roster reads on, so "caught up" and a fresh
+    // connection are the same colour rather than two teals that nearly match.
+    final MapSignal signal = caughtUp ? MapPalette.vital : MapPalette.overdue;
+    final Color accent = signal.ink(theme.brightness);
 
     final String headline;
     final String sub;
@@ -306,12 +307,7 @@ class _SummaryHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                headline,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              Text(headline, style: theme.textTheme.titleLarge),
               const SizedBox(height: 2),
               Text(
                 sub,
@@ -333,14 +329,11 @@ class _CalendarCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
+    // A month is this surface's panel, not a row inside one, so it earns a
+    // real backdrop sample rather than an inlay.
+    return GlassContainer(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, MapSpacing.sm),
+      borderRadius: MapGlass.radiusMd,
       child: child,
     );
   }
@@ -369,13 +362,10 @@ class _SelectedDayDetail extends StatelessWidget {
     final theme = Theme.of(context);
     final dateLabel = DateFormat.yMMMMEEEEd().format(day);
 
-    return Container(
+    return GlassContainer(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
-      ),
+      padding: const EdgeInsets.all(MapSpacing.sm),
+      borderRadius: MapGlass.radiusMd,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -430,7 +420,7 @@ class _DayLogChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(MapGlass.radiusPill),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

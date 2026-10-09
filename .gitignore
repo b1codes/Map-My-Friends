@@ -2,6 +2,9 @@
 *.class
 *.lock
 !poetry.lock
+# The catalog's CI job regenerates code and diffs it, so its generator
+# (and the formatter it runs) must resolve the same everywhere.
+!frontend/widgetbook/pubspec.lock
 *.log
 *.pyc
 *.swp

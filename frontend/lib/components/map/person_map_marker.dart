@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/person.dart';
 import '../../screens/people/person_details_screen.dart';
 import 'custom_map_marker.dart';
+import '../shared/glass_surfaces.dart';
 
 class PersonMapMarker extends StatelessWidget {
   final Person person;
@@ -26,28 +27,22 @@ class PersonMapMarker extends StatelessWidget {
       onTap:
           onTap ??
           () {
-            showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: Text('${person.firstName} ${person.lastName}'),
-                content: Text('${person.city}, ${person.state}'),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context); // Close dialog
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              PersonDetailsScreen(personId: person.id),
-                        ),
-                      );
-                    },
-                    child: const Text('View Details'),
-                  ),
-                ],
-              ),
-            );
+            GlassDialog.confirm(
+              context,
+              title: '${person.firstName} ${person.lastName}',
+              message: '${person.city}, ${person.state}',
+              confirmLabel: 'View Details',
+              cancelLabel: 'Close',
+            ).then((open) {
+              if (!open || !context.mounted) return;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      PersonDetailsScreen(personId: person.id),
+                ),
+              );
+            });
           },
     );
   }

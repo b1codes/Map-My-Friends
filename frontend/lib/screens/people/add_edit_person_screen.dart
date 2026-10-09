@@ -18,6 +18,11 @@ import '../../models/airport.dart';
 import '../../models/station.dart';
 import '../../services/api_service.dart';
 import '../../utils/window_size.dart';
+import '../../utils/app_theme.dart';
+import '../../components/shared/ambient_scaffold.dart';
+import '../../components/shared/chromatic_pulse.dart';
+import '../../components/shared/glass_surfaces.dart';
+import '../../components/shared/glass_header.dart';
 
 class AddEditPersonScreen extends StatefulWidget {
   final Person? person;
@@ -121,9 +126,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
     } catch (e) {
       setState(() => _isLoadingHubs = false);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to load hubs: $e')));
+        GlassToast.show(context, 'Failed to load hubs: $e');
       }
     }
   }
@@ -174,105 +177,72 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
+        GlassToast.show(context, 'Failed to pick image: $e');
       }
     }
   }
 
   void _showColorPicker() {
     Color pickerColor = Color(int.parse(_pinColor.replaceFirst('#', '0xFF')));
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Pick a Pin Color'),
-        content: SingleChildScrollView(
-          child: BlockPicker(
-            pickerColor: pickerColor,
-            onColorChanged: (color) {
-              setState(() {
-                _pinColor =
-                    '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
-              });
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            child: const Text('Got it'),
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-          ),
-        ],
+    GlassDialog.panel(
+      context,
+      title: 'Pick a Pin Color',
+      dismissLabel: 'Got it',
+      content: BlockPicker(
+        pickerColor: pickerColor,
+        onColorChanged: (color) {
+          setState(() {
+            _pinColor =
+                '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+          });
+        },
       ),
     );
   }
 
   void _showEmojiPicker() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return SafeArea(
-          child: SizedBox(
-            height: 300,
-            child: EmojiPicker(
-              onEmojiSelected: (category, emoji) {
-                setState(() {
-                  _pinEmoji = emoji.emoji;
-                });
-                Navigator.pop(context);
-              },
-            ),
-          ),
-        );
-      },
+    GlassSheet.show<void>(
+      context,
+      builder: (context) => SizedBox(
+        height: 300,
+        child: EmojiPicker(
+          onEmojiSelected: (category, emoji) {
+            setState(() {
+              _pinEmoji = emoji.emoji;
+            });
+            Navigator.pop(context);
+          },
+        ),
+      ),
     );
   }
 
   void _showImagePickerOptions() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from Gallery'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.gallery);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Take a Photo'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.camera);
-              },
-            ),
-            if (_selectedImage != null || _existingImageUrl != null)
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text(
-                  'Remove Photo',
-                  style: TextStyle(color: Colors.red),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  setState(() {
-                    _selectedImage = null;
-                    _selectedImageBytes = null;
-                    _existingImageUrl = null;
-                  });
-                },
-              ),
-          ],
+    GlassSheet.actions(
+      context,
+      title: 'Photo',
+      actions: <SheetAction>[
+        SheetAction(
+          icon: Icons.photo_library,
+          label: 'Choose from Gallery',
+          onTap: () => _pickImage(ImageSource.gallery),
         ),
-      ),
+        SheetAction(
+          icon: Icons.camera_alt,
+          label: 'Take a Photo',
+          onTap: () => _pickImage(ImageSource.camera),
+        ),
+        if (_selectedImage != null || _existingImageUrl != null)
+          SheetAction(
+            icon: Icons.delete_outline,
+            label: 'Remove Photo',
+            onTap: () => setState(() {
+              _selectedImage = null;
+              _selectedImageBytes = null;
+              _existingImageUrl = null;
+            }),
+          ),
+      ],
     );
   }
 
@@ -338,16 +308,16 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
             Container(
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  color: MapGlass.inlayFillStrong(Theme.of(context).brightness),
                   width: 4,
                 ),
                 shape: BoxShape.circle,
               ),
               child: CircleAvatar(
                 radius: 64,
-                backgroundColor: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest,
+                backgroundColor: MapGlass.inlayFillStrong(
+                  Theme.of(context).brightness,
+                ),
                 backgroundImage: _selectedImageBytes != null
                     ? MemoryImage(_selectedImageBytes!)
                     : (_existingImageUrl != null
@@ -393,9 +363,9 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.person != null ? l10n.editPerson : l10n.addPerson),
+    return AmbientScaffold(
+      header: GlassHeader(
+        title: widget.person != null ? l10n.editPerson : l10n.addPerson,
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -445,7 +415,9 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                                   color: Theme.of(
                                     context,
                                   ).colorScheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(
+                                    MapGlass.radiusMd,
+                                  ),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -530,17 +502,10 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                                 setState(() => _tagController.text = val!),
                             decoration: InputDecoration(
                               labelText: 'Relationship Tag',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 16,
                               ),
-                              filled: true,
-                              fillColor: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerLowest,
                             ),
                           ),
                           const SizedBox(height: 32),
@@ -612,13 +577,6 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                             controller: _phoneController,
                             decoration: InputDecoration(
                               labelText: 'Phone Number (Optional)',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              filled: true,
-                              fillColor: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerLowest,
                             ),
                             initialCountryCode: 'US',
                             onChanged: (phone) {
@@ -639,17 +597,13 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                                 setState(() => _birthday = date);
                               }
                             },
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(
+                              MapGlass.radiusSm,
+                            ),
                             child: InputDecorator(
                               decoration: InputDecoration(
                                 labelText: 'Birthday (Optional)',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
                                 filled: true,
-                                fillColor: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainerLowest,
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16,
                                   vertical: 16,
@@ -756,16 +710,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                             ],
                             onChanged: (val) =>
                                 setState(() => _pinStyle = val!),
-                            decoration: InputDecoration(
-                              labelText: 'Pin Shape',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              filled: true,
-                              fillColor: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerLowest,
-                            ),
+                            decoration: InputDecoration(labelText: 'Pin Shape'),
                           ),
                           const SizedBox(height: 16),
 
@@ -793,13 +738,6 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                                 setState(() => _pinIconType = val!),
                             decoration: InputDecoration(
                               labelText: 'Inner Icon',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              filled: true,
-                              fillColor: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerLowest,
                             ),
                           ),
 
@@ -814,10 +752,12 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                                   width: 40,
                                   height: 40,
                                   decoration: BoxDecoration(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.surfaceContainerHighest,
-                                    borderRadius: BorderRadius.circular(8),
+                                    color: MapGlass.inlayFillStrong(
+                                      Theme.of(context).brightness,
+                                    ),
+                                    borderRadius: BorderRadius.circular(
+                                      MapGlass.radiusSm,
+                                    ),
                                   ),
                                   alignment: Alignment.center,
                                   child: Text(
@@ -837,16 +777,20 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                               onPressed: _isSaving ? null : _save,
                               style: FilledButton.styleFrom(
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(
+                                    MapGlass.radiusSm,
+                                  ),
                                 ),
                               ),
                               child: _isSaving
-                                  ? const SizedBox(
+                                  ? SizedBox(
                                       height: 20,
                                       width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
+                                      child: ChromaticPulse(
+                                        colors: PulseIndicator.paletteOf(
+                                          context,
+                                        ),
+                                        borderRadius: 10.0,
                                       ),
                                     )
                                   : const Text(
@@ -901,7 +845,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
         ),
         const SizedBox(height: 16),
         if (_isLoadingHubs)
-          const Center(child: CircularProgressIndicator())
+          const PulseIndicator()
         else ...[
           // Airport selection
           DropdownButtonFormField<Airport>(
@@ -923,11 +867,6 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
             decoration: InputDecoration(
               labelText: 'Preferred Airport',
               prefixIcon: const Icon(Icons.airplanemode_active),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              filled: true,
-              fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
             ),
           ),
           const SizedBox(height: 16),
@@ -951,11 +890,6 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
             decoration: InputDecoration(
               labelText: 'Preferred Train Station',
               prefixIcon: const Icon(Icons.train),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              filled: true,
-              fillColor: Theme.of(context).colorScheme.surfaceContainerLowest,
             ),
           ),
           const SizedBox(height: 8),

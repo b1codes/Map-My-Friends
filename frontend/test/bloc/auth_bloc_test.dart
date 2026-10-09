@@ -172,6 +172,46 @@ void main() {
       );
     });
 
+    group('DevLoginRequested', () {
+      blocTest<AuthBloc, AuthState>(
+        'emits [AuthLoading, Authenticated] on a successful dev sign-in',
+        build: () {
+          when(() => authService.loginAsDev()).thenAnswer(
+            (_) async => {
+              'access': 'dev_access',
+              'refresh': 'dev_refresh',
+              'username': 'demo',
+            },
+          );
+          return authBloc;
+        },
+        act: (bloc) => bloc.add(const DevLoginRequested()),
+        expect: () => [
+          AuthLoading(),
+          const Authenticated(
+            accessToken: 'dev_access',
+            refreshToken: 'dev_refresh',
+            username: 'demo',
+          ),
+        ],
+      );
+
+      blocTest<AuthBloc, AuthState>(
+        'surfaces the seed hint when the local stack is not running',
+        build: () {
+          when(
+            () => authService.loginAsDev(),
+          ).thenThrow(Exception('DEV sign-in failed: make up && make seed'));
+          return authBloc;
+        },
+        act: (bloc) => bloc.add(const DevLoginRequested()),
+        expect: () => [
+          AuthLoading(),
+          const AuthError(message: 'DEV sign-in failed: make up && make seed'),
+        ],
+      );
+    });
+
     group('LogoutRequested', () {
       blocTest<AuthBloc, AuthState>(
         'emits [Unauthenticated] on logout',

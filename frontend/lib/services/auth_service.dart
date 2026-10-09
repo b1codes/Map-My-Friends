@@ -78,6 +78,37 @@ class AuthService {
     }
   }
 
+  /// Sign in as the locally seeded development user, skipping credential entry.
+  ///
+  /// This deliberately goes through the same `user/auth/token/` endpoint as a
+  /// normal login instead of minting a fake token. Every screen behind the auth
+  /// wall calls the API through [_getAuthenticatedDio], and Django validates
+  /// those tokens with SimpleJWT - a synthetic token would only move the 401
+  /// from the login screen to the map screen. What this bypasses is typing the
+  /// credentials, not checking them.
+  ///
+  /// Requires the local stack to be running and seeded: `make up && make seed`.
+  Future<Map<String, String>> loginAsDev() async {
+    if (!ApiConfig.devLoginEnabled) {
+      // Unreachable in release builds - the caller is tree-shaken away - but
+      // keep the guard so an accidental call fails loudly rather than
+      // attempting a login with hardcoded credentials.
+      throw Exception('DEV sign-in is not available in this build.');
+    }
+
+    try {
+      return await login(ApiConfig.devUsername, ApiConfig.devPassword);
+    } catch (e) {
+      final reason = e.toString().replaceFirst('Exception: ', '');
+      throw Exception(
+        'DEV sign-in failed for "${ApiConfig.devUsername}" at '
+        '${ApiConfig.baseUrl}\n'
+        'Start and seed the local stack: make up && make seed\n'
+        '($reason)',
+      );
+    }
+  }
+
   Future<Map<String, String>> loginWithAuth0({String? connection}) async {
     // If we're using the placeholder Client ID, run in mock mode
     if (ApiConfig.auth0ClientId == 'YOUR_AUTH0_CLIENT_ID') {

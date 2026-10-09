@@ -38,4 +38,43 @@ class ApiConfig {
     'AUTH0_AUDIENCE',
     defaultValue: 'https://api.mapmyfriends.com/',
   );
+
+  // ------------------------------------------------------------------ //
+  //  LOCAL DEVELOPMENT SIGN-IN                                           //
+  //                                                                      //
+  //  A one-tap login as the user `make seed` creates, so an emulator or  //
+  //  Chrome session can get past the login wall without typing anything. //
+  //  It still calls the real token endpoint - see AuthService.loginAsDev //
+  //  for why a synthetic token would be useless here.                    //
+  // ------------------------------------------------------------------ //
+
+  /// Whether the DEV sign-in affordance exists in this build.
+  ///
+  /// `kReleaseMode` is a compile-time constant, so this whole expression is
+  /// folded by the compiler and the dev-login code is tree-shaken out of any
+  /// release build. Passing `--dart-define=DEV_LOGIN=true` to a release build
+  /// cannot resurrect it; the flag only exists to turn the button *off* in a
+  /// debug build (`--dart-define=DEV_LOGIN=false`).
+  static const bool devLoginEnabled =
+      !kReleaseMode && bool.fromEnvironment('DEV_LOGIN', defaultValue: true);
+
+  /// Skip the login screen entirely and sign in as the dev user on launch.
+  ///
+  /// Off by default - opt in with `--dart-define=DEV_AUTOLOGIN=true`. Useful
+  /// when iterating on a screen that lives behind the auth wall, since a hot
+  /// restart would otherwise drop you back at the login form.
+  static const bool devAutoLogin =
+      devLoginEnabled && bool.fromEnvironment('DEV_AUTOLOGIN');
+
+  /// Credentials for the dev user. Defaults match `DEMO_USERNAME` /
+  /// `DEMO_PASSWORD` in `backend/apps/common/management/commands/seed.py`;
+  /// override with `--dart-define` if you seeded a different account.
+  static const String devUsername = String.fromEnvironment(
+    'DEV_USERNAME',
+    defaultValue: 'demo',
+  );
+  static const String devPassword = String.fromEnvironment(
+    'DEV_PASSWORD',
+    defaultValue: 'demo12345!',
+  );
 }

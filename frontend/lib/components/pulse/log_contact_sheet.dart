@@ -5,6 +5,8 @@ import '../../models/contact_log.dart';
 import '../../models/person.dart';
 import '../../utils/contact_recency.dart';
 import '../shared/thermal_response.dart';
+import '../../utils/app_theme.dart';
+import '../shared/glass_surfaces.dart';
 
 /// Bottom sheet for recording a touchpoint with [person]. Handles channel,
 /// date (with quick Today/Yesterday chips), an optional note, optional
@@ -35,14 +37,8 @@ class LogContactSheet extends StatefulWidget {
     onLog,
     required void Function(int cadenceDays) onSetCadence,
   }) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
+    return GlassSheet.show<void>(
+      context,
       builder: (_) => LogContactSheet(
         person: person,
         recency: recency,
@@ -287,7 +283,9 @@ class _ChannelOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final accent = channel.markerColor;
-    final borderColor = selected ? accent : theme.colorScheme.outlineVariant;
+    final borderColor = selected
+        ? accent
+        : MapGlass.inlayEdge(theme.brightness);
     final fg = selected ? accent : theme.colorScheme.onSurfaceVariant;
 
     return Semantics(
@@ -296,7 +294,7 @@ class _ChannelOption extends StatelessWidget {
       label: '${channel.label}${selected ? ', selected' : ''}',
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(MapGlass.radiusMd),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -304,7 +302,7 @@ class _ChannelOption extends StatelessWidget {
             color: selected
                 ? accent.withValues(alpha: 0.12)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(MapGlass.radiusMd),
             border: Border.all(color: borderColor, width: selected ? 1.5 : 1),
           ),
           child: Column(
@@ -345,16 +343,16 @@ class _DateChip extends StatelessWidget {
     final primary = theme.colorScheme.primary;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(MapGlass.radiusPill),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
           color: selected
               ? primary.withValues(alpha: 0.14)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(MapGlass.radiusPill),
           border: Border.all(
-            color: selected ? primary : theme.colorScheme.outlineVariant,
+            color: selected ? primary : MapGlass.inlayEdge(theme.brightness),
             width: selected ? 1.5 : 1,
           ),
         ),
@@ -403,14 +401,14 @@ class _CadenceEditor extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(MapGlass.radiusMd),
+        border: Border.all(color: MapGlass.inlayEdge(theme.brightness)),
       ),
       child: Column(
         children: [
           InkWell(
             onTap: onToggle,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(MapGlass.radiusMd),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Row(
@@ -499,7 +497,7 @@ class _PrimaryButton extends StatelessWidget {
           foregroundColor: theme.colorScheme.onPrimary,
           minimumSize: const Size.fromHeight(52),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(MapGlass.radiusMd),
           ),
         ),
       ),

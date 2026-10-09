@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 import '../../services/auth_service.dart';
+import '../../services/api_config.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   final AuthService _authService;
@@ -15,6 +16,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<PasswordResetRequested>(_onPasswordResetRequested);
     on<LogoutRequested>(_onLogoutRequested);
     on<Auth0LoginRequested>(_onAuth0LoginRequested);
+    on<DevLoginRequested>(_onDevLoginRequested);
   }
 
   Future<void> _onCheckAuthStatus(
@@ -33,6 +35,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
             username: tokens['username'],
           ),
         );
+      } else if (ApiConfig.devAutoLogin) {
+        // Stay in AuthLoading and hand off: the dev-login handler emits the
+        // terminal state. Emitting Unauthenticated first would flash the login
+        // screen for a frame before replacing it.
+        add(const DevLoginRequested());
       } else {
         emit(const Unauthenticated());
       }
@@ -108,6 +115,26 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     await _authService.logout();
     emit(const Unauthenticated(message: 'You have been logged out.'));
+  }
+
+  Future<void> _onDevLoginRequested(
+    DevLoginRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(AuthLoading());
+
+    try {
+      final tokens = await _authService.loginAsDev();
+      emit(
+        Authenticated(
+          accessToken: tokens['access']!,
+          refreshToken: tokens['refresh']!,
+          username: tokens['username'],
+        ),
+      );
+    } catch (e) {
+      emit(AuthError(message: e.toString().replaceFirst('Exception: ', '')));
+    }
   }
 
   Future<void> _onAuth0LoginRequested(

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:map_my_friends/components/shared/glass_empty_state.dart';
 import 'package:map_my_friends/utils/app_theme.dart';
+import 'package:map_my_friends/components/shared/thermal_button.dart';
+import 'package:map_my_friends/components/shared/thermal_response.dart';
 
 /// The three screens this component replaced had drifted apart in typography,
 /// alignment, and button styling. These tests hold the consolidated version to
@@ -133,17 +135,34 @@ void main() {
         ),
       );
 
-      final button = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
-      const states = <WidgetState>{};
+      // The CTA is the app's own action now, not a Material button wearing
+      // the design system's numbers.
+      expect(find.byType(ThermalButton), findsOneWidget);
+      expect(find.byType(ElevatedButton), findsNothing);
 
       // DESIGN.md §6 bans drop shadows; depth here is the glass behind it.
-      expect(button.style!.elevation!.resolve(states), 0);
+      final decorations = tester
+          .widgetList<Container>(
+            find.descendant(
+              of: find.byType(ThermalButton),
+              matching: find.byType(Container),
+            ),
+          )
+          .map((container) => container.decoration)
+          .whereType<BoxDecoration>();
+      for (final decoration in decorations) {
+        expect(decoration.boxShadow, anyOf(isNull, isEmpty));
+      }
 
-      final shape =
-          button.style!.shape!.resolve(states)! as RoundedRectangleBorder;
+      final response = tester.widget<ThermalResponse>(
+        find.descendant(
+          of: find.byType(ThermalButton),
+          matching: find.byType(ThermalResponse),
+        ),
+      );
       expect(
-        shape.borderRadius,
-        BorderRadius.circular(MapGlass.radiusSm),
+        response.borderRadius,
+        MapGlass.radiusSm,
         reason: 'DESIGN.md components.button-thermal uses rounded.sm',
       );
     });

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../utils/app_theme.dart';
 import 'glass_container.dart';
+import 'thermal_button.dart';
 
 /// The empty state for a primary surface: a single glass panel carrying an
 /// icon, a headline, a line of guidance, and optionally the one action that
@@ -105,9 +106,8 @@ class GlassEmptyState extends StatelessWidget {
 
 /// The single filled action an empty state may carry.
 ///
-/// Styled here rather than at the call site so every empty state's CTA is the
-/// same weight, and flat per DESIGN.md §6 — depth on this surface comes from
-/// the glass behind the button, not from a shadow beneath it.
+/// Kept as a private wrapper rather than inlined at the call site so every
+/// empty state's CTA is the same weight and the same material.
 class _EmptyStateAction extends StatelessWidget {
   final String label;
   final IconData? icon;
@@ -121,34 +121,6 @@ class _EmptyStateAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final style = ElevatedButton.styleFrom(
-      backgroundColor: scheme.primary,
-      foregroundColor: scheme.onPrimary,
-      elevation: 0,
-      padding: const EdgeInsets.symmetric(
-        horizontal: MapSpacing.lg,
-        vertical: MapSpacing.sm,
-      ),
-      shape: RoundedRectangleBorder(
-        // DESIGN.md components.button-thermal: rounded.sm.
-        borderRadius: BorderRadius.circular(MapGlass.radiusSm),
-      ),
-    );
-
-    if (icon == null) {
-      return ElevatedButton(
-        onPressed: onPressed,
-        style: style,
-        child: Text(label),
-      );
-    }
-
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      style: style,
-      icon: Icon(icon),
-      label: Text(label),
-    );
+    return ThermalButton(label: label, icon: icon, onPressed: onPressed);
   }
 }

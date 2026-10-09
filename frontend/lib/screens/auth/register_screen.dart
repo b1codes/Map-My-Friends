@@ -3,6 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../bloc/auth/auth_bloc.dart';
 import '../../bloc/auth/auth_event.dart';
 import '../../bloc/auth/auth_state.dart';
+import '../../components/shared/ambient_scaffold.dart';
+import '../../components/shared/chromatic_pulse.dart';
+import '../../components/shared/glass_surfaces.dart';
+import '../../components/shared/glass_header.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -61,25 +65,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final isLoading = context.watch<AuthBloc>().state is AuthLoading;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Create Account')),
+    return AmbientScaffold(
+      appearance: Brightness.dark,
+      header: const GlassHeader(title: 'Create Account'),
       body: BlocListener<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is RegistrationSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.green,
-              ),
-            );
+            GlassToast.success(context, state.message);
             Navigator.pop(context);
           } else if (state is AuthError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
-            );
+            GlassToast.failure(context, state.message);
           }
         },
         child: SafeArea(
@@ -287,12 +282,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             child: FilledButton(
                               onPressed: isLoading ? null : _register,
                               child: isLoading
-                                  ? const SizedBox(
+                                  ? SizedBox(
                                       height: 20,
                                       width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
+                                      child: ChromaticPulse(
+                                        colors: PulseIndicator.paletteOf(
+                                          context,
+                                        ),
+                                        borderRadius: 10.0,
                                       ),
                                     )
                                   : const Text('Create Account'),

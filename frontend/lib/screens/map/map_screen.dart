@@ -32,6 +32,7 @@ import '../../components/shared/thermal_response.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/window_size.dart';
+import '../../components/shared/chromatic_pulse.dart';
 
 // Spatial tokens per DESIGN.md §5: floating chrome lives at 20px inset; the
 // compass clears the settings button (~75px tall plus its inset) with a
@@ -397,7 +398,24 @@ class _MapScreenState extends State<MapScreen> {
                                       userAgentPackageName:
                                           'com.mapmyfriends.app',
                                       tileProvider: kIsWeb
-                                          ? NetworkTileProvider()
+                                          // Zooming prunes a screenful of
+                                          // tiles at once, and this provider
+                                          // aborts their in-flight requests by
+                                          // default. On web the abort escapes
+                                          // package:http's browser client as
+                                          // an uncaught DOMException on every
+                                          // zoom-out, ahead of flutter_map's
+                                          // own silent handling of it.
+                                          //
+                                          // Removing the cause is the only
+                                          // reliable fix: with no abort
+                                          // trigger there is no AbortError to
+                                          // intercept. The cost is that
+                                          // obsolete tile requests run to
+                                          // completion on a fast zoom.
+                                          ? NetworkTileProvider(
+                                              abortObsoleteRequests: false,
+                                            )
                                           : FMTCTileProvider(
                                               stores: const {
                                                 'mapStore': BrowseStoreStrategy
@@ -958,11 +976,9 @@ class _LocatingPill extends StatelessWidget {
               SizedBox(
                 width: 16,
                 height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    theme.colorScheme.primary,
-                  ),
+                child: ChromaticPulse(
+                  colors: PulseIndicator.paletteOf(context),
+                  borderRadius: 8,
                 ),
               ),
               const SizedBox(width: 12),

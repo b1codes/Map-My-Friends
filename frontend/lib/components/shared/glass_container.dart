@@ -126,7 +126,12 @@ class GlassContainer extends StatelessWidget {
     } else {
       assert(_debugAssertHasBackdropGroup(context));
 
-      final baseColor = color ?? theme.colorScheme.surface;
+      // One material, two rooms. In the void the body is white — the
+      // `#FFFFFF1A` of DESIGN.md §2 and the LLC Tier 3 template — so the panel
+      // sits *above* the ground it floats over. In daylight a white body over a
+      // white ground is a panel that exists in the widget tree and nowhere on
+      // screen, so light glass is the void neutral laid over the room instead.
+      final baseColor = color ?? (isDark ? Colors.white : MapGlass.bodyLight);
       final blurFilter = ImageFilter.blur(
         sigmaX: effectiveBlur,
         sigmaY: effectiveBlur,
@@ -135,20 +140,31 @@ class GlassContainer extends StatelessWidget {
       // The gradient supersedes `decoration.color`: BoxDecoration paints a
       // shader over the flat colour when both are set, so the colour is only
       // expressed through the stops below.
+      // The sheen is a direction of light, not a direction of alpha. With a
+      // light body more alpha reads brighter; with a dark body more alpha
+      // reads darker, so the ramp inverts to keep the top-left corner the lit
+      // end of the surface in both appearances.
+      final double nearAlpha = isDark
+          ? effectiveOpacity + MapGlass.sheen
+          : effectiveOpacity;
+      final double farAlpha = isDark
+          ? effectiveOpacity
+          : effectiveOpacity + MapGlass.sheen;
+
       final decoration = BoxDecoration(
         borderRadius: BorderRadius.circular(effectiveRadius),
         border: Border.all(
-          color: Colors.white.withValues(
-            alpha: isDark ? MapGlass.edgeDark : MapGlass.edgeLight,
-          ),
+          color: isDark
+              ? Colors.white.withValues(alpha: MapGlass.edgeDark)
+              : MapGlass.bodyLight.withValues(alpha: MapGlass.edgeLight),
           width: MapGlass.edgeWidth,
         ),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            baseColor.withValues(alpha: effectiveOpacity + MapGlass.sheen),
-            baseColor.withValues(alpha: effectiveOpacity),
+            baseColor.withValues(alpha: nearAlpha),
+            baseColor.withValues(alpha: farAlpha),
           ],
         ),
       );

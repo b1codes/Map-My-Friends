@@ -193,13 +193,36 @@ void main() {
       }
     });
 
-    testWidgets('the sheen runs top-left to bottom-right', (tester) async {
-      await tester.pumpWidget(_host(const GlassContainer(child: probe)));
-      final gradient = _decoration(tester).gradient! as LinearGradient;
+    testWidgets('lights the surface from the top-left in both appearances', (
+      tester,
+    ) async {
+      // The sheen is a direction of light, not a direction of alpha. Dark
+      // glass is a light body over the void, so more alpha reads brighter;
+      // light glass is the void neutral over daylight, so more alpha reads
+      // darker and the ramp inverts. Asserting raw alpha would pin the
+      // implementation of one appearance and call the other one broken, so
+      // this composites each end over the field it actually floats on.
+      for (final brightness in Brightness.values) {
+        await tester.pumpWidget(
+          _host(const GlassContainer(child: probe), brightness: brightness),
+        );
+        final gradient = _decoration(tester).gradient! as LinearGradient;
 
-      expect(gradient.begin, Alignment.topLeft);
-      expect(gradient.end, Alignment.bottomRight);
-      expect(gradient.colors.first.a, greaterThan(gradient.colors.last.a));
+        expect(gradient.begin, Alignment.topLeft);
+        expect(gradient.end, Alignment.bottomRight);
+
+        final ground = MapField.ground(brightness);
+        final near = Color.alphaBlend(gradient.colors.first, ground);
+        final far = Color.alphaBlend(gradient.colors.last, ground);
+
+        expect(
+          near.computeLuminance(),
+          greaterThan(far.computeLuminance()),
+          reason:
+              'the top-left corner is the lit end of the surface; a single '
+              'source of light does not move between appearances',
+        );
+      }
     });
 
     testWidgets('the light source does not mirror under RTL', (tester) async {
@@ -223,12 +246,19 @@ void main() {
         );
         final border = _decoration(tester).border! as Border;
 
-        // DESIGN.md §5: 0.5px semi-transparent white. Any heavier and the
-        // surface acquires a drawn outline instead of a refractive edge.
+        // DESIGN.md §5: a 0.5px semi-transparent hairline. Any heavier and
+        // the surface acquires a drawn outline instead of a refractive edge.
         expect(border.top.width, 0.5);
-        expect(border.top.color.r, 1.0);
-        expect(border.top.color.g, 1.0);
-        expect(border.top.color.b, 1.0);
+
+        // The edge is drawn in the material's own body colour, which differs
+        // by appearance: white catches the light in the void, and a white
+        // hairline on daylight is an edge nobody can see.
+        final expected = brightness == Brightness.dark
+            ? Colors.white
+            : MapGlass.bodyLight;
+        expect(border.top.color.r, expected.r);
+        expect(border.top.color.g, expected.g);
+        expect(border.top.color.b, expected.b);
       }
     });
 

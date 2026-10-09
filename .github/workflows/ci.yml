@@ -128,6 +128,46 @@ jobs:
         # run them with `flutter test --tags golden`.
         run: flutter test --exclude-tags golden
 
+  validate-widgetbook:
+    name: Lint, Format, & Test Widgetbook
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/widgetbook
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # ratchet:subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          # Same pin as validate-frontend; widgetbook 3.23 is the newest
+          # release that supports it (see frontend/widgetbook/pubspec.yaml).
+          flutter-version: '3.41.7'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      # The catalog's navigation tree is generated from @UseCase annotations
+      # and committed. A use case added without regenerating would silently
+      # not appear, so a stale tree fails here.
+      - name: Check Generated Catalog Is Current
+        run: |
+          dart run build_runner build
+          git diff --exit-code -- lib/main.directories.g.dart
+
+      - name: Check Formatting
+        run: dart format --set-exit-if-changed lib test
+
+      - name: Analyze Code
+        run: flutter analyze
+
+      # Opens every catalog entry and fails on anything it throws.
+      - name: Run Catalog Smoke Test
+        run: flutter test
+
   # -----------------------------------------------------------------
   # INFRASTRUCTURE VALIDATION
   # -----------------------------------------------------------------

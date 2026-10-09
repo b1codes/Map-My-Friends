@@ -105,6 +105,42 @@ flutter pub get
 flutter run
 ```
 
+#### DEV sign-in (local only)
+
+Debug builds show an amber **DEV Sign In** button on the login screen. It signs
+in as the user `make seed` creates (`demo`), so an emulator or Chrome window can
+get past the login wall without typing credentials — or configuring Auth0.
+
+It calls the real `/api/user/auth/token/` endpoint rather than faking a token,
+so the JWTs it returns work for every API call afterwards. Seed the user first:
+
+```bash
+make up && make seed
+```
+
+To skip the login screen entirely and sign in on launch:
+
+```bash
+flutter run --dart-define=DEV_AUTOLOGIN=true          # emulator / simulator
+flutter run -d chrome --dart-define=DEV_AUTOLOGIN=true # Chrome
+```
+
+VS Code equivalents live in `.vscode/launch.json`: **Flutter: Run (debug + DEV
+sign-in)**, **Flutter: Run (debug + DEV auto-login)**, **Flutter: Chrome (debug +
+DEV auto-login)**, and the **Full Stack: Flutter (DEV auto-login) + Django**
+compound.
+
+| `--dart-define` | Default | Purpose |
+| --- | --- | --- |
+| `DEV_LOGIN` | `true` in debug | Set `false` to hide the button in a debug build |
+| `DEV_AUTOLOGIN` | `false` | Sign in on launch, skipping the login screen |
+| `DEV_USERNAME` | `demo` | Override if you seeded a different account |
+| `DEV_PASSWORD` | `demo12345!` | Matches `DEMO_PASSWORD` in `seed.py` |
+
+> The whole path is gated on `kReleaseMode`, a compile-time constant, so the
+> button and the seeded credentials are tree-shaken out of release builds.
+> `--dart-define=DEV_LOGIN=true` cannot re-enable it in a release build.
+
 ---
 
 ## 🔌 API Endpoints

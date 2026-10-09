@@ -3,41 +3,33 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../bloc/location/location_bloc.dart';
 import '../../bloc/theme/theme_cubit.dart';
 import '../../bloc/map/map_settings_cubit.dart';
+import '../../components/shared/ambient_scaffold.dart';
+import '../../components/shared/chromatic_pulse.dart';
+import '../../utils/app_theme.dart';
+import '../../components/shared/glass_surfaces.dart';
+import '../../components/shared/glass_header.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+    return AmbientScaffold(
+      header: const GlassHeader(title: 'Settings'),
       body: BlocListener<LocationBloc, LocationState>(
         listener: (context, state) {
           if (state is LocationPermissionDenied) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Location permission denied')),
-            );
+            GlassToast.show(context, 'Location permission denied');
           } else if (state is LocationPermissionDeniedForever) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Location permission denied forever'),
-              ),
-            );
+            GlassToast.show(context, 'Location permission denied forever');
           } else if (state is LocationLoaded) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Location loaded')));
+            GlassToast.show(context, 'Location loaded');
           }
         },
         child: ListView(
           padding: const EdgeInsets.all(24.0),
           children: [
-            Text(
-              'Appearance',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
+            Text('Appearance', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             BlocBuilder<ThemeCubit, ThemeMode>(
               builder: (context, themeMode) {
@@ -70,9 +62,7 @@ class SettingsScreen extends StatelessWidget {
             const SizedBox(height: 32),
             Text(
               'Default Map Settings',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
             BlocBuilder<MapSettingsCubit, MapSettingsState>(
@@ -186,21 +176,14 @@ class SettingsScreen extends StatelessWidget {
               },
             ),
             const SizedBox(height: 32),
-            Text(
-              'Location',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
+            Text('Location', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             BlocBuilder<LocationBloc, LocationState>(
               builder: (context, state) {
                 if (state is LocationLoading) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: CircularProgressIndicator(),
-                    ),
+                  return const Padding(
+                    padding: EdgeInsets.all(MapSpacing.xs),
+                    child: PulseIndicator(size: 24),
                   );
                 }
                 return OutlinedButton.icon(
@@ -212,7 +195,7 @@ class SettingsScreen extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(MapGlass.radiusSm),
                     ),
                   ),
                 );

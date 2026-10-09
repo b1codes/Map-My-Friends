@@ -21,11 +21,20 @@ class ThermalResponse extends StatefulWidget {
   final VoidCallback? onTap;
   final double borderRadius;
 
+  /// Whether the surface answers a touch at all.
+  ///
+  /// Distinct from a null [onTap], which many call sites use while handling the
+  /// gesture themselves further up. A disabled control still occupies the
+  /// screen, and glowing under a finger that cannot act is the interface
+  /// lying about what it will do.
+  final bool enabled;
+
   const ThermalResponse({
     super.key,
     required this.child,
     this.onTap,
     this.borderRadius = MapGlass.radiusSm,
+    this.enabled = true,
   });
 
   @override
@@ -152,6 +161,8 @@ class _ThermalResponseState extends State<ThermalResponse>
         );
       },
     );
+
+    if (!widget.enabled) return content;
 
     if (widget.onTap != null) {
       content = GestureDetector(

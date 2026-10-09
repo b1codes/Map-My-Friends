@@ -21,9 +21,7 @@ class MapSettingsModal extends StatelessWidget {
             children: [
               Text(
                 'Map Settings',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 20),
               BlocBuilder<LocalMapSettingsCubit, MapSettingsState>(

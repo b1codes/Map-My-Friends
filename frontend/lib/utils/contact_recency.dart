@@ -142,39 +142,34 @@ class ContactRecency {
 
   /// Vivid, saturated tone — for status orbs, dots, and thermal glow. NOT for
   /// text (fails contrast on tinted surfaces by design).
-  Color get vividColor {
+  Color get vividColor => signal.vivid;
+
+  /// The palette entry this level reads on. One spectrum, defined once, so the
+  /// Rare Accent Rule has something countable to apply to.
+  MapSignal get signal {
     switch (level) {
       case RecencyLevel.fresh:
-        return const Color(0xFF14B8A6); // teal — healthy connection
+        return MapPalette.vital;
       case RecencyLevel.steady:
-        return const Color(0xFF6B7280); // calm neutral slate
+        return MapPalette.calm;
       case RecencyLevel.due:
-        return MapPalette.thermalCorona; // #FF9500
+        return MapPalette.due;
       case RecencyLevel.overdue:
-        return const Color(0xFFFF5A1F); // corona → core
+        return MapPalette.overdue;
       case RecencyLevel.silent:
-        return MapPalette.thermalCore; // #FF3B30, hottest
+        return MapPalette.critical;
     }
   }
 
   /// Contrast-safe tone for the person's name text. Darker on light themes,
   /// lighter on dark themes, so body text clears 4.5:1 either way.
   Color inkColor(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    final isDark = brightness == Brightness.dark;
-    switch (level) {
-      case RecencyLevel.fresh:
-        return isDark ? const Color(0xFF5EEAD4) : const Color(0xFF00695C);
-      case RecencyLevel.steady:
-        // Full-contrast neutral: a "calm" connection reads as ordinary text.
-        return Theme.of(context).colorScheme.onSurface;
-      case RecencyLevel.due:
-        return isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309);
-      case RecencyLevel.overdue:
-        return isDark ? const Color(0xFFFB923C) : const Color(0xFFC2410C);
-      case RecencyLevel.silent:
-        return isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C);
+    // Full-contrast neutral: a "calm" connection reads as ordinary text, not
+    // as a status.
+    if (level == RecencyLevel.steady) {
+      return Theme.of(context).colorScheme.onSurface;
     }
+    return signal.ink(Theme.of(context).brightness);
   }
 
   IconData get icon {
@@ -211,11 +206,11 @@ extension ContactChannelUi on ContactChannel {
   Color get markerColor {
     switch (this) {
       case ContactChannel.call:
-        return const Color(0xFF3F51B5); // brand indigo
+        return MapPalette.defaultPin; // brand indigo
       case ContactChannel.video:
-        return const Color(0xFFFF4081); // secondary pink
+        return MapPalette.accent; // secondary pink
       case ContactChannel.message:
-        return const Color(0xFF14B8A6); // teal
+        return MapPalette.vital.vivid;
     }
   }
 }

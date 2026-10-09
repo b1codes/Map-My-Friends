@@ -61,6 +61,13 @@ class PasswordResetRequested extends AuthEvent {
 
 class LogoutRequested extends AuthEvent {}
 
+/// Local-development bypass: sign in as the seeded dev user without typing
+/// credentials. Only dispatched when `ApiConfig.devLoginEnabled` is true, which
+/// is never the case in a release build.
+class DevLoginRequested extends AuthEvent {
+  const DevLoginRequested();
+}
+
 class Auth0LoginRequested extends AuthEvent {
   final String? connection;
 

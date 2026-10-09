@@ -23,6 +23,7 @@ import 'screens/profile/me_screen.dart';
 import 'screens/trips/trips_screen.dart';
 import 'utils/app_theme.dart';
 import 'utils/window_size.dart';
+import 'components/shared/ambient_field.dart';
 import 'components/shared/glass_container.dart';
 import 'components/shared/nav_label.dart';
 import 'bloc/theme/theme_cubit.dart';
@@ -35,6 +36,8 @@ import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
+import 'components/shared/chromatic_pulse.dart';
+import 'components/shared/thermal_response.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -116,9 +119,9 @@ class AuthWrapper extends StatelessWidget {
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, state) {
         if (state is AuthInitial || state is AuthLoading) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          // The app's very first frame is a wait, so it is the first thing
+          // the Chromatic Pulse answers for.
+          return const Scaffold(body: PulseIndicator());
         }
 
         if (state is Authenticated) {
@@ -206,9 +209,18 @@ class _MainScreenState extends State<MainScreen> {
           return BackdropGroup(
             child: Scaffold(
               extendBodyBehindAppBar: true,
-              // Removed AppBar as requested
+              // Transparent so the field below is what every glass surface on
+              // every tab refracts. The shell owns exactly one field; tab
+              // screens are transparent over it, and only routes pushed on top
+              // of the shell bring their own (see AmbientScaffold).
+              backgroundColor: Colors.transparent,
               body: Stack(
                 children: [
+                  // The room. Painted first so the shared backdrop sample taken
+                  // by the chrome above includes it; it costs no filter layer
+                  // of its own.
+                  const Positioned.fill(child: AmbientField()),
+
                   // Content Layer
                   Positioned.fill(child: _getScreen(_selectedIndex)),
 
@@ -353,41 +365,39 @@ class _MainScreenState extends State<MainScreen> {
     return Semantics(
       selected: isSelected,
       label: '$label Tab',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _onItemTapped(index),
-          borderRadius: BorderRadius.circular(MapGlass.radiusMd),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 60,
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: isSelected
-                ? BoxDecoration(
-                    color: MapGlass.selectionLift(theme.brightness),
-                    borderRadius: BorderRadius.circular(MapGlass.radiusMd),
-                  )
-                : const BoxDecoration(),
-            child: Column(
-              children: [
-                Icon(
-                  isSelected ? selectedIcon : icon,
+      // The most-touched control in the app, so it answers in the app's own
+      // interaction language: heat and a yielding surface, not an ink ripple
+      // crossing a Material layer that exists only to host the ripple.
+      child: ThermalResponse(
+        onTap: () => _onItemTapped(index),
+        borderRadius: MapGlass.radiusMd,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          width: 60,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: isSelected
+              ? BoxDecoration(
+                  color: MapGlass.selectionLift(theme.brightness),
+                  borderRadius: BorderRadius.circular(MapGlass.radiusMd),
+                )
+              : const BoxDecoration(),
+          child: Column(
+            children: [
+              Icon(
+                isSelected ? selectedIcon : icon,
+                color: isSelected ? selectedColor : unselectedColor,
+                size: 24,
+              ),
+              const SizedBox(height: 4),
+              NavLabel(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                   color: isSelected ? selectedColor : unselectedColor,
-                  size: 24,
                 ),
-                const SizedBox(height: 4),
-                NavLabel(
-                  label,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                    color: isSelected ? selectedColor : unselectedColor,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -408,9 +418,9 @@ class _MainScreenState extends State<MainScreen> {
       child: Semantics(
         selected: isSelected,
         label: '$label Tab',
-        child: InkWell(
+        child: ThermalResponse(
           onTap: () => _onItemTapped(index),
-          borderRadius: BorderRadius.circular(MapGlass.radiusMd),
+          borderRadius: MapGlass.radiusMd,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
@@ -431,11 +441,13 @@ class _MainScreenState extends State<MainScreen> {
                 const SizedBox(height: 4),
                 NavLabel(
                   label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                    color: isSelected ? selectedColor : unselectedColor,
-                  ),
+                  style: (theme.textTheme.labelSmall ?? const TextStyle())
+                      .copyWith(
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: isSelected ? selectedColor : unselectedColor,
+                      ),
                 ),
               ],
             ),

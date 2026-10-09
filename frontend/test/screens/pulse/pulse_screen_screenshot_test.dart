@@ -15,6 +15,8 @@ import 'package:map_my_friends/bloc/pulse/pulse_bloc.dart';
 import 'package:map_my_friends/models/contact_log.dart';
 import 'package:map_my_friends/models/person.dart';
 import 'package:map_my_friends/screens/pulse/pulse_screen.dart';
+import 'package:map_my_friends/components/shared/ambient_field.dart';
+import 'package:map_my_friends/utils/app_theme.dart';
 
 class MockPulseBloc extends MockBloc<PulseEvent, PulseState>
     implements PulseBloc {}
@@ -41,6 +43,19 @@ Person _p(
 }
 
 void main() {
+  setUpAll(() {
+    // Render offline: the real theme, a local typeface. See
+    // AppTheme.textThemeBuilder for why this seam exists.
+    AppTheme.textThemeBuilder = (color) => Typography.material2021().black
+        .apply(bodyColor: color, displayColor: color);
+    AppTheme.resetThemeCache();
+  });
+
+  tearDownAll(() {
+    AppTheme.textThemeBuilder = AppTheme.buildBrandTextTheme;
+    AppTheme.resetThemeCache();
+  });
+
   final now = DateTime(2026, 7, 22);
 
   PulseLoaded sampleState() {
@@ -102,19 +117,15 @@ void main() {
     return PulseLoaded(people: people, logs: logs);
   }
 
-  // Local theme mirroring the app's color scheme but using default fonts, so
-  // the golden renders offline without GoogleFonts fetching over the network.
-  // Layout, spacing, and the thermal recency colors are what these goldens
-  // validate; production type is Montserrat/Open Sans (see AppTheme).
+  // The real theme, with GoogleFonts fetching disabled so the golden renders
+  // offline in the fallback face. Everything these goldens exist to check --
+  // the glass material, the Ambient Field behind it, spacing, and the thermal
+  // recency colours -- comes from AppTheme itself; only the typeface differs
+  // from production.
   ThemeData testTheme(Brightness brightness) {
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF3F51B5),
-        brightness: brightness,
-        secondary: const Color(0xFFFF4081),
-      ),
-    );
+    return brightness == Brightness.dark
+        ? AppTheme.darkTheme
+        : AppTheme.lightTheme;
   }
 
   Widget harness(PulseBloc bloc, {required Brightness brightness}) {
@@ -125,9 +136,29 @@ void main() {
       themeMode: brightness == Brightness.dark
           ? ThemeMode.dark
           : ThemeMode.light,
-      home: BlocProvider<PulseBloc>.value(
-        value: bloc,
-        child: PulseScreen(now: now),
+      // Freeze the field. A drifting composition never settles, and a golden
+      // of a moving surface is a golden of whichever frame the runner reached
+      // first; MapField.stillPhase is the composition the reduced-motion path
+      // shows anyway.
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(disableAnimations: true),
+        child: child!,
+      ),
+      // The shell owns the field in production; the golden has to stand it up
+      // itself, or every glass surface on this screen renders against nothing
+      // and the shot shows a material the app never displays.
+      home: BackdropGroup(
+        child: Stack(
+          children: <Widget>[
+            const Positioned.fill(child: AmbientField()),
+            Positioned.fill(
+              child: BlocProvider<PulseBloc>.value(
+                value: bloc,
+                child: PulseScreen(now: now),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

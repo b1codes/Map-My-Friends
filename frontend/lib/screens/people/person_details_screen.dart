@@ -12,6 +12,14 @@ import '../../components/shared/nearby_airports_section.dart';
 import '../../components/shared/nearby_stations_section.dart';
 import 'add_edit_person_screen.dart';
 import '../../utils/window_size.dart';
+import '../../utils/app_theme.dart';
+import '../../components/shared/ambient_scaffold.dart';
+import '../../components/shared/glass_inlay.dart';
+import '../../components/shared/chromatic_pulse.dart';
+import '../../components/shared/thermal_response.dart';
+import '../../components/shared/glass_surfaces.dart';
+import '../../components/shared/glass_header.dart';
+import '../../components/shared/thermal_button.dart';
 
 class PersonDetailsScreen extends StatelessWidget {
   final String personId;
@@ -24,9 +32,9 @@ class PersonDetailsScreen extends StatelessWidget {
       builder: (context, state) {
         if (state is! PeopleLoaded) {
           // Fallback if accessed while not loaded, though rare
-          return Scaffold(
-            appBar: AppBar(title: const Text('Person Details')),
-            body: const Center(child: CircularProgressIndicator()),
+          return AmbientScaffold(
+            header: const GlassHeader(title: 'Person Details'),
+            body: const PulseIndicator(),
           );
         }
 
@@ -34,20 +42,22 @@ class PersonDetailsScreen extends StatelessWidget {
         final personIndex = state.people.indexWhere((p) => p.id == personId);
 
         if (personIndex == -1) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('Person Not Found')),
+          return AmbientScaffold(
+            header: const GlassHeader(title: 'Person Not Found'),
             body: const Center(child: Text('This person no longer exists.')),
           );
         }
 
         final person = state.people[personIndex];
 
-        return Scaffold(
-          appBar: AppBar(
-            title: Text('${person.firstName} ${person.lastName}'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.edit),
+        return AmbientScaffold(
+          header: GlassHeader(
+            title: '${person.firstName} ${person.lastName}',
+            subtitle: person.relationshipTag,
+            actions: <HeaderAction>[
+              HeaderAction(
+                icon: Icons.edit_outlined,
+                label: 'Edit',
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -57,13 +67,28 @@ class PersonDetailsScreen extends StatelessWidget {
                   );
                 },
               ),
-              IconButton(
-                icon: const Icon(Icons.delete),
-                onPressed: () {
-                  context.read<PeopleBloc>().add(DeletePerson(person.id));
-                  Navigator.pop(context);
+              HeaderAction(
+                icon: Icons.delete_outline,
+                label: 'Delete',
+                // Deleting a person was a single unconfirmed tap on an icon
+                // sitting next to Edit. It is the only irreversible action on
+                // this surface and now reads like one.
+                onPressed: () async {
+                  final peopleBloc = context.read<PeopleBloc>();
+                  final navigator = Navigator.of(context);
+                  final confirmed = await GlassDialog.confirm(
+                    context,
+                    title: 'Delete ${person.firstName}?',
+                    message:
+                        'This removes them from your map, your trips, and '
+                        'your contact history. It cannot be undone.',
+                    confirmLabel: 'Delete',
+                    tone: ThermalButtonTone.danger,
+                  );
+                  if (!confirmed) return;
+                  peopleBloc.add(DeletePerson(person.id));
+                  navigator.pop();
                 },
-                color: Theme.of(context).colorScheme.error,
               ),
             ],
           ),
@@ -90,12 +115,9 @@ class PersonDetailsScreen extends StatelessWidget {
                         ElevatedButton.icon(
                           onPressed: () {
                             context.read<TripBloc>().add(AddStop(person));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Added ${person.firstName} to trip',
-                                ),
-                              ),
+                            GlassToast.show(
+                              context,
+                              'Added ${person.firstName} to trip',
                             );
                           },
                           icon: const Icon(Icons.add_location_alt_outlined),
@@ -109,7 +131,9 @@ class PersonDetailsScreen extends StatelessWidget {
                             ).colorScheme.onPrimary,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(
+                                MapGlass.radiusSm,
+                              ),
                             ),
                           ),
                         ),
@@ -141,9 +165,9 @@ class PersonDetailsScreen extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 64,
-          backgroundColor: Theme.of(
-            context,
-          ).colorScheme.surfaceContainerHighest,
+          backgroundColor: MapGlass.inlayFillStrong(
+            Theme.of(context).brightness,
+          ),
           backgroundImage: person.profileImageUrl != null
               ? NetworkImage(person.profileImageUrl!)
               : null,
@@ -168,7 +192,7 @@ class PersonDetailsScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(MapGlass.radiusMd),
           ),
           child: Text(
             person.relationshipTag,
@@ -313,55 +337,50 @@ class PersonDetailsScreen extends StatelessWidget {
     required String content,
     VoidCallback? onTap,
   }) {
-    return Card(
-      elevation: 0,
-      color: Theme.of(context).colorScheme.surfaceContainerLowest,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  icon,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+    // The whole row is the tap target, so the whole row is what takes on heat
+    // and yields — not a ripple travelling across it from wherever the finger
+    // happened to land.
+    return ThermalResponse(
+      onTap: onTap,
+      borderRadius: MapGlass.radiusMd,
+      child: GlassInlay(
+        padding: const EdgeInsets.all(MapSpacing.sm),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: MapGlass.inlayFillStrong(Theme.of(context).brightness),
+                shape: BoxShape.circle,
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+              child: Icon(
+                icon,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                    const SizedBox(height: 4),
-                    Text(content, style: Theme.of(context).textTheme.bodyLarge),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(content, style: Theme.of(context).textTheme.bodyLarge),
+                ],
               ),
-              if (onTap != null)
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-            ],
-          ),
+            ),
+            if (onTap != null)
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+          ],
         ),
       ),
     );

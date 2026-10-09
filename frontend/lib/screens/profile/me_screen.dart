@@ -20,6 +20,10 @@ import '../../bloc/auth/auth_event.dart';
 import '../../bloc/location/location_bloc.dart';
 import '../settings/settings_screen.dart';
 import '../../utils/window_size.dart';
+import '../../utils/app_theme.dart';
+import '../../components/shared/chromatic_pulse.dart';
+import '../../components/shared/glass_surfaces.dart';
+import '../../components/shared/glass_header.dart';
 
 class MeScreen extends StatefulWidget {
   const MeScreen({super.key});
@@ -95,78 +99,56 @@ class _MeScreenState extends State<MeScreen> {
   }
 
   void _showImageSourceDialog() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera),
-              title: const Text('Take a Photo'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from Gallery'),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImage(ImageSource.gallery);
-              },
-            ),
-          ],
+    GlassSheet.actions(
+      context,
+      title: 'Profile photo',
+      actions: <SheetAction>[
+        SheetAction(
+          icon: Icons.photo_camera,
+          label: 'Take a Photo',
+          onTap: () => _pickImage(ImageSource.camera),
         ),
-      ),
+        SheetAction(
+          icon: Icons.photo_library,
+          label: 'Choose from Gallery',
+          onTap: () => _pickImage(ImageSource.gallery),
+        ),
+      ],
     );
   }
 
   void _showColorPicker() {
     Color pickerColor = Color(int.parse(_pinColor.replaceFirst('#', '0xFF')));
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Pick a Pin Color'),
-        content: SingleChildScrollView(
-          child: BlockPicker(
-            pickerColor: pickerColor,
-            onColorChanged: (color) {
-              setState(() {
-                _pinColor =
-                    '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
-              });
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            child: const Text('Got it'),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
+    GlassDialog.panel(
+      context,
+      title: 'Pick a Pin Color',
+      dismissLabel: 'Got it',
+      content: BlockPicker(
+        pickerColor: pickerColor,
+        onColorChanged: (color) {
+          setState(() {
+            _pinColor =
+                '#${color.toARGB32().toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+          });
+        },
       ),
     );
   }
 
   void _showEmojiPicker() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return SafeArea(
-          child: SizedBox(
-            height: 300,
-            child: EmojiPicker(
-              onEmojiSelected: (category, emoji) {
-                setState(() {
-                  _pinEmoji = emoji.emoji;
-                });
-                Navigator.pop(context);
-              },
-            ),
-          ),
-        );
-      },
+    GlassSheet.show<void>(
+      context,
+      builder: (context) => SizedBox(
+        height: 300,
+        child: EmojiPicker(
+          onEmojiSelected: (category, emoji) {
+            setState(() {
+              _pinEmoji = emoji.emoji;
+            });
+            Navigator.pop(context);
+          },
+        ),
+      ),
     );
   }
 
@@ -223,628 +205,650 @@ class _MeScreenState extends State<MeScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.profile),
-        actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              );
-            },
-            icon: const Icon(Icons.settings),
-            tooltip: 'Settings',
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: MultiBlocListener(
-          listeners: [
-            BlocListener<ProfileBloc, ProfileState>(
-              listener: (context, state) {
-                if (state is ProfileLoaded) {
-                  _populateFieldsFromProfile(state);
-                  // Clear local image path once server image is loaded
-                  if (state.profileImageUrl != null) {
-                    setState(() {
-                      _localImageBytes = null;
-                    });
-                  }
-                } else if (state is ProfileError) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text(state.message)));
-                }
-              },
-            ),
-          ],
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final isDesktop = MapWindow(
-                Size(constraints.maxWidth, constraints.maxHeight),
-              ).isWide;
-
-              return Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: isDesktop ? 600 : double.infinity,
+      backgroundColor: Colors.transparent,
+      body: Column(
+        children: <Widget>[
+          GlassHeader(
+            title: l10n.profile,
+            showBack: false,
+            actions: <HeaderAction>[
+              HeaderAction(
+                icon: Icons.settings_outlined,
+                label: 'Settings',
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SettingsScreen(),
                   ),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24.0,
-                      vertical: 32.0,
-                    ),
-                    child: Form(
-                      key: _formKey,
-                      child: BlocBuilder<ProfileBloc, ProfileState>(
-                        builder: (context, profileState) {
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              // Profile Picture Section
-                              Center(
-                                child: Stack(
-                                  children: [
-                                    _buildProfileAvatar(profileState),
-                                    Positioned(
-                                      bottom: 0,
-                                      right: 0,
-                                      child: Container(
-                                        decoration: BoxDecoration(
+                ),
+              ),
+            ],
+          ),
+          Expanded(
+            child: MultiBlocListener(
+              listeners: [
+                BlocListener<ProfileBloc, ProfileState>(
+                  listener: (context, state) {
+                    if (state is ProfileLoaded) {
+                      _populateFieldsFromProfile(state);
+                      // Clear local image path once server image is loaded
+                      if (state.profileImageUrl != null) {
+                        setState(() {
+                          _localImageBytes = null;
+                        });
+                      }
+                    } else if (state is ProfileError) {
+                      GlassToast.show(context, state.message);
+                    }
+                  },
+                ),
+              ],
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isDesktop = MapWindow(
+                    Size(constraints.maxWidth, constraints.maxHeight),
+                  ).isWide;
+
+                  return Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: isDesktop ? 600 : double.infinity,
+                      ),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24.0,
+                          vertical: 32.0,
+                        ),
+                        child: Form(
+                          key: _formKey,
+                          child: BlocBuilder<ProfileBloc, ProfileState>(
+                            builder: (context, profileState) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // Profile Picture Section
+                                  Center(
+                                    child: Stack(
+                                      children: [
+                                        _buildProfileAvatar(profileState),
+                                        Positioned(
+                                          bottom: 0,
+                                          right: 0,
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: Theme.of(
+                                                  context,
+                                                ).scaffoldBackgroundColor,
+                                                width: 2,
+                                              ),
+                                            ),
+                                            child: InkWell(
+                                              onTap:
+                                                  profileState
+                                                      is ProfileUpdating
+                                                  ? null
+                                                  : _showImageSourceDialog,
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                    MapGlass.radiusMd,
+                                                  ),
+                                              child: Padding(
+                                                padding: const EdgeInsets.all(
+                                                  8.0,
+                                                ),
+                                                child:
+                                                    profileState
+                                                        is ProfileUpdating
+                                                    ? SizedBox(
+                                                        height: 20,
+                                                        width: 20,
+                                                        child: ChromaticPulse(
+                                                          colors:
+                                                              PulseIndicator.paletteOf(
+                                                                context,
+                                                              ),
+                                                          borderRadius: 10.0,
+                                                        ),
+                                                      )
+                                                    : Icon(
+                                                        Icons.camera_alt,
+                                                        size: 20,
+                                                        color: Theme.of(
+                                                          context,
+                                                        ).colorScheme.onPrimary,
+                                                      ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 32),
+                                  Text(
+                                    'Personal Info',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleLarge,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: CustomTextFormField(
+                                          controller: _firstNameController,
+                                          labelText: 'First Name',
+                                          prefixIcon: const Icon(
+                                            Icons.person_outline,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: CustomTextFormField(
+                                          controller: _lastNameController,
+                                          labelText: 'Last Name',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  IntlPhoneField(
+                                    controller: _phoneNumberController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Phone Number',
+                                    ),
+                                    initialCountryCode: 'US',
+                                    onChanged: (phone) {
+                                      // _phoneNumberController is already updated
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+                                  CustomTextFormField(
+                                    controller: _birthDateController,
+                                    labelText: 'Birth Date (YYYY-MM-DD)',
+                                    prefixIcon: const Icon(Icons.cake_outlined),
+                                    keyboardType: TextInputType.datetime,
+                                    readOnly: true,
+                                    onTap: () async {
+                                      FocusScope.of(
+                                        context,
+                                      ).requestFocus(FocusNode());
+                                      final date = await showDatePicker(
+                                        context: context,
+                                        initialDate:
+                                            DateTime.tryParse(
+                                              _birthDateController.text,
+                                            ) ??
+                                            DateTime.now(),
+                                        firstDate: DateTime(1900),
+                                        lastDate: DateTime.now(),
+                                      );
+                                      if (date != null) {
+                                        _birthDateController.text =
+                                            "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(height: 32),
+                                  Text(
+                                    'My Address',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleLarge,
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  CustomTextFormField(
+                                    controller: _streetController,
+                                    labelText: 'Street Address (Optional)',
+                                    prefixIcon: const Icon(Icons.home_outlined),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  CustomTextFormField(
+                                    controller: _cityController,
+                                    labelText: 'City (Required)',
+                                    prefixIcon: const Icon(Icons.location_city),
+                                    validator: (value) =>
+                                        value == null || value.isEmpty
+                                        ? 'City is required'
+                                        : null,
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: CustomTextFormField(
+                                          controller: _stateController,
+                                          labelText: 'State (Required)',
+                                          validator: (value) =>
+                                              value == null || value.isEmpty
+                                              ? 'Required'
+                                              : null,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        child: CustomTextFormField(
+                                          controller: _countryController,
+                                          labelText: 'Country (Required)',
+                                          validator: (value) =>
+                                              value == null || value.isEmpty
+                                              ? 'Required'
+                                              : null,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                  const SizedBox(height: 32),
+                                  Text(
+                                    'Preferences',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleLarge,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Distance Unit',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  SegmentedButton<String>(
+                                    segments: const [
+                                      ButtonSegment(
+                                        value: 'metric',
+                                        label: Text('Metric (km)'),
+                                        icon: Icon(Icons.straighten),
+                                      ),
+                                      ButtonSegment(
+                                        value: 'imperial',
+                                        label: Text('Imperial (mi)'),
+                                        icon: Icon(Icons.architecture),
+                                      ),
+                                    ],
+                                    selected: {_distanceUnit},
+                                    onSelectionChanged:
+                                        (Set<String> newSelection) {
+                                          setState(() {
+                                            _distanceUnit = newSelection.first;
+                                          });
+                                        },
+                                    showSelectedIcon: false,
+                                    style: const ButtonStyle(
+                                      visualDensity: VisualDensity.compact,
+                                      tapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 32),
+
+                                  // --- Map Pin Customization ---
+                                  Text(
+                                    'Map Pin Customization',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
                                           color: Theme.of(
                                             context,
                                           ).colorScheme.primary,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // Pin Preview
+                                  Center(
+                                    child: Column(
+                                      children: [
+                                        CustomMapMarker(
+                                          pinColorHex: _pinColor,
+                                          pinStyle: _pinStyle,
+                                          pinIconType: _pinIconType,
+                                          pinEmoji: _pinEmoji,
+                                          initials: _getInitials(),
+                                          profileImageUrl:
+                                              profileState is ProfileLoaded
+                                              ? profileState.profileImageUrl
+                                              : null,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Preview',
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    title: const Text('Pin Color'),
+                                    trailing: GestureDetector(
+                                      onTap: _showColorPicker,
+                                      child: Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: Color(
+                                            int.parse(
+                                              _pinColor.replaceFirst(
+                                                '#',
+                                                '0xFF',
+                                              ),
+                                            ),
+                                          ),
                                           shape: BoxShape.circle,
                                           border: Border.all(
-                                            color: Theme.of(
-                                              context,
-                                            ).scaffoldBackgroundColor,
-                                            width: 2,
+                                            color: Colors.grey,
                                           ),
                                         ),
-                                        child: InkWell(
-                                          onTap: profileState is ProfileUpdating
-                                              ? null
-                                              : _showImageSourceDialog,
-                                          borderRadius: BorderRadius.circular(
-                                            20,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  DropdownButtonFormField<String>(
+                                    initialValue: _pinStyle,
+                                    items: const [
+                                      DropdownMenuItem(
+                                        value: 'teardrop',
+                                        child: Text('Teardrop'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'circle',
+                                        child: Text('Circle'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'square',
+                                        child: Text('Square'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'triangle',
+                                        child: Text('Triangle'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'diamond',
+                                        child: Text('Diamond'),
+                                      ),
+                                    ],
+                                    onChanged: (val) =>
+                                        setState(() => _pinStyle = val!),
+                                    decoration: InputDecoration(
+                                      labelText: 'Pin Shape',
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  DropdownButtonFormField<String>(
+                                    initialValue: _pinIconType,
+                                    items: const [
+                                      DropdownMenuItem(
+                                        value: 'none',
+                                        child: Text('None'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'emoji',
+                                        child: Text('Emoji'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'initials',
+                                        child: Text('Initials'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'picture',
+                                        child: Text('Profile Picture'),
+                                      ),
+                                    ],
+                                    onChanged: (val) =>
+                                        setState(() => _pinIconType = val!),
+                                    decoration: InputDecoration(
+                                      labelText: 'Inner Icon',
+                                    ),
+                                  ),
+
+                                  if (_pinIconType == 'emoji') ...[
+                                    const SizedBox(height: 16),
+                                    ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: const Text('Selected Emoji'),
+                                      trailing: GestureDetector(
+                                        onTap: _showEmojiPicker,
+                                        child: Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            color: MapGlass.inlayFillStrong(
+                                              Theme.of(context).brightness,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
                                           ),
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(8.0),
-                                            child:
-                                                profileState is ProfileUpdating
-                                                ? const SizedBox(
-                                                    width: 20,
-                                                    height: 20,
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                          strokeWidth: 2,
-                                                          color: Colors.white,
-                                                        ),
-                                                  )
-                                                : Icon(
-                                                    Icons.camera_alt,
-                                                    size: 20,
-                                                    color: Theme.of(
-                                                      context,
-                                                    ).colorScheme.onPrimary,
+                                          alignment: Alignment.center,
+                                          child: Text(
+                                            _pinEmoji ?? '😀',
+                                            style: const TextStyle(
+                                              fontSize: 24,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+
+                                  const SizedBox(height: 32),
+
+                                  SizedBox(
+                                    height: 50,
+                                    child: FilledButton(
+                                      onPressed: profileState is ProfileUpdating
+                                          ? null
+                                          : () {
+                                              if (_formKey.currentState!
+                                                  .validate()) {
+                                                context.read<ProfileBloc>().add(
+                                                  UpdateProfile(
+                                                    firstName:
+                                                        _firstNameController
+                                                            .text
+                                                            .isNotEmpty
+                                                        ? _firstNameController
+                                                              .text
+                                                        : null,
+                                                    lastName:
+                                                        _lastNameController
+                                                            .text
+                                                            .isNotEmpty
+                                                        ? _lastNameController
+                                                              .text
+                                                        : null,
+                                                    phoneNumber:
+                                                        _phoneNumberController
+                                                            .text
+                                                            .isNotEmpty
+                                                        ? _phoneNumberController
+                                                              .text
+                                                        : null,
+                                                    birthDate:
+                                                        _birthDateController
+                                                            .text
+                                                            .isNotEmpty
+                                                        ? _birthDateController
+                                                              .text
+                                                        : null,
+                                                    city: _cityController.text,
+                                                    state:
+                                                        _stateController.text,
+                                                    country:
+                                                        _countryController.text,
+                                                    street:
+                                                        _streetController
+                                                            .text
+                                                            .isNotEmpty
+                                                        ? _streetController.text
+                                                        : null,
+                                                    pinColor: _pinColor,
+                                                    pinStyle: _pinStyle,
+                                                    pinIconType: _pinIconType,
+                                                    pinEmoji: _pinEmoji,
+                                                    distanceUnit: _distanceUnit,
                                                   ),
+                                                );
+                                                GlassToast.show(
+                                                  context,
+                                                  'Profile Saved',
+                                                );
+                                              }
+                                            },
+                                      style: FilledButton.styleFrom(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
                                           ),
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 32),
-                              Text(
-                                'Personal Info',
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: CustomTextFormField(
-                                      controller: _firstNameController,
-                                      labelText: 'First Name',
-                                      prefixIcon: const Icon(
-                                        Icons.person_outline,
-                                      ),
+                                      child: profileState is ProfileUpdating
+                                          ? SizedBox(
+                                              height: 24,
+                                              width: 24,
+                                              child: ChromaticPulse(
+                                                colors:
+                                                    PulseIndicator.paletteOf(
+                                                      context,
+                                                    ),
+                                                borderRadius: 12.0,
+                                              ),
+                                            )
+                                          : const Text(
+                                              'Save Profile',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
                                     ),
                                   ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: CustomTextFormField(
-                                      controller: _lastNameController,
-                                      labelText: 'Last Name',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              IntlPhoneField(
-                                controller: _phoneNumberController,
-                                decoration: InputDecoration(
-                                  labelText: 'Phone Number',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  filled: true,
-                                  fillColor: Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerLowest,
-                                ),
-                                initialCountryCode: 'US',
-                                onChanged: (phone) {
-                                  // _phoneNumberController is already updated
-                                },
-                              ),
-                              const SizedBox(height: 16),
-                              CustomTextFormField(
-                                controller: _birthDateController,
-                                labelText: 'Birth Date (YYYY-MM-DD)',
-                                prefixIcon: const Icon(Icons.cake_outlined),
-                                keyboardType: TextInputType.datetime,
-                                readOnly: true,
-                                onTap: () async {
-                                  FocusScope.of(
-                                    context,
-                                  ).requestFocus(FocusNode());
-                                  final date = await showDatePicker(
-                                    context: context,
-                                    initialDate:
-                                        DateTime.tryParse(
-                                          _birthDateController.text,
-                                        ) ??
-                                        DateTime.now(),
-                                    firstDate: DateTime(1900),
-                                    lastDate: DateTime.now(),
-                                  );
-                                  if (date != null) {
-                                    _birthDateController.text =
-                                        "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-                                  }
-                                },
-                              ),
-                              const SizedBox(height: 32),
-                              Text(
-                                'My Address',
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 16),
+                                  const SizedBox(height: 24),
 
-                              CustomTextFormField(
-                                controller: _streetController,
-                                labelText: 'Street Address (Optional)',
-                                prefixIcon: const Icon(Icons.home_outlined),
-                              ),
-                              const SizedBox(height: 16),
+                                  // Nearby Airports section
+                                  BlocBuilder<LocationBloc, LocationState>(
+                                    builder: (context, locationState) {
+                                      if (locationState is LocationLoaded &&
+                                          locationState.position != null) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 24,
+                                          ),
+                                          child: NearbyAirportsSection(
+                                            latitude: locationState
+                                                .position!
+                                                .latitude,
+                                            longitude: locationState
+                                                .position!
+                                                .longitude,
+                                          ),
+                                        );
+                                      }
+                                      return const SizedBox.shrink();
+                                    },
+                                  ),
 
-                              CustomTextFormField(
-                                controller: _cityController,
-                                labelText: 'City (Required)',
-                                prefixIcon: const Icon(Icons.location_city),
-                                validator: (value) =>
-                                    value == null || value.isEmpty
-                                    ? 'City is required'
-                                    : null,
-                              ),
-                              const SizedBox(height: 16),
+                                  BlocBuilder<LocationBloc, LocationState>(
+                                    builder: (context, locationState) {
+                                      if (locationState is LocationLoaded &&
+                                          locationState.position != null) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 24,
+                                          ),
+                                          child: NearbyStationsSection(
+                                            latitude: locationState
+                                                .position!
+                                                .latitude,
+                                            longitude: locationState
+                                                .position!
+                                                .longitude,
+                                          ),
+                                        );
+                                      }
+                                      return const SizedBox.shrink();
+                                    },
+                                  ),
 
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: CustomTextFormField(
-                                      controller: _stateController,
-                                      labelText: 'State (Required)',
-                                      validator: (value) =>
-                                          value == null || value.isEmpty
-                                          ? 'Required'
-                                          : null,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: CustomTextFormField(
-                                      controller: _countryController,
-                                      labelText: 'Country (Required)',
-                                      validator: (value) =>
-                                          value == null || value.isEmpty
-                                          ? 'Required'
-                                          : null,
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 32),
-                              Text(
-                                'Preferences',
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Distance Unit',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 8),
-                              SegmentedButton<String>(
-                                segments: const [
-                                  ButtonSegment(
-                                    value: 'metric',
-                                    label: Text('Metric (km)'),
-                                    icon: Icon(Icons.straighten),
-                                  ),
-                                  ButtonSegment(
-                                    value: 'imperial',
-                                    label: Text('Imperial (mi)'),
-                                    icon: Icon(Icons.architecture),
-                                  ),
-                                ],
-                                selected: {_distanceUnit},
-                                onSelectionChanged: (Set<String> newSelection) {
-                                  setState(() {
-                                    _distanceUnit = newSelection.first;
-                                  });
-                                },
-                                showSelectedIcon: false,
-                                style: const ButtonStyle(
-                                  visualDensity: VisualDensity.compact,
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                ),
-                              ),
-
-                              const SizedBox(height: 32),
-
-                              // --- Map Pin Customization ---
-                              Text(
-                                'Map Pin Customization',
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.primary,
-                                    ),
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Pin Preview
-                              Center(
-                                child: Column(
-                                  children: [
-                                    CustomMapMarker(
-                                      pinColorHex: _pinColor,
-                                      pinStyle: _pinStyle,
-                                      pinIconType: _pinIconType,
-                                      pinEmoji: _pinEmoji,
-                                      initials: _getInitials(),
-                                      profileImageUrl:
-                                          profileState is ProfileLoaded
-                                          ? profileState.profileImageUrl
-                                          : null,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Preview',
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.bodySmall,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-
-                              ListTile(
-                                contentPadding: EdgeInsets.zero,
-                                title: const Text('Pin Color'),
-                                trailing: GestureDetector(
-                                  onTap: _showColorPicker,
-                                  child: Container(
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: Color(
-                                        int.parse(
-                                          _pinColor.replaceFirst('#', '0xFF'),
-                                        ),
-                                      ),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.grey),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-
-                              DropdownButtonFormField<String>(
-                                initialValue: _pinStyle,
-                                items: const [
-                                  DropdownMenuItem(
-                                    value: 'teardrop',
-                                    child: Text('Teardrop'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'circle',
-                                    child: Text('Circle'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'square',
-                                    child: Text('Square'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'triangle',
-                                    child: Text('Triangle'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'diamond',
-                                    child: Text('Diamond'),
-                                  ),
-                                ],
-                                onChanged: (val) =>
-                                    setState(() => _pinStyle = val!),
-                                decoration: InputDecoration(
-                                  labelText: 'Pin Shape',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  filled: true,
-                                  fillColor: Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerLowest,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-
-                              DropdownButtonFormField<String>(
-                                initialValue: _pinIconType,
-                                items: const [
-                                  DropdownMenuItem(
-                                    value: 'none',
-                                    child: Text('None'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'emoji',
-                                    child: Text('Emoji'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'initials',
-                                    child: Text('Initials'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'picture',
-                                    child: Text('Profile Picture'),
-                                  ),
-                                ],
-                                onChanged: (val) =>
-                                    setState(() => _pinIconType = val!),
-                                decoration: InputDecoration(
-                                  labelText: 'Inner Icon',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  filled: true,
-                                  fillColor: Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerLowest,
-                                ),
-                              ),
-
-                              if (_pinIconType == 'emoji') ...[
-                                const SizedBox(height: 16),
-                                ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  title: const Text('Selected Emoji'),
-                                  trailing: GestureDetector(
-                                    onTap: _showEmojiPicker,
-                                    child: Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
+                                  SizedBox(
+                                    height: 50,
+                                    child: OutlinedButton.icon(
+                                      onPressed: () {
+                                        context.read<AuthBloc>().add(
+                                          LogoutRequested(),
+                                        );
+                                      },
+                                      icon: Icon(
+                                        Icons.logout,
                                         color: Theme.of(
                                           context,
-                                        ).colorScheme.surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(8),
+                                        ).colorScheme.error,
                                       ),
-                                      alignment: Alignment.center,
-                                      child: Text(
-                                        _pinEmoji ?? '😀',
-                                        style: const TextStyle(fontSize: 24),
+                                      label: Text(
+                                        'Logout',
+                                        style: TextStyle(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.error,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-
-                              const SizedBox(height: 32),
-
-                              SizedBox(
-                                height: 50,
-                                child: FilledButton(
-                                  onPressed: profileState is ProfileUpdating
-                                      ? null
-                                      : () {
-                                          if (_formKey.currentState!
-                                              .validate()) {
-                                            context.read<ProfileBloc>().add(
-                                              UpdateProfile(
-                                                firstName:
-                                                    _firstNameController
-                                                        .text
-                                                        .isNotEmpty
-                                                    ? _firstNameController.text
-                                                    : null,
-                                                lastName:
-                                                    _lastNameController
-                                                        .text
-                                                        .isNotEmpty
-                                                    ? _lastNameController.text
-                                                    : null,
-                                                phoneNumber:
-                                                    _phoneNumberController
-                                                        .text
-                                                        .isNotEmpty
-                                                    ? _phoneNumberController
-                                                          .text
-                                                    : null,
-                                                birthDate:
-                                                    _birthDateController
-                                                        .text
-                                                        .isNotEmpty
-                                                    ? _birthDateController.text
-                                                    : null,
-                                                city: _cityController.text,
-                                                state: _stateController.text,
-                                                country:
-                                                    _countryController.text,
-                                                street:
-                                                    _streetController
-                                                        .text
-                                                        .isNotEmpty
-                                                    ? _streetController.text
-                                                    : null,
-                                                pinColor: _pinColor,
-                                                pinStyle: _pinStyle,
-                                                pinIconType: _pinIconType,
-                                                pinEmoji: _pinEmoji,
-                                                distanceUnit: _distanceUnit,
-                                              ),
-                                            );
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('Profile Saved'),
-                                                behavior:
-                                                    SnackBarBehavior.floating,
-                                              ),
-                                            );
-                                          }
-                                        },
-                                  style: FilledButton.styleFrom(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: profileState is ProfileUpdating
-                                      ? const SizedBox(
-                                          width: 24,
-                                          height: 24,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white,
-                                          ),
-                                        )
-                                      : const Text(
-                                          'Save Profile',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.error,
+                                          width: 2,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
                                           ),
                                         ),
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-
-                              // Nearby Airports section
-                              BlocBuilder<LocationBloc, LocationState>(
-                                builder: (context, locationState) {
-                                  if (locationState is LocationLoaded &&
-                                      locationState.position != null) {
-                                    return Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 24,
                                       ),
-                                      child: NearbyAirportsSection(
-                                        latitude:
-                                            locationState.position!.latitude,
-                                        longitude:
-                                            locationState.position!.longitude,
-                                      ),
-                                    );
-                                  }
-                                  return const SizedBox.shrink();
-                                },
-                              ),
-
-                              BlocBuilder<LocationBloc, LocationState>(
-                                builder: (context, locationState) {
-                                  if (locationState is LocationLoaded &&
-                                      locationState.position != null) {
-                                    return Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 24,
-                                      ),
-                                      child: NearbyStationsSection(
-                                        latitude:
-                                            locationState.position!.latitude,
-                                        longitude:
-                                            locationState.position!.longitude,
-                                      ),
-                                    );
-                                  }
-                                  return const SizedBox.shrink();
-                                },
-                              ),
-
-                              SizedBox(
-                                height: 50,
-                                child: OutlinedButton.icon(
-                                  onPressed: () {
-                                    context.read<AuthBloc>().add(
-                                      LogoutRequested(),
-                                    );
-                                  },
-                                  icon: Icon(
-                                    Icons.logout,
-                                    color: Theme.of(context).colorScheme.error,
-                                  ),
-                                  label: Text(
-                                    'Logout',
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.error,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
                                     ),
                                   ),
-                                  style: OutlinedButton.styleFrom(
-                                    side: BorderSide(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.error,
-                                      width: 2,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(
-                                height: 120,
-                              ), // Bottom padding for navigation bar
-                            ],
-                          );
-                        },
+                                  const SizedBox(
+                                    height: 120,
+                                  ), // Bottom padding for navigation bar
+                                ],
+                              );
+                            },
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              );
-            },
+                  );
+                },
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -863,14 +867,14 @@ class _MeScreenState extends State<MeScreen> {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          color: MapGlass.inlayFillStrong(Theme.of(context).brightness),
           width: 4,
         ),
         shape: BoxShape.circle,
       ),
       child: CircleAvatar(
         radius: 64,
-        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        backgroundColor: MapGlass.inlayFillStrong(Theme.of(context).brightness),
         backgroundImage: backgroundImage,
         child: backgroundImage == null
             ? Icon(

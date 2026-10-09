@@ -51,3 +51,10 @@ add:
 
 update:
 	docker compose exec api poetry update
+
+# Component catalog (frontend/widgetbook). Regenerates the navigation tree
+# first, so a newly annotated use case appears without a separate step.
+# Runs in Chrome by default; override with e.g. `make widgetbook DEVICE=macos`.
+DEVICE ?= chrome
+widgetbook:
+	cd frontend/widgetbook && flutter pub get && dart run build_runner build && flutter run -d $(DEVICE)

@@ -4,6 +4,10 @@ import '../../models/airport.dart';
 import '../../models/station.dart';
 import '../../bloc/trip/trip_bloc.dart';
 import '../../bloc/trip/trip_event.dart';
+import '../shared/glass_surfaces.dart';
+import '../shared/glass_inlay.dart';
+import '../shared/thermal_button.dart';
+import '../../utils/app_theme.dart';
 
 class AirportBottomSheet extends StatelessWidget {
   final Airport airport;
@@ -15,7 +19,7 @@ class AirportBottomSheet extends StatelessWidget {
         : 'Regional Airport';
     return BaseBottomSheet(
       icon: Icons.flight,
-      color: const Color(0xFF1565C0),
+      color: MapPalette.airport,
       title: airport.name,
       subtitle: airport.iataCode,
       location: '${airport.city}, ${airport.country}',
@@ -23,9 +27,7 @@ class AirportBottomSheet extends StatelessWidget {
       onAddToTrip: () {
         context.read<TripBloc>().add(AddAirportStop(airport));
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Added ${airport.name} to trip')),
-        );
+        GlassToast.show(context, 'Added ${airport.name} to trip');
       },
     );
   }
@@ -37,28 +39,28 @@ class StationBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     IconData iconData = Icons.train;
-    Color color = const Color(0xFFE65100);
+    Color color = MapPalette.majorStation;
     String label = 'Station';
 
     switch (station.stationType) {
       case 'major_station':
         iconData = Icons.train;
-        color = const Color(0xFFE65100);
+        color = MapPalette.majorStation;
         label = 'Major Station';
         break;
       case 'commuter_rail_station':
         iconData = Icons.directions_railway;
-        color = const Color(0xFF00695C);
+        color = MapPalette.commuterRail;
         label = 'Commuter Rail';
         break;
       case 'subway_station':
         iconData = Icons.subway;
-        color = const Color(0xFF2E7D32);
+        color = MapPalette.subway;
         label = 'Subway Station';
         break;
       case 'regional_station':
         iconData = Icons.train;
-        color = const Color(0xFF607D8B);
+        color = MapPalette.regionalStation;
         label = 'Regional Station';
         break;
       default:
@@ -78,9 +80,7 @@ class StationBottomSheet extends StatelessWidget {
       onAddToTrip: () {
         context.read<TripBloc>().add(AddStationStop(station));
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Added ${station.name} to trip')),
-        );
+        GlassToast.show(context, 'Added ${station.name} to trip');
       },
     );
   }
@@ -107,84 +107,61 @@ class BaseBottomSheet extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.grey[400],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 32),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                subtitle!,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            Text(
-              location,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
+    final theme = Theme.of(context);
+    final onSurface = theme.colorScheme.onSurface;
+
+    // This is the cheapest refraction in the app: a live map is already behind
+    // the sheet, so the material costs one backdrop sample and returns the
+    // whole point of the design system. It was spending it on `cardColor`.
+    return GlassSheet(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          GlassInlay(
+            strong: true,
+            edge: false,
+            borderRadius: MapGlass.radiusPill,
+            padding: const EdgeInsets.all(12),
+            child: Icon(icon, color: color, size: 32),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: theme.textTheme.titleLarge,
+            textAlign: TextAlign.center,
+          ),
+          if (subtitle != null) ...<Widget>[
             const SizedBox(height: 4),
             Text(
-              label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+              subtitle!,
+              style: theme.textTheme.headlineSmall?.copyWith(color: color),
             ),
-            if (onAddToTrip != null) ...[
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: onAddToTrip,
-                  icon: const Icon(Icons.add_location_alt_outlined),
-                  label: const Text('Add to Trip'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: color,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
-              ),
-            ],
           ],
-        ),
+          const SizedBox(height: MapSpacing.xs),
+          Text(
+            location,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: onSurface.withValues(alpha: 0.7),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: onSurface.withValues(alpha: 0.5),
+            ),
+          ),
+          if (onAddToTrip != null) ...<Widget>[
+            const SizedBox(height: MapSpacing.md),
+            ThermalButton(
+              label: 'Add to Trip',
+              icon: Icons.add_location_alt_outlined,
+              onPressed: onAddToTrip,
+              expand: true,
+            ),
+          ],
+        ],
       ),
     );
   }

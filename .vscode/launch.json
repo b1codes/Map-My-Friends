@@ -22,7 +22,7 @@
       "program": "lib/main.dart",
       "cwd": "${workspaceFolder}/frontend",
       "flutterMode": "debug",
-      "args": ["--dart-define-from-file=.env"]
+      // "args": ["--dart-define-from-file=.env"]
     },
     {
       // Profile mode – measures real performance without debug overhead.
@@ -32,7 +32,7 @@
       "program": "lib/main.dart",
       "cwd": "${workspaceFolder}/frontend",
       "flutterMode": "profile",
-      "args": ["--dart-define-from-file=.env"]
+      // "args": ["--dart-define-from-file=.env"]
     },
     {
       // Release build – closest to production; no debugger attached.
@@ -42,7 +42,46 @@
       "program": "lib/main.dart",
       "cwd": "${workspaceFolder}/frontend",
       "flutterMode": "release",
-      "args": ["--dart-define-from-file=.env"]
+      // "args": ["--dart-define-from-file=.env"]
+    },
+    {
+      // Local development: launches on the currently selected device (device
+      // emulator, simulator, or desktop) with the amber "DEV Sign In" button
+      // visible on the login screen. One tap signs in as the user created by
+      // `make seed` — no credentials to type, and real JWTs so the API works.
+      //
+      // Prerequisites: `make up` then `make seed`.
+      "name": "Flutter: Run (debug + DEV sign-in)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/frontend",
+      "flutterMode": "debug",
+      "args": ["--dart-define=DEV_AUTOLOGIN=false"]
+    },
+    {
+      // Same, but skips the login screen entirely — signs in on launch.
+      // Best when iterating on a screen behind the auth wall, since a hot
+      // restart would otherwise drop you back at the login form.
+      "name": "Flutter: Run (debug + DEV auto-login)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/frontend",
+      "flutterMode": "debug",
+      "args": ["--dart-define=DEV_AUTOLOGIN=true"]
+    },
+    {
+      // Chrome window with DEV auto-login. ApiConfig routes web builds at
+      // http://localhost:8000/api/, which is where `make up` publishes Django.
+      "name": "Flutter: Chrome (debug + DEV auto-login)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/frontend",
+      "flutterMode": "debug",
+      "deviceId": "chrome",
+      "args": ["--dart-define=DEV_AUTOLOGIN=true"]
     },
     {
       // Run the Flutter widget / unit test suite.
@@ -120,6 +159,16 @@
       // Start `make up` (with debugpy) before using this compound.
       "name": "Full Stack: Flutter + Django",
       "configurations": ["Flutter: Run (debug)", "Django: Attach (Docker)"],
+      "stopAll": true
+    },
+    {
+      // Same, but the Flutter side auto-signs-in as the seeded dev user.
+      // Run `make seed` once before the first use.
+      "name": "Full Stack: Flutter (DEV auto-login) + Django",
+      "configurations": [
+        "Flutter: Run (debug + DEV auto-login)",
+        "Django: Attach (Docker)"
+      ],
       "stopAll": true
     }
   ]

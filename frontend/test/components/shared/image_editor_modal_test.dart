@@ -83,12 +83,14 @@ void main() {
     );
 
     expect(find.text('Edit Image'), findsOneWidget);
-    expect(find.text('Save'), findsOneWidget);
+    // The save affordance is a thermal header action now, labelled rather
+    // than spelled out: the header carries icons, not text buttons.
+    expect(find.byTooltip('Save'), findsOneWidget);
     expect(find.byType(InteractiveViewer), findsOneWidget);
 
     // Tap save (in a real environment this would pop with data,
     // but in test environment creating an image from RepaintBoundary might need more setup or might not return real data easily without golden tests)
-    await tester.tap(find.text('Save'));
+    await tester.tap(find.byTooltip('Save'));
     await tester.pumpAndSettle();
 
     // If no exception, basic structure is sound.
