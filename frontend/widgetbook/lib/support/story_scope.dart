@@ -16,11 +16,15 @@ import 'package:map_my_friends/bloc/station/station_state.dart';
 import 'package:map_my_friends/bloc/theme/theme_cubit.dart';
 import 'package:map_my_friends/bloc/trip/trip_bloc.dart';
 import 'package:map_my_friends/bloc/trip/trip_state.dart';
+import 'package:map_my_friends/components/shared/nearby_blocs.dart';
 
 import 'fake_blocs.dart';
 import 'fixtures.dart';
 
 /// Provides every bloc the app's widgets read, each pinned to a given state.
+///
+/// That includes [NearbyBlocs], so the nearby sections on Person details and
+/// Me render [nearbyAirports] and [nearbyStations] instead of calling the API.
 ///
 /// Every provider is always present, whatever the use case renders. A screen
 /// that pushes another (People → Person details → Edit) reads blocs the first
@@ -43,6 +47,8 @@ class StoryScope extends StatefulWidget {
     this.airports = const MapAirportsLoaded([]),
     this.stations = const MapStationsLoaded([]),
     this.trip = const TripState(),
+    this.nearbyAirports,
+    this.nearbyStations,
     this.mapSettings = const MapSettingsState(),
   });
 
@@ -61,9 +67,20 @@ class StoryScope extends StatefulWidget {
   /// Defaults to the sample signed-in profile.
   final ProfileState? profile;
 
+  /// The map's airport and station layers.
   final AirportState airports;
   final StationState stations;
+
+  /// Defaults to the sample airports near the sample position.
+  final AirportState? nearbyAirports;
+
+  /// Defaults to the three sample stations nearest the sample position.
+  final StationState? nearbyStations;
+
   final TripState trip;
+
+  /// Seeds both the app-wide settings and the map session's own copy, so
+  /// widgets reading either one follow a knob.
   final MapSettingsState mapSettings;
 
   @override
@@ -78,12 +95,24 @@ class _StoryScopeState extends State<StoryScope> {
   late final StoryProfileBloc _profile = StoryProfileBloc(_profileState);
   late final StoryAirportBloc _airports = StoryAirportBloc(widget.airports);
   late final StoryStationBloc _stations = StoryStationBloc(widget.stations);
+  late final StoryAirportBloc _nearbyAirports = StoryAirportBloc(
+    _nearbyAirportsState,
+  );
+  late final StoryStationBloc _nearbyStations = StoryStationBloc(
+    _nearbyStationsState,
+  );
+  late final NearbyBlocs _nearby = NearbyBlocs(
+    airports: _nearbyAirports,
+    stations: _nearbyStations,
+  );
   late final StoryTripBloc _trip = StoryTripBloc(widget.trip);
   late final StoryMapSettingsCubit _mapSettings = StoryMapSettingsCubit(
     widget.mapSettings,
   );
-  late final LocalMapSettingsCubit _localMapSettings = LocalMapSettingsCubit(
-    initialState: widget.mapSettings,
+  // Seedable, unlike the app's LocalMapSettingsCubit, and the same in-memory
+  // cubit as the app-wide one: it is provided as LocalMapSettingsCubit too.
+  late final StoryMapSettingsCubit _localMapSettings = StoryMapSettingsCubit(
+    widget.mapSettings,
   );
   final ThemeCubit _theme = ThemeCubit();
 
@@ -92,6 +121,11 @@ class _StoryScopeState extends State<StoryScope> {
       widget.people ?? PeopleLoaded(Fixtures.people);
   PulseState get _pulseState => widget.pulse ?? Fixtures.pulseLoaded();
   ProfileState get _profileState => widget.profile ?? Fixtures.profile;
+  AirportState get _nearbyAirportsState =>
+      widget.nearbyAirports ?? NearestAirportsLoaded(Fixtures.airports);
+  StationState get _nearbyStationsState =>
+      widget.nearbyStations ??
+      NearestStationsLoaded(Fixtures.stations.take(3).toList());
 
   @override
   void didUpdateWidget(StoryScope oldWidget) {
@@ -103,8 +137,11 @@ class _StoryScopeState extends State<StoryScope> {
     _profile.seed(_profileState);
     _airports.seed(widget.airports);
     _stations.seed(widget.stations);
+    _nearbyAirports.seed(_nearbyAirportsState);
+    _nearbyStations.seed(_nearbyStationsState);
     _trip.seed(widget.trip);
     _mapSettings.seed(widget.mapSettings);
+    _localMapSettings.seed(widget.mapSettings);
   }
 
   @override
@@ -117,6 +154,8 @@ class _StoryScopeState extends State<StoryScope> {
       _profile,
       _airports,
       _stations,
+      _nearbyAirports,
+      _nearbyStations,
       _trip,
       _mapSettings,
       _localMapSettings,
@@ -138,6 +177,7 @@ class _StoryScopeState extends State<StoryScope> {
         BlocProvider<ProfileBloc>.value(value: _profile),
         BlocProvider<AirportBloc>.value(value: _airports),
         BlocProvider<StationBloc>.value(value: _stations),
+        RepositoryProvider<NearbyBlocs>.value(value: _nearby),
         BlocProvider<TripBloc>.value(value: _trip),
         BlocProvider<MapSettingsCubit>.value(value: _mapSettings),
         BlocProvider<LocalMapSettingsCubit>.value(value: _localMapSettings),

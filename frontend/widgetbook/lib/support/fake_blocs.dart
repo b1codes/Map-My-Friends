@@ -107,12 +107,15 @@ class StoryTripBloc extends InertBloc<TripEvent, TripState>
   StoryTripBloc(super.initialState);
 }
 
-/// The app-wide map settings, held in memory instead of SharedPreferences.
+/// Map settings, held in memory instead of SharedPreferences.
 ///
 /// Unlike the blocs above this one stays live: its methods are pure state
 /// changes with the same signatures as [LocalMapSettingsCubit], so toggling a
 /// setting inside the catalog works exactly as it does in the app — it just
 /// never writes to disk, and never reads the developer's own saved settings.
+///
+/// It also stands in for the map session's [LocalMapSettingsCubit], which
+/// has no way to be moved to a new state from outside.
 class StoryMapSettingsCubit extends LocalMapSettingsCubit
     implements MapSettingsCubit {
   StoryMapSettingsCubit(MapSettingsState initialState)

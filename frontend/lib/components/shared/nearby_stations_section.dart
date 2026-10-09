@@ -7,24 +7,21 @@ import '../../bloc/map/map_settings_cubit.dart';
 import '../../utils/unit_converter.dart';
 import '../../utils/app_theme.dart';
 import 'glass_inlay.dart';
+import 'nearby_blocs.dart';
 import 'chromatic_pulse.dart';
 
 /// A reusable widget that shows the nearest train stations to a given coordinate.
 /// Used on both PersonDetailsScreen and MeScreen.
+///
+/// Loads its own bloc unless a [NearbyBlocs] is provided above it.
 class NearbyStationsSection extends StatefulWidget {
   final double latitude;
   final double longitude;
-
-  /// Supplies the bloc instead of creating one, so a test or the Widgetbook
-  /// catalog can pin the section to a state without the network. The section
-  /// neither loads nor closes a bloc it was given; the caller owns it.
-  final StationBloc? bloc;
 
   const NearbyStationsSection({
     super.key,
     required this.latitude,
     required this.longitude,
-    this.bloc,
   });
 
   @override
@@ -32,21 +29,18 @@ class NearbyStationsSection extends StatefulWidget {
 }
 
 class _NearbyStationsSectionState extends State<NearbyStationsSection> {
-  late final StationBloc _stationBloc;
-  late final bool _ownsBloc;
+  /// Created on first build, and only if no [NearbyBlocs] is provided.
+  StationBloc? _ownBloc;
 
-  @override
-  void initState() {
-    super.initState();
-    final given = widget.bloc;
-    _ownsBloc = given == null;
-    if (given != null) {
-      _stationBloc = given;
-      return;
-    }
-    // Create a separate bloc instance for nearest stations
-    _stationBloc = StationBloc();
-    _stationBloc.add(
+  StationBloc _createOwnBloc() {
+    // A separate bloc instance from the map's, for the nearest stations
+    final bloc = StationBloc();
+    _load(bloc);
+    return bloc;
+  }
+
+  void _load(StationBloc bloc) {
+    bloc.add(
       FetchNearestStations(
         latitude: widget.latitude,
         longitude: widget.longitude,
@@ -56,17 +50,33 @@ class _NearbyStationsSectionState extends State<NearbyStationsSection> {
   }
 
   @override
+  void didUpdateWidget(NearbyStationsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The person's address was edited, or the device moved.
+    final own = _ownBloc;
+    if (own != null &&
+        (widget.latitude != oldWidget.latitude ||
+            widget.longitude != oldWidget.longitude)) {
+      _load(own);
+    }
+  }
+
+  @override
   void dispose() {
-    if (_ownsBloc) _stationBloc.close();
+    _ownBloc?.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final distanceUnit = context.watch<MapSettingsCubit>().state.distanceUnit;
+    // Watched, so a provided bloc that changes is picked up.
+    final bloc =
+        context.watch<NearbyBlocs?>()?.stations ??
+        (_ownBloc ??= _createOwnBloc());
 
     return BlocProvider.value(
-      value: _stationBloc,
+      value: bloc,
       child: BlocBuilder<StationBloc, StationState>(
         builder: (context, state) {
           if (state is StationLoading) {

@@ -83,9 +83,8 @@ Widget mapSettingsModalInline(BuildContext context) {
   );
 
   return StoryScope(
-    // Keyed so a knob change rebuilds the scope with the new starting
-    // settings rather than leaving the modal's own edits in place.
-    key: ValueKey((showAirports, showStations, mapType)),
+    // A knob change moves the modal's cubit to the new settings in place,
+    // replacing whatever was toggled in the modal since.
     mapSettings: MapSettingsState(
       showAirports: showAirports,
       showStations: showStations,

@@ -286,8 +286,11 @@ abstract final class Fixtures {
 
   // --- Pulse -----------------------------------------------------------------
 
-  /// Final rather than a getter: Equatable compares these by identity, so a
-  /// fresh list per build would read as a new Pulse state on every rebuild.
+  /// Final rather than a getter. Equatable compares the list deeply, so a
+  /// fresh list is fine ([people] builds one per call), but ContactLog has no
+  /// `==` of its own: its elements compare by identity, and a getter would
+  /// construct new logs each time. StoryScope reseeds on every rebuild, so
+  /// that would read as a new Pulse state for each one.
   static final List<ContactLog> contactLogs = [
     ContactLog(
       id: 'log-1',

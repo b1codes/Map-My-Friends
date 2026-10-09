@@ -8,7 +8,6 @@ import 'package:map_my_friends/components/shared/nearby_stations_section.dart';
 import 'package:widgetbook/widgetbook.dart';
 import 'package:widgetbook_annotation/widgetbook_annotation.dart' as widgetbook;
 
-import '../../../support/fake_blocs.dart';
 import '../../../support/fixtures.dart';
 import '../../../support/stage.dart';
 import '../../../support/story_scope.dart';
@@ -28,42 +27,6 @@ DistanceUnit _unitKnob(BuildContext context) => context.knobs.object.dropdown(
   labelBuilder: (u) => u.name,
 );
 
-/// Owns the bloc a section is handed, so it is closed with the entry.
-class _Seeded<B extends InertBloc<Object?, S>, S> extends StatefulWidget {
-  const _Seeded({
-    required this.create,
-    required this.state,
-    required this.builder,
-  });
-
-  final B Function(S state) create;
-  final S state;
-  final Widget Function(B bloc) builder;
-
-  @override
-  State<_Seeded<B, S>> createState() => _SeededState<B, S>();
-}
-
-class _SeededState<B extends InertBloc<Object?, S>, S>
-    extends State<_Seeded<B, S>> {
-  late final B _bloc = widget.create(widget.state);
-
-  @override
-  void didUpdateWidget(_Seeded<B, S> oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _bloc.seed(widget.state);
-  }
-
-  @override
-  void dispose() {
-    _bloc.close();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => widget.builder(_bloc);
-}
-
 @widgetbook.UseCase(
   name: 'States',
   type: NearbyAirportsSection,
@@ -79,18 +42,11 @@ Widget nearbyAirportsStates(BuildContext context) {
   final unit = _unitKnob(context);
 
   return StoryScope(
+    nearbyAirports: state,
     mapSettings: MapSettingsState(distanceUnit: unit),
-    child: Stage(
+    child: const Stage(
       child: GlassContainer(
-        child: _Seeded<StoryAirportBloc, AirportState>(
-          create: StoryAirportBloc.new,
-          state: state,
-          builder: (bloc) => NearbyAirportsSection(
-            latitude: 40.7128,
-            longitude: -74.0060,
-            bloc: bloc,
-          ),
-        ),
+        child: NearbyAirportsSection(latitude: 40.7128, longitude: -74.0060),
       ),
     ),
   );
@@ -111,18 +67,11 @@ Widget nearbyStationsStates(BuildContext context) {
   final unit = _unitKnob(context);
 
   return StoryScope(
+    nearbyStations: state,
     mapSettings: MapSettingsState(distanceUnit: unit),
-    child: Stage(
+    child: const Stage(
       child: GlassContainer(
-        child: _Seeded<StoryStationBloc, StationState>(
-          create: StoryStationBloc.new,
-          state: state,
-          builder: (bloc) => NearbyStationsSection(
-            latitude: 40.7128,
-            longitude: -74.0060,
-            bloc: bloc,
-          ),
-        ),
+        child: NearbyStationsSection(latitude: 40.7128, longitude: -74.0060),
       ),
     ),
   );
