@@ -15,10 +15,16 @@ class NearbyStationsSection extends StatefulWidget {
   final double latitude;
   final double longitude;
 
+  /// Supplies the bloc instead of creating one, so a test or the Widgetbook
+  /// catalog can pin the section to a state without the network. The section
+  /// neither loads nor closes a bloc it was given; the caller owns it.
+  final StationBloc? bloc;
+
   const NearbyStationsSection({
     super.key,
     required this.latitude,
     required this.longitude,
+    this.bloc,
   });
 
   @override
@@ -27,10 +33,17 @@ class NearbyStationsSection extends StatefulWidget {
 
 class _NearbyStationsSectionState extends State<NearbyStationsSection> {
   late final StationBloc _stationBloc;
+  late final bool _ownsBloc;
 
   @override
   void initState() {
     super.initState();
+    final given = widget.bloc;
+    _ownsBloc = given == null;
+    if (given != null) {
+      _stationBloc = given;
+      return;
+    }
     // Create a separate bloc instance for nearest stations
     _stationBloc = StationBloc();
     _stationBloc.add(
@@ -44,7 +57,7 @@ class _NearbyStationsSectionState extends State<NearbyStationsSection> {
 
   @override
   void dispose() {
-    _stationBloc.close();
+    if (_ownsBloc) _stationBloc.close();
     super.dispose();
   }
 

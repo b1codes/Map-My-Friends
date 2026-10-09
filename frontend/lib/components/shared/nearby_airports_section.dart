@@ -15,10 +15,16 @@ class NearbyAirportsSection extends StatefulWidget {
   final double latitude;
   final double longitude;
 
+  /// Supplies the bloc instead of creating one, so a test or the Widgetbook
+  /// catalog can pin the section to a state without the network. The section
+  /// neither loads nor closes a bloc it was given; the caller owns it.
+  final AirportBloc? bloc;
+
   const NearbyAirportsSection({
     super.key,
     required this.latitude,
     required this.longitude,
+    this.bloc,
   });
 
   @override
@@ -27,10 +33,17 @@ class NearbyAirportsSection extends StatefulWidget {
 
 class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
   late final AirportBloc _airportBloc;
+  late final bool _ownsBloc;
 
   @override
   void initState() {
     super.initState();
+    final given = widget.bloc;
+    _ownsBloc = given == null;
+    if (given != null) {
+      _airportBloc = given;
+      return;
+    }
     // Create a separate bloc instance for nearest airports
     _airportBloc = AirportBloc();
     _airportBloc.add(
@@ -43,7 +56,7 @@ class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
 
   @override
   void dispose() {
-    _airportBloc.close();
+    if (_ownsBloc) _airportBloc.close();
     super.dispose();
   }
 
