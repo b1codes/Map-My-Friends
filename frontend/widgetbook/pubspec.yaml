@@ -36,8 +36,10 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  build_runner: any
-  widgetbook_generator: ^3.20.0
+  # Versions are held by the committed pubspec.lock: CI regenerates the
+  # catalog tree and fails if the output differs from what is committed.
+  build_runner: ^2.15.1
+  widgetbook_generator: ^3.24.0
 
 flutter:
   uses-material-design: true
