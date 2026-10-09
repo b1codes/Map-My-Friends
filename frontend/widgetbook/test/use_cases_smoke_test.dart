@@ -1,5 +1,5 @@
 // Opens every catalog entry, through the real Widgetbook app and its addons,
-// and fails on anything it throws.
+// and fails on anything it throws, or if the route did not reach the entry.
 //
 // A catalog entry breaks silently: the app's own tests never build it, and a
 // renamed parameter or a new bloc a screen reads only shows up when someone
@@ -19,15 +19,52 @@ import 'package:map_my_friends_widgetbook/main.directories.g.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:widgetbook/widgetbook.dart';
 
+/// A node's place in the tree, as the path Widgetbook routes to.
+String _route(String prefix, WidgetbookNode node) =>
+    '$prefix${node.name}'.replaceAll(' ', '-').toLowerCase();
+
 /// Every use case in the generated tree, as the path Widgetbook routes to.
 List<String> _useCasePaths(List<WidgetbookNode> nodes, [String prefix = '']) {
   return [
     for (final node in nodes)
       if (node is WidgetbookUseCase)
-        '$prefix${node.name}'.replaceAll(' ', '-').toLowerCase()
+        _route(prefix, node)
       else
         ..._useCasePaths(node.children ?? const [], '$prefix${node.name}/'),
   ];
+}
+
+/// A copy of [nodes] whose use cases wrap what they build in a [_Rendered]
+/// naming their path.
+///
+/// A path that does not resolve throws nothing: Widgetbook shows its empty
+/// pane and the entry is never built. Finding the marker is what proves the
+/// route reached the builder.
+List<WidgetbookNode> _tagged(List<WidgetbookNode> nodes, [String prefix = '']) {
+  return [
+    for (final node in nodes)
+      if (node is WidgetbookUseCase)
+        WidgetbookUseCase(
+          name: node.name,
+          designLink: node.designLink,
+          builder: (context) =>
+              _Rendered(_route(prefix, node), node.builder(context)),
+        )
+      else
+        node.copyWith(
+          children: _tagged(node.children ?? const [], '$prefix${node.name}/'),
+        ),
+  ];
+}
+
+class _Rendered extends StatelessWidget {
+  const _Rendered(this.path, this.child);
+
+  final String path;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => child;
 }
 
 bool _isOverflow(FlutterErrorDetails details) =>
@@ -50,6 +87,7 @@ void main() {
   });
 
   final paths = _useCasePaths(directories);
+  final tagged = _tagged(directories);
 
   test('the catalog is not empty', () {
     expect(paths, isNotEmpty);
@@ -66,7 +104,7 @@ void main() {
       FlutterError.onError = errors.add;
       try {
         await tester.pumpWidget(
-          WidgetbookApp(initialRoute: '/?path=$path&preview'),
+          WidgetbookApp(initialRoute: '/?path=$path&preview', nodes: tagged),
         );
         // Not pumpAndSettle: the Ambient Field and the Chromatic Pulse
         // animate for as long as they are on screen, so nothing settles.
@@ -89,6 +127,11 @@ void main() {
         failures.map((d) => d.exceptionAsString()).toList(),
         isEmpty,
         reason: '$path threw while building',
+      );
+      expect(
+        find.byWidgetPredicate((w) => w is _Rendered && w.path == path),
+        findsOneWidget,
+        reason: '$path did not route to its use case',
       );
 
       // Tear the tree down inside the test, then run out any timers it left

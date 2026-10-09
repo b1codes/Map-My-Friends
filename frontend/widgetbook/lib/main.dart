@@ -27,17 +27,22 @@ Future<void> main() async {
 
 @widgetbook.App()
 class WidgetbookApp extends StatelessWidget {
-  const WidgetbookApp({super.key, this.initialRoute = '/'});
+  const WidgetbookApp({super.key, this.initialRoute = '/', this.nodes});
 
   /// Where the catalog opens, e.g. `/?path=screens/people/peoplescreen/states`.
   /// The smoke test uses it to open every entry in turn.
   final String initialRoute;
 
+  /// The navigation tree, if not the generated one. The smoke test passes a
+  /// copy whose use cases mark what they build, to confirm each route
+  /// reached its entry.
+  final List<WidgetbookNode>? nodes;
+
   @override
   Widget build(BuildContext context) {
     return Widgetbook.material(
       initialRoute: initialRoute,
-      directories: directories,
+      directories: nodes ?? directories,
       appBuilder: _appBuilder,
       addons: [
         MaterialThemeAddon(
@@ -80,6 +85,10 @@ class WidgetbookApp extends StatelessWidget {
   }
 }
 
+/// Created once: the image cache keys on the bundle, so a new one per
+/// rebuild (every knob change) would re-decode the logo and grow the cache.
+final _assetBundle = AppAssetBundle(rootBundle);
+
 /// Widgetbook's default MaterialApp, plus the app's own localizations.
 ///
 /// The addons above wrap each entry inside this app, so routes pushed onto
@@ -92,7 +101,7 @@ Widget _appBuilder(BuildContext context, Widget child) {
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: DefaultAssetBundle(
-      bundle: AppAssetBundle(rootBundle),
+      bundle: _assetBundle,
       child: Material(type: MaterialType.transparency, child: child),
     ),
   );
