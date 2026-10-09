@@ -1,0 +1,9 @@
+targets:
+  $default:
+    builders:
+      # widgetbook_generator posts a usage report to Mixpanel on every local
+      # build: a hash of `git config user.email`, the GitHub owner URL, and
+      # this package's component counts. It is opt-out, so opt out here, once,
+      # for everyone who builds the catalog.
+      widgetbook_generator:telemetry:
+        enabled: false
