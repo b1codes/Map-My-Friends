@@ -201,6 +201,40 @@ class NearestStationsParameterTests(_AuthenticatedMixin, APITestCase):
             {"error": "lat and lon query parameters are required and must be numbers."},
         )
 
+    def _assert_invalid_coordinates(self, params):
+        response = self.client.get(URL, params)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data,
+            {"error": "lat must be between -90 and 90 and lon between -180 and 180."},
+        )
+
+    def test_non_finite_coordinates_return_400(self):
+        # Previously a 500: float() accepts these but haversine_km cannot.
+        for value in ("inf", "-inf", "nan", "1e309"):
+            for params in ({"lat": value, "lon": 0}, {"lat": 0, "lon": value}):
+                with self.subTest(**params):
+                    self._assert_invalid_coordinates(params)
+
+    def test_out_of_range_coordinates_return_400(self):
+        # Previously a 200 with meaningless results.
+        for params in (
+            {"lat": 90.0001, "lon": 0},
+            {"lat": -91, "lon": 0},
+            {"lat": 0, "lon": 180.5},
+            {"lat": 0, "lon": -181},
+            {"lat": 999, "lon": 999},
+        ):
+            with self.subTest(**params):
+                self._assert_invalid_coordinates(params)
+
+    def test_boundary_coordinates_are_valid(self):
+        for params in ({"lat": 90, "lon": 180}, {"lat": -90, "lon": -180}):
+            with self.subTest(**params):
+                response = self.client.get(URL, {**params, "count": 1})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(len(response.data["features"]), 1)
+
     def test_missing_lat_returns_400(self):
         self._assert_bad_coordinates({"lon": -87.6298})
 
