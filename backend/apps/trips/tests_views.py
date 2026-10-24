@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from rest_framework.test import APITestCase
 
 from apps.common import firestore as fs
-from apps.common.testing import FirestoreTestMixin
+from apps.common.testing import FirestoreTestMixin, ThrottleIsolationMixin
 from apps.trips.repositories import TripRepository
 
 TRIPS_URL = "/api/trips/"
@@ -26,7 +26,7 @@ LONDON = (-0.1278, 51.5074)
 PARIS = (2.3522, 48.8566)
 
 
-class TripViewTestCase(FirestoreTestMixin, APITestCase):
+class TripViewTestCase(ThrottleIsolationMixin, FirestoreTestMixin, APITestCase):
     collections_to_purge = ["trips", "people"]
 
     def setUp(self):
@@ -778,6 +778,32 @@ class TripLegPartialUpdateTests(TripViewTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["departure_stop"], self.trip["stops"][0]["id"])
 
+    def test_empty_patch_returns_leg_unchanged(self):
+        # Regression: an empty payload reached Firestore's update() and 500'd.
+        before = self.raw_leg(self.trip["id"], self.leg_id)
+
+        response = self.client.patch(self.leg_url, {}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, self.trip["legs"][0])
+        self.assertEqual(self.raw_leg(self.trip["id"], self.leg_id), before)
+
+    def test_id_in_payload_is_not_written_to_document(self):
+        # Regression: the writable `id` landed in the leg document as a field.
+        response = self.client.patch(
+            self.leg_url, {"id": "spoof", "booking_reference": "X"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["id"], self.leg_id)
+        self.assertEqual(response.data["booking_reference"], "X")
+        self.assertNotIn("id", self.raw_leg(self.trip["id"], self.leg_id))
+
+    def test_id_only_patch_is_a_no_op(self):
+        before = self.raw_leg(self.trip["id"], self.leg_id)
+        response = self.client.patch(self.leg_url, {"id": "spoof"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["id"], self.leg_id)
+        self.assertEqual(self.raw_leg(self.trip["id"], self.leg_id), before)
+
 
 class SmartLookupTests(TripViewTestCase):
     def setUp(self):
@@ -827,6 +853,26 @@ class SmartLookupTests(TripViewTestCase):
         response = self.client.post(self.url, {}, format="json")
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data, {"error": "Missing identifier"})
+
+    def test_null_identifier_is_treated_as_missing(self):
+        self.set_leg(transport_type="FLIGHT", booking_reference="BA123")
+        response = self.client.post(self.url, {"identifier": None}, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data, {"error": "Missing identifier"})
+
+    def test_non_string_identifier_returns_400(self):
+        # Regression: the lookup called .upper() on it and 500'd.
+        self.set_leg(transport_type="FLIGHT")
+        for identifier in (123, ["BA123"], {"number": "BA123"}, True):
+            with self.subTest(identifier=identifier):
+                response = self.client.post(
+                    self.url, {"identifier": identifier}, format="json"
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(
+                    response.data, {"error": "Identifier must be a string"}
+                )
+        self.assertEqual(self.raw_leg(self.trip["id"], self.leg_id)["ticket_data"], {})
 
     def test_unknown_flight_returns_404_and_leaves_leg_alone(self):
         self.set_leg(transport_type="FLIGHT")

@@ -189,10 +189,15 @@ class TripLegViewSet(viewsets.ViewSet):
 
         serializer = TripLegSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        # `id` addresses the leg; the doc id is the id, so it is never written.
         payload = {
             k: (v.isoformat() if hasattr(v, "isoformat") else v)
             for k, v in serializer.validated_data.items()
+            if k != "id"
         }
+        # Firestore rejects an empty update, so a no-op PATCH returns the leg.
+        if not payload:
+            return Response(TripLegSerializer(leg).data)
         updated = self.repository.update_leg(leg.trip_id, pk, owner_key, payload)
         return Response(TripLegSerializer(updated).data)
 
@@ -207,6 +212,11 @@ class TripLegViewSet(viewsets.ViewSet):
         if not identifier:
             return Response(
                 {"error": "Missing identifier"}, status=status.HTTP_400_BAD_REQUEST
+            )
+        if not isinstance(identifier, str):
+            return Response(
+                {"error": "Identifier must be a string"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         data = {}
