@@ -403,6 +403,16 @@ class PasswordResetTests(ThrottleIsolationMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, {"message": "Password reset email sent."})
 
+    def test_request_for_shared_email_is_generic(self):
+        # Several accounts can share an address; the reset must not 500, pick
+        # one arbitrarily, or reveal that duplicates exist.
+        User.objects.create_user(username="owner-b", email="a@example.com")
+
+        response = self.client.post(RESET_URL, {"email": "a@example.com"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, {"message": "Password reset email sent."})
+
     def test_request_requires_valid_email(self):
         response = self.client.post(RESET_URL, {"email": "nope"})
 
@@ -490,5 +500,15 @@ class PasswordResetTests(ThrottleIsolationMixin, APITestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("password", response.data)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(STRONG_PASSWORD))
+
+    def test_malformed_user_id_is_rejected(self):
+        for user_id in ("abc", [self.user.pk], {"id": self.user.pk}, 2**70):
+            with self.subTest(user_id=user_id):
+                response = self.confirm(user_id=user_id)
+
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.data, {"error": "Invalid request."})
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password(STRONG_PASSWORD))
