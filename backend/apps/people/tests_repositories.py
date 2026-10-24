@@ -1,5 +1,6 @@
 from django.test import SimpleTestCase
 
+from apps.common import firestore as fs
 from apps.common.testing import FirestoreTestMixin
 from apps.people.repositories import ContactLogRepository, PersonRepository
 
@@ -212,3 +213,107 @@ class ContactLogCrossOwnerTests(FirestoreTestMixin, SimpleTestCase):
     def test_delete_by_wrong_owner_is_refused(self):
         self.assertFalse(self.logs.delete(self.log_a.id, "owner-b"))
         self.assertIsNotNone(self.logs.get_for_owner(self.log_a.id, "owner-a"))
+
+
+class PersonDeleteCascadeTests(FirestoreTestMixin, SimpleTestCase):
+    collections_to_purge = ["people"]
+
+    def test_delete_removes_contact_log_subcollection(self):
+        people = PersonRepository()
+        logs = ContactLogRepository()
+        person = people.create("owner-a", PERSON_DATA)
+        for day in (1, 2):
+            logs.create(
+                "owner-a",
+                person.id,
+                {"channel": "CALL", "contacted_at": f"2026-07-0{day}T12:00:00+00:00"},
+            )
+
+        self.assertTrue(people.delete(person.id, "owner-a"))
+
+        # Firestore leaves subcollections behind when a parent is deleted, so
+        # the repository must remove them itself.
+        remaining = (
+            fs.collection("people")
+            .document(person.id)
+            .collection("contact_logs")
+            .stream()
+        )
+        self.assertEqual(list(remaining), [])
+
+
+class ContactLogWriteTests(FirestoreTestMixin, SimpleTestCase):
+    collections_to_purge = ["people"]
+
+    def setUp(self):
+        super().setUp()
+        self.people = PersonRepository()
+        self.logs = ContactLogRepository()
+        self.person = self.people.create("owner-a", PERSON_DATA)
+        self.log = self.logs.create(
+            "owner-a",
+            self.person.id,
+            {
+                "channel": "CALL",
+                "contacted_at": "2026-07-01T12:00:00+00:00",
+                "note": "First",
+            },
+        )
+
+    def raw(self):
+        return (
+            fs.collection("people")
+            .document(self.person.id)
+            .collection("contact_logs")
+            .document(self.log.id)
+            .get()
+        )
+
+    def test_get_for_owner_returns_record(self):
+        record = self.logs.get_for_owner(self.log.id, "owner-a")
+        self.assertEqual(record.id, self.log.id)
+        self.assertEqual(record.person_id, self.person.id)
+        self.assertEqual(record.note, "First")
+
+    def test_get_unknown_id_returns_none(self):
+        self.assertIsNone(self.logs.get_for_owner("does-not-exist", "owner-a"))
+
+    def test_update_applies_changes(self):
+        updated = self.logs.update(
+            self.log.id, "owner-a", {"channel": "VIDEO", "note": "Edited"}
+        )
+
+        self.assertEqual(updated.channel, "VIDEO")
+        self.assertEqual(updated.note, "Edited")
+        self.assertEqual(updated.person_id, self.person.id)
+        self.assertEqual(self.raw().to_dict()["channel"], "VIDEO")
+
+    def test_update_ignores_non_writable_keys(self):
+        self.logs.update(
+            self.log.id,
+            "owner-a",
+            {"note": "Edited", "created_at": "1970-01-01", "person_id": "other"},
+        )
+
+        doc = self.raw().to_dict()
+        self.assertEqual(doc["note"], "Edited")
+        self.assertNotEqual(doc["created_at"], "1970-01-01")
+        self.assertNotIn("person_id", doc)
+
+    def test_update_with_nothing_writable_is_a_no_op(self):
+        # Firestore rejects an empty update, so this must short-circuit.
+        updated = self.logs.update(self.log.id, "owner-a", {"unknown": "x"})
+        self.assertEqual(updated.note, "First")
+        self.assertEqual(updated.channel, "CALL")
+
+    def test_update_unknown_id_returns_none(self):
+        self.assertIsNone(self.logs.update("does-not-exist", "owner-a", {"note": "x"}))
+
+    def test_delete_removes_document(self):
+        self.assertTrue(self.logs.delete(self.log.id, "owner-a"))
+        self.assertFalse(self.raw().exists)
+        self.assertIsNone(self.logs.get_for_owner(self.log.id, "owner-a"))
+
+    def test_delete_unknown_id_returns_false(self):
+        self.assertFalse(self.logs.delete("does-not-exist", "owner-a"))
+        self.assertTrue(self.raw().exists)
