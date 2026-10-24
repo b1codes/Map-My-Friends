@@ -26,7 +26,9 @@ dependencies = [
 dev = [
     # Remote debugger – used by VS Code's debugpy attach launch config.
     # Installed in the image; activated via docker-compose.debug.yml.
-    "debugpy>=1.8.0,<2.0.0"
+    "debugpy>=1.8.0,<2.0.0",
+    # Coverage measurement for the test suite (`make test-cov`).
+    "coverage>=7.6.0,<8.0.0",
 ]
 
 [build-system]
@@ -43,4 +45,27 @@ ignore = [
     # hooks as ClassVar would add noise without adding safety. Re-enable if the
     # codebase ever grows non-framework mutable class defaults worth catching.
     "RUF012",
+]
+
+[tool.coverage.run]
+source = ["apps", "config"]
+branch = true
+omit = [
+    # Tests measure the code, not themselves.
+    "*/tests.py",
+    "*/tests_*.py",
+    "*/tests/*",
+    "apps/common/testing.py",
+    "*/migrations/*",
+    # Server entry points: imported only by a WSGI/ASGI server, never by tests.
+    "config/asgi.py",
+    "config/wsgi.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
 ]

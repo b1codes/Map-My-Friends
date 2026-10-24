@@ -214,3 +214,8 @@ AGENTS.override.md
 .agents/skills/b1-edge-case.md
 .agents/skills/b1-reconcile.md
 .agents/.b1-snapshots/
+
+# Python coverage output (make test-cov)
+.coverage
+.coverage.*
+htmlcov/

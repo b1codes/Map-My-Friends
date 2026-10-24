@@ -41,6 +41,13 @@ ui:
 test:
 	docker compose exec api python manage.py test 2>&1 | tee .gemini/last_test_results.txt
 
+# Backend tests under coverage. Scope and exclusions live in
+# backend/pyproject.toml ([tool.coverage.*]); html lands in backend/htmlcov/.
+test-cov:
+	docker compose exec api coverage run manage.py test
+	docker compose exec api coverage report
+	docker compose exec api coverage html
+
 # Poetry helpers
 install:
 	docker compose exec api poetry install
