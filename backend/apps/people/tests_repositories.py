@@ -317,3 +317,48 @@ class ContactLogWriteTests(FirestoreTestMixin, SimpleTestCase):
     def test_delete_unknown_id_returns_false(self):
         self.assertFalse(self.logs.delete("does-not-exist", "owner-a"))
         self.assertTrue(self.raw().exists)
+
+
+class InvalidIdTests(FirestoreTestMixin, SimpleTestCase):
+    """Ids Firestore cannot address directly are treated as not found."""
+
+    collections_to_purge = ["people"]
+    INVALID_IDS = ("", "x/y", ".", "..", "__x__")
+
+    def setUp(self):
+        super().setUp()
+        self.people = PersonRepository()
+        self.logs = ContactLogRepository()
+
+    def test_person_methods_report_not_found(self):
+        for person_id in self.INVALID_IDS:
+            with self.subTest(person_id):
+                self.assertIsNone(self.people.get_for_owner(person_id, "owner-a"))
+                self.assertIsNone(
+                    self.people.update(person_id, "owner-a", {"first_name": "X"})
+                )
+                self.assertFalse(self.people.delete(person_id, "owner-a"))
+
+    def test_contact_log_methods_report_not_found(self):
+        log = {"channel": "CALL", "contacted_at": "2026-07-01T12:00:00+00:00"}
+        for person_id in self.INVALID_IDS:
+            with self.subTest(person_id):
+                self.assertIsNone(self.logs.create("owner-a", person_id, log))
+                self.assertEqual(
+                    self.logs.list_for_owner("owner-a", person_id=person_id), []
+                )
+
+    def test_nested_path_cannot_reach_a_contact_log_document(self):
+        # "people/{id}/contact_logs/{log}" is a valid document path; it must
+        # not be accepted as a person id.
+        person = self.people.create(None, PERSON_DATA)
+        log = self.logs.create(
+            None,
+            person.id,
+            {"channel": "CALL", "contacted_at": "2026-07-01T12:00:00+00:00"},
+        )
+        nested = f"{person.id}/contact_logs/{log.id}"
+        self.assertIsNone(self.people.get_for_owner(nested, None))
+        self.assertIsNone(
+            self.logs.create(None, nested, {"channel": "CALL", "contacted_at": "x"})
+        )

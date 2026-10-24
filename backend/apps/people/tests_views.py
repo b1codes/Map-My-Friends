@@ -11,6 +11,7 @@ import tempfile
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
@@ -19,6 +20,7 @@ from rest_framework.test import APITestCase
 from apps.common import firestore as fs
 from apps.common.testing import FirestoreTestMixin, ThrottleIsolationMixin
 from apps.people.repositories import ContactLogRepository, PersonRepository
+from apps.people.services import GeocodingUnavailable
 
 LONDON = (51.5074, -0.1278, "Europe/London")
 PARIS = (48.8566, 2.3522, "Europe/Paris")
@@ -440,6 +442,85 @@ class PersonDestroyTests(PersonTestCase):
         response = self.client.delete(f"/api/people/{person.id}/")
         self.assertEqual(response.status_code, 401)
         self.assertTrue(stored(person.id).exists)
+
+
+class PersonGeocodingFailureTests(PersonTestCase):
+    """geocode_address raises Django's ValidationError, which DRF does not
+    handle; unmapped, both failure modes used to surface as a 500."""
+
+    NOT_FOUND = ValidationError("Could not geocode address: Nowhere")
+    OUTAGE = GeocodingUnavailable(
+        "Geocoding service unavailable. Please try again later."
+    )
+
+    def setUp(self):
+        super().setUp()
+        self.person = self.people.create("owner-a", SEEDED_PERSON)
+        self.url = f"/api/people/{self.person.id}/"
+        self.client.force_authenticate(user=self.user)
+
+    def write(self, method, side_effect):
+        requests = {
+            "create": lambda: self.client.post(
+                "/api/people/", PERSON_PAYLOAD, format="json"
+            ),
+            "patch": lambda: self.client.patch(
+                self.url, {"city": "Nowhere"}, format="json"
+            ),
+        }
+        with patch("apps.people.views.geocode_address", side_effect=side_effect):
+            return requests[method]()
+
+    def assert_nothing_written(self):
+        self.assertEqual(
+            [p.id for p in self.people.list_for_owner("owner-a")], [self.person.id]
+        )
+        self.assertEqual(stored(self.person.id).to_dict()["city"], "London")
+
+    def test_unresolvable_address_is_400(self):
+        for method in ("create", "patch"):
+            with self.subTest(method):
+                response = self.write(method, self.NOT_FOUND)
+
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(
+                    response.data,
+                    {"non_field_errors": ["Could not geocode address: Nowhere"]},
+                )
+                self.assert_nothing_written()
+
+    def test_geocoder_outage_is_503(self):
+        for method in ("create", "patch"):
+            with self.subTest(method):
+                response = self.write(method, self.OUTAGE)
+
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(
+                    response.data,
+                    {"error": "Geocoding service unavailable. Please try again later."},
+                )
+                self.assert_nothing_written()
+
+
+@patch("apps.people.views.geocode_address", return_value=LONDON)
+class PersonReservedIdTests(PersonTestCase):
+    """The router keeps "/" and "." out of URL ids, but not Firestore-reserved
+    __names__, which Firestore rejects outright rather than reporting missing."""
+
+    def test_reserved_ids_are_404(self, _geocode):
+        self.client.force_authenticate(user=self.user)
+        url = "/api/people/__reserved__/"
+        requests = {
+            "retrieve": lambda: self.client.get(url),
+            "update": lambda: self.client.put(url, PERSON_PAYLOAD, format="json"),
+            "partial_update": lambda: self.client.patch(
+                url, {"first_name": "X"}, format="json"
+            ),
+            "destroy": lambda: self.client.delete(url),
+        }
+        for action, request in requests.items():
+            with self.subTest(action):
+                self.assertEqual(request().status_code, 404)
 
 
 @patch("apps.people.views.geocode_address", return_value=LONDON)

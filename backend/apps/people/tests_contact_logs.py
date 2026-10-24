@@ -84,6 +84,23 @@ class ContactLogListTests(ContactLogTestCase):
 
         self.assertEqual([log["id"] for log in response.data], [ada_log.id])
 
+    def test_blank_person_filter_is_ignored(self):
+        # A blank filter used to reach Firestore as an empty document id (500).
+        log = self.seed_log(self.ada, contacted_at="2026-07-01T09:00:00+00:00")
+
+        response = self.client.get("/api/contact-logs/", {"person": ""})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([entry["id"] for entry in response.data], [log.id])
+
+    def test_person_filter_with_invalid_id_is_empty(self):
+        self.seed_log(self.ada, contacted_at="2026-07-01T09:00:00+00:00")
+        for person_id in ("x/y", f"{self.ada.id}/contact_logs/z", ".", "__x__"):
+            with self.subTest(person_id):
+                response = self.client.get("/api/contact-logs/", {"person": person_id})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data, [])
+
     def test_person_filter_for_unknown_person_is_empty(self):
         self.seed_log(self.ada, contacted_at="2026-07-01T09:00:00+00:00")
         response = self.client.get("/api/contact-logs/", {"person": "nobody"})
@@ -179,6 +196,21 @@ class ContactLogCreateTests(ContactLogTestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data, {"person": ["Invalid person."]})
+
+    def test_invalid_person_id_is_400(self):
+        # A "/" used to be passed straight into a document path (500), and
+        # Firestore rejects "." and reserved __names__ outright.
+        for person_id in ("x/y", f"{self.ada.id}/contact_logs/z", ".", "..", "__x__"):
+            with self.subTest(person_id):
+                response = self.client.post(
+                    "/api/contact-logs/",
+                    {**LOG_PAYLOAD, "person": person_id},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.data, {"person": ["Invalid person."]})
+
+        self.assertEqual(self.logs.list_for_owner("owner-a"), [])
 
     def test_invalid_payloads_are_400_and_write_nothing(self):
         valid = {**LOG_PAYLOAD, "person": self.ada.id}
