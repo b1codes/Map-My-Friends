@@ -40,6 +40,10 @@ import '../../components/shared/chromatic_pulse.dart';
 const double _kChromeInset = 16.0;
 const double _kCompassTopOffset = 72.0;
 const double _kCameraFitPadding = 50.0;
+// Caps every bounds fit. Points that coincide (two friends in one city, a
+// friend visited twice) give zero-area bounds, which would otherwise fit to
+// an infinite zoom.
+const double _kCameraFitMaxZoom = 16.0;
 const double _kFallbackLat = 37.7749;
 const double _kFallbackLon = -122.4194;
 const double _kInitialZoom = 13.0;
@@ -145,6 +149,7 @@ class _MapScreenState extends State<MapScreen> {
                       CameraFit.bounds(
                         bounds: bounds,
                         padding: const EdgeInsets.all(_kCameraFitPadding),
+                        maxZoom: _kCameraFitMaxZoom,
                       ),
                     );
                   }
@@ -616,8 +621,10 @@ class _MapScreenState extends State<MapScreen> {
                                                               .bounds,
                                                           padding:
                                                               const EdgeInsets.all(
-                                                                50,
+                                                                _kCameraFitPadding,
                                                               ),
+                                                          maxZoom:
+                                                              _kCameraFitMaxZoom,
                                                         ),
                                                       );
                                                     },

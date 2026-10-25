@@ -569,8 +569,8 @@ void main() {
   group('clusters', () {
     testWidgets('tapping a cluster lists everything in it, and Zoom to Area '
         'fits the camera to it', (tester) async {
-      // Close enough to cluster at zoom 5, but not on one point: fitting the
-      // camera to a zero-area cluster is a separate, known crash.
+      // Close enough to cluster at zoom 5, but spread out, so the fit zooms
+      // to the bounds rather than the max-zoom cap.
       final ann = _person('1', 'Ann', 'Lee', lat: 37.77, lon: -122.42);
       final bob = _person('2', 'Bob', 'Ray', lat: 37.80, lon: -122.27);
       final sfo = _airport('SFO', 'large_airport', lat: 37.62, lon: -122.38);
@@ -617,6 +617,33 @@ void main() {
         ).camera.visibleBounds.contains(const LatLng(37.80, -122.27)),
         isTrue,
       );
+    });
+
+    // Regression: people whose addresses geocode to the same city share one
+    // point, so the cluster's bounds have zero area and fitting the camera
+    // to them asked for an infinite zoom (an assertion in debug builds).
+    testWidgets('Zoom to Area on members at one point centres at a finite '
+        'zoom', (tester) async {
+      when(() => peopleBloc.state).thenReturn(
+        PeopleLoaded([_person('1', 'Ann', 'Lee'), _person('2', 'Bob', 'Ray')]),
+      );
+      await pumpMap(tester, size: const Size(1200, 1600));
+      await _moveCamera(tester, const LatLng(30, -110), 5);
+      await tester.tap(
+        find.bySemanticsLabel('Friend: Ann Lee'),
+        warnIfMissed: false,
+      );
+      await _settle(tester);
+      expect(find.text('2 Items Here'), findsOneWidget);
+
+      await tester.tap(find.text('Zoom to Area'));
+      await _settle(tester);
+
+      expect(tester.takeException(), isNull);
+      final camera = controller(tester).camera;
+      expect(camera.zoom.isFinite, isTrue);
+      expect(camera.center.latitude, closeTo(37.7749, 1e-3));
+      expect(camera.center.longitude, closeTo(-122.4194, 1e-3));
     });
 
     testWidgets('a cluster of more than four shows three avatars and a +N', (
@@ -749,6 +776,33 @@ void main() {
       final bounds = controller(tester).camera.visibleBounds;
       expect(bounds.contains(const LatLng(40, -74)), isTrue);
       expect(bounds.contains(const LatLng(34, -118)), isTrue);
+    });
+
+    // Regression: two stops at one place (e.g. visiting the same friend
+    // twice) have zero-area bounds, and fitting them asked for infinite zoom.
+    testWidgets('several stops at one place centre there at a finite zoom', (
+      tester,
+    ) async {
+      final states = StreamController<TripState>();
+      addTearDown(states.close);
+      whenListen(tripBloc, states.stream, initialState: const TripState());
+      await pumpMap(tester);
+
+      states.add(
+        TripState(
+          stops: [
+            personStop(0, const LatLng(40, -74)),
+            personStop(1, const LatLng(40, -74)),
+          ],
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(tester.takeException(), isNull);
+      final camera = controller(tester).camera;
+      expect(camera.zoom.isFinite, isTrue);
+      expect(camera.center.latitude, closeTo(40, 1e-6));
+      expect(camera.center.longitude, closeTo(-74, 1e-6));
     });
 
     testWidgets('does not move the camera while the trip is being optimised', (
