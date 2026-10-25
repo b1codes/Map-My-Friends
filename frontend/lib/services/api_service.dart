@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:image_picker/image_picker.dart';
 import '../models/person.dart';
 import '../models/contact_log.dart';
@@ -11,7 +12,7 @@ import 'auth_service.dart';
 
 class ApiService {
   late final Dio _dio;
-  final AuthService _authService = AuthService();
+  final AuthService _authService;
 
   // Singleton pattern
   static final ApiService _instance = ApiService._internal();
@@ -20,16 +21,27 @@ class ApiService {
     return _instance;
   }
 
+  /// A non-singleton instance for tests: [dio] carries a fake HTTP adapter,
+  /// and the auth interceptor is attached to it exactly as in production.
+  @visibleForTesting
+  factory ApiService.forTesting({
+    required Dio dio,
+    required AuthService authService,
+  }) => ApiService._internal(dio: dio, authService: authService);
+
   Dio get dio => _dio;
 
-  ApiService._internal() {
-    _dio = Dio(
-      BaseOptions(
-        baseUrl: ApiConfig.baseUrl,
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 3),
-      ),
-    );
+  ApiService._internal({Dio? dio, AuthService? authService})
+    : _authService = authService ?? AuthService() {
+    _dio =
+        dio ??
+        Dio(
+          BaseOptions(
+            baseUrl: ApiConfig.baseUrl,
+            connectTimeout: const Duration(seconds: 5),
+            receiveTimeout: const Duration(seconds: 3),
+          ),
+        );
 
     // Add auth interceptor
     _dio.interceptors.add(

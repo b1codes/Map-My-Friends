@@ -4,9 +4,11 @@ import 'station_event.dart';
 import 'station_state.dart';
 
 class StationBloc extends Bloc<StationEvent, StationState> {
-  final StationService _stationService = StationService();
+  final StationService _stationService;
 
-  StationBloc() : super(StationInitial()) {
+  StationBloc({StationService? stationService})
+    : _stationService = stationService ?? StationService(),
+      super(StationInitial()) {
     on<LoadMapStations>(_onLoadMapStations);
     on<FetchNearestStations>(_onFetchNearestStations);
   }
