@@ -122,16 +122,17 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
         widget.person!.longitude!,
       );
 
+      // The user may have left the form while the hubs were loading.
+      if (!mounted) return;
       setState(() {
         _nearbyAirports = airports;
         _nearbyStations = stations;
         _isLoadingHubs = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoadingHubs = false);
-      if (mounted) {
-        GlassToast.show(context, 'Failed to load hubs: $e');
-      }
+      GlassToast.show(context, 'Failed to load hubs: $e');
     }
   }
 

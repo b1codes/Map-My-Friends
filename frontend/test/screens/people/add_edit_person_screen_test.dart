@@ -707,6 +707,34 @@ void main() {
       expect(find.text('Refresh Nearby Hubs'), findsOneWidget);
     });
 
+    // Regression: neither setState after the hub fetch checked `mounted`, so
+    // going Back before the hubs arrived threw "setState() called after
+    // dispose()" whether the fetch then succeeded or failed.
+    for (final outcome in ['succeeds', 'fails']) {
+      testWidgets('leaving before the hub load $outcome does not throw', (
+        tester,
+      ) async {
+        final airports = Completer<List<Airport>>();
+        when(
+          () => api.getNearestAirports(any(), any()),
+        ).thenAnswer((_) => airports.future);
+        await pumpForm(tester, person: _existing);
+
+        await tester.tap(find.byTooltip('Back'));
+        await _settle(tester);
+        expect(find.byType(AddEditPersonScreen), findsNothing);
+
+        if (outcome == 'succeeds') {
+          airports.complete([_pdx]);
+        } else {
+          airports.completeError(Exception('offline'));
+        }
+        await _settle(tester);
+
+        expect(tester.takeException(), isNull);
+      });
+    }
+
     testWidgets('a failed load is reported and the form stays usable', (
       tester,
     ) async {
