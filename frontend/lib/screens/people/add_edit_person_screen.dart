@@ -27,7 +27,11 @@ import '../../components/shared/glass_header.dart';
 class AddEditPersonScreen extends StatefulWidget {
   final Person? person;
 
-  const AddEditPersonScreen({super.key, this.person});
+  /// Loads the nearby hubs. Defaults to the app's shared [ApiService]; tests
+  /// pass a fake.
+  final ApiService? apiService;
+
+  const AddEditPersonScreen({super.key, this.person, this.apiService});
 
   @override
   State<AddEditPersonScreen> createState() => _AddEditPersonScreenState();
@@ -108,7 +112,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
 
     setState(() => _isLoadingHubs = true);
     try {
-      final apiService = ApiService();
+      final apiService = widget.apiService ?? ApiService();
       final airports = await apiService.getNearestAirports(
         widget.person!.latitude!,
         widget.person!.longitude!,

@@ -14,7 +14,11 @@ import '../../components/shared/glass_surfaces.dart';
 class TripDetailsScreen extends StatefulWidget {
   final Trip trip;
 
-  const TripDetailsScreen({super.key, required this.trip});
+  /// Draws the route line. Defaults to a fresh [RoutingService]; tests pass a
+  /// fake.
+  final RoutingService? routingService;
+
+  const TripDetailsScreen({super.key, required this.trip, this.routingService});
 
   @override
   State<TripDetailsScreen> createState() => _TripDetailsScreenState();
@@ -22,7 +26,8 @@ class TripDetailsScreen extends StatefulWidget {
 
 class _TripDetailsScreenState extends State<TripDetailsScreen> {
   late Future<List<LatLng>> _routeFuture;
-  final RoutingService _routingService = RoutingService();
+  late final RoutingService _routingService =
+      widget.routingService ?? RoutingService();
 
   @override
   void initState() {
