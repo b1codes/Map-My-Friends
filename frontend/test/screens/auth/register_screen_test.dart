@@ -138,4 +138,255 @@ void main() {
       await controller.close();
     });
   });
+
+  group('RegisterScreen payload, toggles and navigation', () {
+    Finder field(String label) => find.widgetWithText(TextFormField, label);
+    final createButton = find.widgetWithText(FilledButton, 'Create Account');
+
+    Future<void> submit(WidgetTester tester) async {
+      await tester.ensureVisible(createButton);
+      await tester.tap(createButton);
+      await tester.pump();
+    }
+
+    Future<void> fillRequired(WidgetTester tester) async {
+      await tester.enterText(field('Username *'), '  ada  ');
+      await tester.enterText(field('Email *'), 'ada@example.com');
+      await tester.enterText(field('Password *'), 'password123');
+      await tester.enterText(field('Confirm Password *'), 'password123');
+    }
+
+    // The honeypot reuses the "First Name" label on purpose, so the real
+    // field is the first match and the trap is the last.
+    Finder realFirstName() => field('First Name').first;
+    Finder honeypot() => field('First Name').last;
+
+    /// Pushes the screen over a host page, as the login screen does, so the
+    /// pops it performs have somewhere to land.
+    Future<StreamController<AuthState>> pumpPushed(WidgetTester tester) async {
+      final controller = StreamController<AuthState>.broadcast();
+      addTearDown(controller.close);
+      when(() => authBloc.stream).thenAnswer((_) => controller.stream);
+      await tester.pumpWidget(
+        BlocProvider<AuthBloc>.value(
+          value: authBloc,
+          child: MaterialApp(
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(disableAnimations: true),
+              child: child!,
+            ),
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                    ),
+                    child: const Text('host'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('host'));
+      await tester.pumpAndSettle();
+      expect(find.byType(RegisterScreen), findsOneWidget);
+      return controller;
+    }
+
+    testWidgets('rejects a username shorter than three characters', (
+      tester,
+    ) async {
+      await tester.pumpWidget(createWidgetUnderTest());
+
+      await tester.enterText(field('Username *'), 'ab');
+      await submit(tester);
+
+      expect(
+        find.text('Username must be at least 3 characters'),
+        findsOneWidget,
+      );
+      verifyNever(() => authBloc.add(any()));
+    });
+
+    testWidgets('rejects a password shorter than eight characters', (
+      tester,
+    ) async {
+      await tester.pumpWidget(createWidgetUnderTest());
+
+      await tester.enterText(field('Password *'), 'short');
+      await tester.enterText(field('Confirm Password *'), 'short');
+      await submit(tester);
+
+      expect(
+        find.text('Password must be at least 8 characters'),
+        findsOneWidget,
+      );
+      verifyNever(() => authBloc.add(any()));
+    });
+
+    testWidgets('sends a trimmed username and null for blank names', (
+      tester,
+    ) async {
+      await tester.pumpWidget(createWidgetUnderTest());
+
+      await fillRequired(tester);
+      await tester.enterText(realFirstName(), '   ');
+      await submit(tester);
+
+      verify(
+        () => authBloc.add(
+          const RegisterRequested(
+            username: 'ada',
+            email: 'ada@example.com',
+            password: 'password123',
+            passwordConfirm: 'password123',
+            firstName: null,
+            lastName: null,
+            firstNameHp: '',
+          ),
+        ),
+      ).called(1);
+    });
+
+    testWidgets('sends trimmed first and last names when given', (
+      tester,
+    ) async {
+      await tester.pumpWidget(createWidgetUnderTest());
+
+      await fillRequired(tester);
+      await tester.enterText(realFirstName(), ' Ada ');
+      await tester.enterText(field('Last Name'), ' Lovelace ');
+      await submit(tester);
+
+      final event =
+          verify(
+                () => authBloc.add(captureAny(that: isA<RegisterRequested>())),
+              ).captured.single
+              as RegisterRequested;
+      expect(event.firstName, 'Ada');
+      expect(event.lastName, 'Lovelace');
+    });
+
+    testWidgets('forwards whatever a bot typed into the honeypot', (
+      tester,
+    ) async {
+      await tester.pumpWidget(createWidgetUnderTest());
+
+      await fillRequired(tester);
+      // A bot fills fields programmatically; a person can never focus it.
+      tester.widget<TextFormField>(honeypot()).controller!.text = 'botty';
+      await submit(tester);
+
+      final event =
+          verify(
+                () => authBloc.add(captureAny(that: isA<RegisterRequested>())),
+              ).captured.single
+              as RegisterRequested;
+      expect(event.firstNameHp, 'botty');
+      expect(event.firstName, isNull);
+    });
+
+    testWidgets('the done action on Confirm Password submits', (tester) async {
+      await tester.pumpWidget(createWidgetUnderTest());
+
+      await fillRequired(tester);
+      await tester.showKeyboard(field('Confirm Password *'));
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      verify(() => authBloc.add(any(that: isA<RegisterRequested>()))).called(1);
+    });
+
+    testWidgets('each eye toggle reveals only its own field', (tester) async {
+      await tester.pumpWidget(createWidgetUnderTest());
+
+      bool obscured(String label) => tester
+          .widget<EditableText>(
+            find.descendant(
+              of: field(label),
+              matching: find.byType(EditableText),
+            ),
+          )
+          .obscureText;
+
+      expect(obscured('Password *'), isTrue);
+      expect(obscured('Confirm Password *'), isTrue);
+
+      await tester.tap(find.byTooltip('Show password'));
+      await tester.pump();
+      expect(obscured('Password *'), isFalse);
+      expect(obscured('Confirm Password *'), isTrue);
+      expect(find.byTooltip('Hide password'), findsOneWidget);
+
+      await tester.ensureVisible(find.byTooltip('Show confirm password'));
+      await tester.tap(find.byTooltip('Show confirm password'));
+      await tester.pump();
+      expect(obscured('Confirm Password *'), isFalse);
+      expect(find.byTooltip('Hide confirm password'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Hide password'));
+      await tester.tap(find.byTooltip('Hide confirm password'));
+      await tester.pump();
+      expect(obscured('Password *'), isTrue);
+      expect(obscured('Confirm Password *'), isTrue);
+    });
+
+    testWidgets('while AuthLoading the submit is disabled', (tester) async {
+      when(() => authBloc.state).thenReturn(AuthLoading());
+      await tester.pumpWidget(createWidgetUnderTest());
+
+      // The header still reads "Create Account"; the button no longer does.
+      expect(createButton, findsNothing);
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNull,
+      );
+      await tester.tap(find.byType(FilledButton), warnIfMissed: false);
+      await tester.pump();
+      verifyNever(() => authBloc.add(any()));
+    });
+
+    testWidgets('RegistrationSuccess shows its message and returns to login', (
+      tester,
+    ) async {
+      final states = await pumpPushed(tester);
+
+      states.add(const RegistrationSuccess());
+      await tester.pumpAndSettle();
+
+      expect(find.byType(RegisterScreen), findsNothing);
+      expect(find.text('host'), findsOneWidget);
+      expect(
+        find.text('Registration successful! Please login.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('AuthError keeps the user on the form', (tester) async {
+      final states = await pumpPushed(tester);
+
+      states.add(const AuthError(message: 'Username taken'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(RegisterScreen), findsOneWidget);
+      expect(find.text('Username taken'), findsOneWidget);
+      expect(find.byIcon(Icons.error_outline), findsOneWidget);
+    });
+
+    testWidgets('Sign In returns to the previous screen', (tester) async {
+      await pumpPushed(tester);
+
+      final signIn = find.widgetWithText(TextButton, 'Sign In');
+      await tester.ensureVisible(signIn);
+      await tester.tap(signIn);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(RegisterScreen), findsNothing);
+      verifyNever(() => authBloc.add(any()));
+    });
+  });
 }

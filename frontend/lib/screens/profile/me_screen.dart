@@ -26,7 +26,11 @@ import '../../components/shared/glass_surfaces.dart';
 import '../../components/shared/glass_header.dart';
 
 class MeScreen extends StatefulWidget {
-  const MeScreen({super.key});
+  /// Injectable picker. Production leaves this null and gets the platform
+  /// [ImagePicker]; tests pass a fake, since the real one is a native plugin.
+  final ImagePicker? imagePicker;
+
+  const MeScreen({super.key, this.imagePicker});
 
   @override
   State<MeScreen> createState() => _MeScreenState();
@@ -42,7 +46,7 @@ class _MeScreenState extends State<MeScreen> {
   final _lastNameController = TextEditingController();
   final _phoneNumberController = TextEditingController();
   final _birthDateController = TextEditingController();
-  final _imagePicker = ImagePicker();
+  late final ImagePicker _imagePicker = widget.imagePicker ?? ImagePicker();
   Uint8List?
   _localImageBytes; // For showing local image immediately after picking
 
