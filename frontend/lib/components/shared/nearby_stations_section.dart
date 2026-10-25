@@ -22,7 +22,14 @@ class NearbyStationsSection extends StatefulWidget {
     super.key,
     required this.latitude,
     required this.longitude,
+    this.createBloc,
   });
+
+  /// Builds the section's own bloc when no [NearbyBlocs] is provided.
+  /// Defaults to a production [StationBloc]; a test passes a fake to drive the
+  /// own-bloc path without the network.
+  @visibleForTesting
+  final StationBloc Function()? createBloc;
 
   @override
   State<NearbyStationsSection> createState() => _NearbyStationsSectionState();
@@ -34,7 +41,7 @@ class _NearbyStationsSectionState extends State<NearbyStationsSection> {
 
   StationBloc _createOwnBloc() {
     // A separate bloc instance from the map's, for the nearest stations
-    final bloc = StationBloc();
+    final bloc = widget.createBloc?.call() ?? StationBloc();
     _load(bloc);
     return bloc;
   }

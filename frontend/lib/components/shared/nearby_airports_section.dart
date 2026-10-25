@@ -22,7 +22,14 @@ class NearbyAirportsSection extends StatefulWidget {
     super.key,
     required this.latitude,
     required this.longitude,
+    this.createBloc,
   });
+
+  /// Builds the section's own bloc when no [NearbyBlocs] is provided.
+  /// Defaults to a production [AirportBloc]; a test passes a fake to drive the
+  /// own-bloc path without the network.
+  @visibleForTesting
+  final AirportBloc Function()? createBloc;
 
   @override
   State<NearbyAirportsSection> createState() => _NearbyAirportsSectionState();
@@ -34,7 +41,7 @@ class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
 
   AirportBloc _createOwnBloc() {
     // A separate bloc instance from the map's, for the nearest airports
-    final bloc = AirportBloc();
+    final bloc = widget.createBloc?.call() ?? AirportBloc();
     _load(bloc);
     return bloc;
   }
