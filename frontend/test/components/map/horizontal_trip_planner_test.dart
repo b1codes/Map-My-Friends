@@ -244,6 +244,40 @@ void main() {
       expect(find.text('D'), findsNothing);
     });
 
+    // Regression: the avatar initial was `firstName[0]`, which threw a
+    // RangeError for a traveller with no first name (the form requires one,
+    // but server data doesn't).
+    testWidgets('a traveller without a first name gets a last-name initial', (
+      tester,
+    ) async {
+      final noFirst = Person(
+        id: 'n',
+        firstName: '',
+        lastName: 'Ng',
+        relationshipTag: 'Friend',
+        city: 'NY',
+        state: 'NY',
+        country: 'USA',
+      );
+      await pumpPlanner(tester, [
+        TripStop(
+          location: const LatLng(0, 0),
+          sequenceOrder: 0,
+          airport: sfo,
+          people: [noFirst],
+        ),
+      ]);
+
+      expect(tester.takeException(), isNull);
+      expect(
+        find.descendant(
+          of: find.byType(CircleAvatar),
+          matching: find.text('N'),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('a station stop shows its name and a train', (tester) async {
       await pumpPlanner(tester, [
         TripStop(

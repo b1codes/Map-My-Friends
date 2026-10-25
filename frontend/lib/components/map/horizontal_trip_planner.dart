@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../bloc/trip/trip_bloc.dart';
 import '../../bloc/trip/trip_event.dart';
 import '../../bloc/trip/trip_state.dart';
+import '../../models/person.dart';
 import '../../models/trip.dart';
 import '../../utils/app_theme.dart';
 import '../shared/glass_container.dart';
@@ -166,7 +167,7 @@ class HorizontalTripPlanner extends StatelessWidget {
                                             : null,
                                         child: p.profileImageUrl == null
                                             ? Text(
-                                                p.firstName[0],
+                                                _initialOf(p),
                                                 style: const TextStyle(
                                                   fontSize: 8,
                                                 ),
@@ -262,4 +263,12 @@ class _ActionGroup extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The avatar letter for [p]: their first initial, else their last, else
+/// nothing. Names come from the server, so either may be empty.
+String _initialOf(Person p) {
+  if (p.firstName.isNotEmpty) return p.firstName[0];
+  if (p.lastName.isNotEmpty) return p.lastName[0];
+  return '';
 }
