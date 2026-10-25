@@ -26,6 +26,34 @@ void main() {
       expect(mapSettingsCubit.state, const MapSettingsState());
     });
 
+    // Regression: the saved indexes were used unchecked, so a value from an
+    // older or newer build (an enum gained or lost a case) threw a RangeError
+    // in the constructor and the app could not start.
+    for (final saved in [99, -1]) {
+      test(
+        'falls back to defaults when saved enum indexes are $saved',
+        () async {
+          SharedPreferences.setMockInitialValues({
+            'map_show_controls': false,
+            'map_type': saved,
+            'map_theme_mode': saved,
+            'map_airport_filter': saved,
+            'map_station_filter': saved,
+            'map_distance_unit': saved,
+          });
+          final prefs = await SharedPreferences.getInstance();
+
+          final cubit = MapSettingsCubit(prefs: prefs);
+          addTearDown(cubit.close);
+
+          expect(
+            cubit.state,
+            const MapSettingsState().copyWith(showControls: false),
+          );
+        },
+      );
+    }
+
     test('initial state loads values from prefs', () async {
       SharedPreferences.setMockInitialValues({
         'map_show_controls': false,
