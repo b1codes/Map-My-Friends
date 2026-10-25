@@ -219,3 +219,6 @@ AGENTS.override.md
 .coverage
 .coverage.*
 htmlcov/
+
+# FVM: per-project Flutter SDK link (the pinned version lives in .fvmrc)
+.fvm/

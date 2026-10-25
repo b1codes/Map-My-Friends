@@ -7,5 +7,6 @@
     "python.terminal.activateEnvInCurrentTerminal": true,
     "python.analysis.typeCheckingMode": "basic",
     "python.analysis.importFormat": "absolute",
-    "cmake.ignoreCMakeListsMissing": true
+    "cmake.ignoreCMakeListsMissing": true,
+    "dart.flutterSdkPath": ".fvm/versions/3.41.7"
 }

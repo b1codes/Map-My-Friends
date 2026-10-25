@@ -59,8 +59,9 @@ jobs:
           # Floating on latest stable meant CI and the production web build
           # used a Flutter nobody had run: it broke version solving on the
           # exact intl pin, and dart format disagreed with local output.
-          # Bump this deliberately, together with the team's SDK.
-          flutter-version: '3.41.7'
+          # The pin lives in .fvmrc so local (fvm) and CI read one value;
+          # bump it with `fvm use <version>` at the repo root.
+          flutter-version-file: ${{ github.workspace }}/.fvmrc
           cache: true
 
       - name: Install Dependencies

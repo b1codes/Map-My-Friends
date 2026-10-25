@@ -63,7 +63,7 @@ graph TD
 ## 🛠 Prerequisites
 
 1.  **Docker Desktop:** Required to run the backend and database.
-2.  **Flutter SDK:** Required for running the mobile app locally.
+2.  **Flutter SDK, via [FVM](https://fvm.app):** The project pins its Flutter version in `.fvmrc`, and CI reads the same file. Install FVM (`brew tap leoafarias/fvm && brew install fvm`), then run `fvm install` at the repo root and prefix Flutter commands with `fvm` (e.g. `fvm flutter test`).
 3.  **Git:** To clone the repo.
 
 ---
@@ -98,11 +98,12 @@ Open a **new terminal** tab (leave Docker running in the first one).
 ```bash
 cd frontend
 
-# 1. Install Dart dependencies
-flutter pub get
+# 1. Install the pinned Flutter SDK (reads ../.fvmrc) and Dart dependencies
+fvm install
+fvm flutter pub get
 
 # 2. Run the App (Select your Simulator/Emulator)
-flutter run
+fvm flutter run
 ```
 
 #### DEV sign-in (local only)
