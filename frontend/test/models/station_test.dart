@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:map_my_friends/models/station.dart';
 
@@ -39,7 +41,31 @@ void main() {
     });
   });
 
+  // Regression: latitude/longitude were assigned straight into double fields,
+  // so a whole-number coordinate (decoded by Dart as an int) threw.
+  test('Station.fromJson accepts whole-number coordinates', () {
+    final s = Station.fromJson(
+      jsonDecode(
+            '{"name": "Union", "osm_id": 1, "latitude": 41, "longitude": -87}',
+          )
+          as Map<String, dynamic>,
+    );
+    expect(s.latitude, 41.0);
+    expect(s.longitude, -87.0);
+  });
+
   group('Station.fromGeoJson (backend nearest endpoint)', () {
+    // Regression: Airport and Person fall back to 0,0 without a geometry;
+    // Station cast the missing geometry and threw.
+    test('tolerates a missing geometry like Airport and Person do', () {
+      final s = Station.fromGeoJson({
+        'properties': {'name': 'Union', 'osm_id': 1},
+      });
+      expect(s.name, 'Union');
+      expect(s.latitude, 0.0);
+      expect(s.longitude, 0.0);
+    });
+
     test('reads properties and [lng, lat] coordinates', () {
       final s = Station.fromGeoJson({
         'id': 11,

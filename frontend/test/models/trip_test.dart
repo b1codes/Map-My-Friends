@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:map_my_friends/models/trip.dart';
@@ -99,6 +101,20 @@ void main() {
       expect(stop.location, const LatLng(41.8781, -87.6298));
       expect(stop.snapshotAddress, 'Chicago, IL');
       expect(stop.snapshotMetadata, {'note': 'hi'});
+    });
+
+    // Regression: coordinates were cast `as double`, but JSON has one number
+    // type and Dart decodes `41` as an int. The web build serialises 41.0 as
+    // `41`, so one whole-degree stop made the whole trips list fail to load.
+    test('accepts whole-number coordinates', () {
+      final stop = TripStop.fromJson(
+        jsonDecode(
+              '{"sequence_order": 0, '
+              '"location": {"type": "Point", "coordinates": [-87, 41]}}',
+            )
+            as Map<String, dynamic>,
+      );
+      expect(stop.location, const LatLng(41.0, -87.0));
     });
 
     test('falls back to the legacy single person_detail', () {

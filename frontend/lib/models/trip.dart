@@ -100,7 +100,12 @@ class TripStop extends Equatable {
       station: json['station_detail'] != null
           ? Station.fromGeoJson(json['station_detail'])
           : null,
-      location: LatLng(coordinates[1] as double, coordinates[0] as double),
+      // GeoJSON Point is [longitude, latitude]; JSON has one number type, so
+      // a whole-degree value decodes as int.
+      location: LatLng(
+        (coordinates[1] as num).toDouble(),
+        (coordinates[0] as num).toDouble(),
+      ),
       sequenceOrder: json['sequence_order'] as int,
       snapshotAddress: json['snapshot_address'] as String?,
       snapshotMetadata: json['snapshot_metadata'] as Map<String, dynamic>?,
