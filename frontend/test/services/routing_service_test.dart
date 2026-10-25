@@ -5,16 +5,10 @@ import 'package:map_my_friends/models/airport.dart';
 import 'package:map_my_friends/models/person.dart';
 import 'package:map_my_friends/models/station.dart';
 import 'package:map_my_friends/models/trip.dart';
-import 'package:map_my_friends/services/api_service.dart';
 import 'package:map_my_friends/services/routing_service.dart';
 
 import '../helpers/fake_http_adapter.dart';
-
-class MockApiService extends Fake implements ApiService {
-  @override
-  final Dio dio;
-  MockApiService(this.dio);
-}
+import 'service_test_support.dart';
 
 /// The OSRM path for a segment, in OSRM's lon,lat order.
 String osrmPath(LatLng a, LatLng b) =>
@@ -39,12 +33,10 @@ Map<String, dynamic> osrmRoute(List<LatLng> points) => {
 void main() {
   late RoutingService routingService;
   late FakeHttpAdapter adapter;
-  late MockApiService mockApiService;
 
   setUp(() {
     adapter = FakeHttpAdapter();
-    mockApiService = MockApiService(fakeDio(adapter));
-    routingService = RoutingService(apiService: mockApiService);
+    routingService = RoutingService(dio: fakeDio(adapter));
   });
 
   group('RoutingService', () {
@@ -115,7 +107,22 @@ void main() {
       expect(adapter.requests, isEmpty);
     });
 
-    test('defaults to the shared ApiService', () async {
+    test('never sends the signed-in user\'s token to OSRM', () async {
+      // OSRM is a public third-party host. Regression: the default instance
+      // used ApiService's Dio, whose interceptor attaches the app JWT.
+      seedTokens(access: 'user-jwt', refresh: 'r');
+      final service = RoutingService();
+      service.dio.httpClientAdapter = adapter;
+      adapter.onAny((_) => FakeResponse(200, osrmRoute([locA, locB])));
+
+      await service.getRoute([stopA, stopB]);
+
+      final osrm = adapter.requests.single;
+      expect(osrm.uri.host, 'router.project-osrm.org');
+      expect(authHeaderOf(osrm), isNull);
+    });
+
+    test('works with its default client', () async {
       // No network: fewer than two stops never reaches the HTTP client.
       expect(await RoutingService().getRoute([stopA]), isEmpty);
     });

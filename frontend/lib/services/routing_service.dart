@@ -1,16 +1,27 @@
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:latlong2/latlong.dart';
 import '../models/trip.dart';
-import 'api_service.dart';
 
 class RoutingService {
-  final ApiService _apiService;
+  /// A plain Dio, deliberately not `ApiService.dio`: OSRM is a public
+  /// third-party host, and the API client's interceptor would attach the
+  /// signed-in user's bearer token (and retry 401s through a token refresh).
+  final Dio _dio;
 
-  RoutingService({ApiService? apiService})
-    : _apiService = apiService ?? ApiService();
+  RoutingService({Dio? dio})
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              connectTimeout: const Duration(seconds: 5),
+              receiveTimeout: const Duration(seconds: 10),
+            ),
+          );
 
-  Dio get _dio => _apiService.dio;
+  @visibleForTesting
+  Dio get dio => _dio;
 
   /// Fetches a hybrid route based on stop types.
   /// - Friend -> Friend: Driving route via OSRM.
