@@ -1,0 +1,13 @@
+{
+  "description": "Delete a person.",
+  "consumer": "ApiService.deletePerson",
+  "provider_state": "user_with_person",
+  "request": {
+    "method": "DELETE",
+    "path": "people/Pp5ltxR4W9tpvZTZUlY7/",
+    "auth": "user"
+  },
+  "response": {
+    "status": 204
+  }
+}

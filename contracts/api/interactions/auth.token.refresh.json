@@ -1,0 +1,19 @@
+{
+  "description": "Swap the stored refresh token for a new access token. ROTATE_REFRESH_TOKENS is on, so a new refresh token comes back too and the old one must not be reused.",
+  "consumer": "AuthService.refreshAccessToken",
+  "provider_state": "registered_user",
+  "request": {
+    "method": "POST",
+    "path": "user/auth/token/refresh/",
+    "auth": "none",
+    "json": { "refresh": "eyJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCJ9.refresh-signature" }
+  },
+  "response": {
+    "status": 200,
+    "schema": "TokenPair",
+    "example": {
+      "access": "eyJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIn0.rotated-access",
+      "refresh": "eyJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCJ9.rotated-refresh"
+    }
+  }
+}

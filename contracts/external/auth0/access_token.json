@@ -1,0 +1,27 @@
+{
+  "description": "The access token loginWithAuth0 stores and every API call then sends. It is issued by Auth0 and verified by Django, so this is a three-party contract.",
+  "consumer": "Auth0JSONWebTokenAuthentication (backend); produced for AuthService.loginWithAuth0 (frontend)",
+  "provider": "Auth0 tenant",
+  "live": false,
+  "live_note": "Needs an interactive login. The tenant half is covered by openid_configuration and jwks; config/auth0.json pins the audience.",
+  "schema": "access_token.schema.json",
+  "example": {
+    "header": {
+      "alg": "RS256",
+      "typ": "JWT",
+      "kid": "eIhJuvb4PQI9mfpDr9b5S"
+    },
+    "claims": {
+      "iss": "https://b1codes.us.auth0.com/",
+      "sub": "google-oauth2|104807611830372981423",
+      "aud": [
+        "https://api.mapmyfriends.com/",
+        "https://b1codes.us.auth0.com/userinfo"
+      ],
+      "iat": 1792940000,
+      "exp": 1793026400,
+      "scope": "openid profile email offline_access",
+      "azp": "aKyq4Ew0FhtHow6vTmz4IK8WjdJPVt35"
+    }
+  }
+}

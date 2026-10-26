@@ -1,0 +1,32 @@
+{
+  "description": "Load the signed-in user's profile.",
+  "consumer": "AuthService.getProfile -> ProfileBloc",
+  "provider_state": "registered_user",
+  "request": {
+    "method": "GET",
+    "path": "user/profile/",
+    "auth": "user"
+  },
+  "response": {
+    "status": 200,
+    "schema": "Profile",
+    "example": {
+      "username": "ada",
+      "email": "ada@example.com",
+      "profile_image": null,
+      "city": "",
+      "state": "",
+      "country": "",
+      "street": "",
+      "birth_date": null,
+      "phone_number": "",
+      "pin_color": "#2196F3",
+      "pin_style": "teardrop",
+      "pin_icon_type": "none",
+      "pin_emoji": null,
+      "distance_unit": "metric",
+      "first_name": "Ada",
+      "last_name": "Lovelace"
+    }
+  }
+}

@@ -1,0 +1,374 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mapmyfriends.local/contracts/api/schema.json",
+  "title": "Map My Friends API response shapes",
+  "description": "Strict on purpose: every property the API sends is listed and required, and nothing else is allowed. Adding a response field is a contract change. Update the schema and the interaction examples in the same PR, so the Flutter tests parse what the server really sends.",
+  "$defs": {
+    "FirestoreId": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^/]+$"
+    },
+    "Date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "DateTime": {
+      "description": "ISO 8601 with an explicit offset; Dart's DateTime.parse reads both Z and +00:00.",
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "Url": {
+      "type": "string",
+      "pattern": "^https?://"
+    },
+    "Point": {
+      "description": "GeoJSON Point. Coordinates are [longitude, latitude].",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "coordinates"],
+      "properties": {
+        "type": { "const": "Point" },
+        "coordinates": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "number", "minimum": -180, "maximum": 180 },
+            { "type": "number", "minimum": -90, "maximum": 90 }
+          ],
+          "items": false,
+          "minItems": 2
+        }
+      }
+    },
+    "PinStyle": { "enum": ["teardrop", "circle", "square", "triangle", "diamond"] },
+    "PinIconType": { "enum": ["none", "emoji", "initials", "picture"] },
+    "ContactChannel": { "enum": ["CALL", "VIDEO", "MESSAGE"] },
+
+    "AirportFeature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "geometry", "properties"],
+      "properties": {
+        "id": { "type": "integer" },
+        "type": { "const": "Feature" },
+        "geometry": { "$ref": "#/$defs/Point" },
+        "properties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "iata_code", "icao_code", "airport_type", "city", "country", "continent", "distance_km"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "iata_code": { "type": "string", "minLength": 3, "maxLength": 3 },
+            "icao_code": { "type": "string" },
+            "airport_type": { "type": "string", "minLength": 1 },
+            "city": { "type": "string" },
+            "country": { "type": "string" },
+            "continent": { "type": "string" },
+            "distance_km": { "type": ["number", "null"], "minimum": 0 }
+          }
+        }
+      }
+    },
+    "AirportFeatureCollection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "features"],
+      "properties": {
+        "type": { "const": "FeatureCollection" },
+        "features": { "type": "array", "items": { "$ref": "#/$defs/AirportFeature" } }
+      }
+    },
+
+    "StationFeature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "geometry", "properties"],
+      "properties": {
+        "id": { "type": "integer" },
+        "type": { "const": "Feature" },
+        "geometry": { "$ref": "#/$defs/Point" },
+        "properties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "osm_id", "station_type", "uic_ref", "city", "country", "distance_km"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "osm_id": { "type": "integer" },
+            "station_type": { "enum": ["major_station", "subway_station", "commuter_rail_station", "regional_station"] },
+            "uic_ref": { "type": "string" },
+            "city": { "type": "string" },
+            "country": { "type": "string" },
+            "distance_km": { "type": ["number", "null"], "minimum": 0 }
+          }
+        }
+      }
+    },
+    "StationFeatureCollection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "features"],
+      "properties": {
+        "type": { "const": "FeatureCollection" },
+        "features": { "type": "array", "items": { "$ref": "#/$defs/StationFeature" } }
+      }
+    },
+
+    "PersonFeature": {
+      "description": "Parsed by Person.fromGeoJson.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "geometry", "properties"],
+      "properties": {
+        "id": { "$ref": "#/$defs/FirestoreId" },
+        "type": { "const": "Feature" },
+        "geometry": {
+          "description": "Null only for a person whose address never geocoded; the map leaves them off.",
+          "anyOf": [{ "$ref": "#/$defs/Point" }, { "type": "null" }]
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner", "tag", "first_name", "last_name", "city", "state", "country", "street",
+            "birthday", "phone_number", "profile_image", "timezone", "pin_color", "pin_style",
+            "pin_icon_type", "pin_emoji", "contact_cadence_days", "preferred_airport",
+            "preferred_station", "preferred_airport_detail", "preferred_station_detail",
+            "last_contacted_at", "last_contact_channel"
+          ],
+          "properties": {
+            "owner": { "type": ["string", "null"] },
+            "tag": { "enum": ["FRIEND", "FAMILY"] },
+            "first_name": { "type": "string" },
+            "last_name": { "type": "string" },
+            "city": { "type": "string" },
+            "state": { "type": "string" },
+            "country": { "type": "string" },
+            "street": { "type": ["string", "null"] },
+            "birthday": { "anyOf": [{ "$ref": "#/$defs/Date" }, { "type": "null" }] },
+            "phone_number": { "type": ["string", "null"] },
+            "profile_image": { "anyOf": [{ "$ref": "#/$defs/Url" }, { "type": "null" }] },
+            "timezone": { "type": ["string", "null"] },
+            "pin_color": { "type": "string" },
+            "pin_style": { "$ref": "#/$defs/PinStyle" },
+            "pin_icon_type": { "$ref": "#/$defs/PinIconType" },
+            "pin_emoji": { "type": ["string", "null"] },
+            "contact_cadence_days": { "type": ["integer", "null"], "minimum": 0 },
+            "preferred_airport": { "type": ["integer", "null"] },
+            "preferred_station": { "type": ["integer", "null"] },
+            "preferred_airport_detail": { "anyOf": [{ "$ref": "#/$defs/AirportFeature" }, { "type": "null" }] },
+            "preferred_station_detail": { "anyOf": [{ "$ref": "#/$defs/StationFeature" }, { "type": "null" }] },
+            "last_contacted_at": { "anyOf": [{ "$ref": "#/$defs/DateTime" }, { "type": "null" }] },
+            "last_contact_channel": { "anyOf": [{ "$ref": "#/$defs/ContactChannel" }, { "type": "null" }] }
+          }
+        }
+      }
+    },
+    "PersonFeatureCollection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "features"],
+      "properties": {
+        "type": { "const": "FeatureCollection" },
+        "features": { "type": "array", "items": { "$ref": "#/$defs/PersonFeature" } }
+      }
+    },
+
+    "ContactLog": {
+      "description": "Parsed by ContactLog.fromJson.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "person", "channel", "contacted_at", "note", "created_at"],
+      "properties": {
+        "id": { "$ref": "#/$defs/FirestoreId" },
+        "person": { "$ref": "#/$defs/FirestoreId" },
+        "channel": { "$ref": "#/$defs/ContactChannel" },
+        "contacted_at": { "$ref": "#/$defs/DateTime" },
+        "note": { "type": ["string", "null"], "maxLength": 280 },
+        "created_at": { "$ref": "#/$defs/DateTime" }
+      }
+    },
+    "ContactLogList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ContactLog" }
+    },
+
+    "StopPerson": {
+      "description": "A person on a trip stop, flat (not GeoJSON): TripStop.fromJson parses people_detail with Person.fromJson.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "tag", "first_name", "last_name", "city", "state", "country", "street",
+        "birthday", "phone_number", "latitude", "longitude", "profile_image", "timezone",
+        "pin_color", "pin_style", "pin_icon_type", "pin_emoji"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/FirestoreId" },
+        "tag": { "enum": ["FRIEND", "FAMILY"] },
+        "first_name": { "type": "string" },
+        "last_name": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "country": { "type": "string" },
+        "street": { "type": ["string", "null"] },
+        "birthday": { "anyOf": [{ "$ref": "#/$defs/Date" }, { "type": "null" }] },
+        "phone_number": { "type": ["string", "null"] },
+        "latitude": { "type": ["number", "null"], "minimum": -90, "maximum": 90 },
+        "longitude": { "type": ["number", "null"], "minimum": -180, "maximum": 180 },
+        "profile_image": { "anyOf": [{ "$ref": "#/$defs/Url" }, { "type": "null" }] },
+        "timezone": { "type": ["string", "null"] },
+        "pin_color": { "type": "string" },
+        "pin_style": { "$ref": "#/$defs/PinStyle" },
+        "pin_icon_type": { "$ref": "#/$defs/PinIconType" },
+        "pin_emoji": { "type": ["string", "null"] }
+      }
+    },
+    "TripStop": {
+      "description": "Parsed by TripStop.fromJson. The *_detail fields are what the planner draws and routes with after a reload.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "trip", "sequence_order", "location", "people", "airport", "station",
+        "snapshot_address", "snapshot_metadata", "people_detail", "airport_detail", "station_detail"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/FirestoreId" },
+        "trip": { "$ref": "#/$defs/FirestoreId" },
+        "sequence_order": { "type": "integer", "minimum": 0 },
+        "location": { "$ref": "#/$defs/Point" },
+        "people": { "type": "array", "items": { "$ref": "#/$defs/FirestoreId" } },
+        "airport": { "type": ["integer", "null"] },
+        "station": { "type": ["integer", "null"] },
+        "snapshot_address": { "type": "string" },
+        "snapshot_metadata": { "type": "object" },
+        "people_detail": { "type": "array", "items": { "$ref": "#/$defs/StopPerson" } },
+        "airport_detail": { "anyOf": [{ "$ref": "#/$defs/AirportFeature" }, { "type": "null" }] },
+        "station_detail": { "anyOf": [{ "$ref": "#/$defs/StationFeature" }, { "type": "null" }] }
+      }
+    },
+    "TripLeg": {
+      "description": "Parsed by TripLeg.fromJson.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "trip", "departure_stop", "arrival_stop", "departure_time", "arrival_time",
+        "transport_type", "booking_reference", "ticket_data"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/FirestoreId" },
+        "trip": { "$ref": "#/$defs/FirestoreId" },
+        "departure_stop": { "$ref": "#/$defs/FirestoreId" },
+        "arrival_stop": { "$ref": "#/$defs/FirestoreId" },
+        "departure_time": { "anyOf": [{ "$ref": "#/$defs/DateTime" }, { "type": "null" }] },
+        "arrival_time": { "anyOf": [{ "$ref": "#/$defs/DateTime" }, { "type": "null" }] },
+        "transport_type": { "enum": ["FLIGHT", "TRAIN", "BUS", "CAR"] },
+        "booking_reference": { "type": "string", "maxLength": 100 },
+        "ticket_data": { "type": "object" }
+      }
+    },
+    "Trip": {
+      "description": "Parsed by Trip.fromJson.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "date", "start_date", "end_date", "status", "user", "stops", "legs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/FirestoreId" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "date": { "$ref": "#/$defs/Date" },
+        "start_date": { "anyOf": [{ "$ref": "#/$defs/Date" }, { "type": "null" }] },
+        "end_date": { "anyOf": [{ "$ref": "#/$defs/Date" }, { "type": "null" }] },
+        "status": { "enum": ["DRAFT", "BOOKED", "CANCELLED"] },
+        "user": { "type": "string" },
+        "stops": { "type": "array", "items": { "$ref": "#/$defs/TripStop" } },
+        "legs": { "type": "array", "items": { "$ref": "#/$defs/TripLeg" } }
+      }
+    },
+    "TripList": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Trip" }
+    },
+
+    "Profile": {
+      "description": "Read key by key in ProfileBloc.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "username", "email", "first_name", "last_name", "profile_image", "city", "state",
+        "country", "street", "birth_date", "phone_number", "pin_color", "pin_style",
+        "pin_icon_type", "pin_emoji", "distance_unit"
+      ],
+      "properties": {
+        "username": { "type": "string", "minLength": 1 },
+        "email": { "type": "string" },
+        "first_name": { "type": "string" },
+        "last_name": { "type": "string" },
+        "profile_image": { "anyOf": [{ "$ref": "#/$defs/Url" }, { "type": "null" }] },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "country": { "type": "string" },
+        "street": { "type": "string" },
+        "birth_date": { "anyOf": [{ "$ref": "#/$defs/Date" }, { "type": "null" }] },
+        "phone_number": { "type": "string" },
+        "pin_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "pin_style": { "$ref": "#/$defs/PinStyle" },
+        "pin_icon_type": { "$ref": "#/$defs/PinIconType" },
+        "pin_emoji": { "type": ["string", "null"] },
+        "distance_unit": { "enum": ["metric", "imperial"] }
+      }
+    },
+
+    "TokenPair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["access", "refresh"],
+      "properties": {
+        "access": { "type": "string", "minLength": 1 },
+        "refresh": { "type": "string", "minLength": 1 }
+      }
+    },
+    "RegisteredUser": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["username", "email", "first_name", "last_name"],
+      "properties": {
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "first_name": { "type": "string" },
+        "last_name": { "type": "string" }
+      }
+    },
+    "Message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message"],
+      "properties": { "message": { "type": "string" } }
+    },
+
+    "Detail": {
+      "description": "DRF's error body for 401/403/404-style failures.",
+      "type": "object",
+      "required": ["detail"],
+      "properties": { "detail": { "type": "string" } }
+    },
+    "TokenNotValid": {
+      "description": "SimpleJWT's 401 for a bad or expired access token. The client retries through a token refresh on any 401.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["detail", "code", "messages"],
+      "properties": {
+        "detail": { "type": "string" },
+        "code": { "const": "token_not_valid" },
+        "messages": { "type": "array" }
+      }
+    },
+    "FieldErrors": {
+      "description": "DRF validation errors. AuthService.register joins each value as a list, so every value must be an array of strings.",
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": { "type": "string" }
+      }
+    }
+  }
+}

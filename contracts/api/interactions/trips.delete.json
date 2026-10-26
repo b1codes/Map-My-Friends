@@ -1,0 +1,13 @@
+{
+  "description": "Delete a trip with its stops and legs.",
+  "consumer": "ApiService.deleteTrip",
+  "provider_state": "user_with_trip",
+  "request": {
+    "method": "DELETE",
+    "path": "trips/CPczK4heHksu4O9ODudG/",
+    "auth": "user"
+  },
+  "response": {
+    "status": 204
+  }
+}

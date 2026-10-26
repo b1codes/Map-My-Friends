@@ -1,0 +1,90 @@
+{
+  "description": "The airports nearest a point, closest first. AirportBloc asks for 3 (AirportService); the person form asks for the default 5 (ApiService) and gets the same shape.",
+  "consumer": "AirportService.getNearestAirports, ApiService.getNearestAirports",
+  "provider_state": "registered_user",
+  "request": {
+    "method": "GET",
+    "path": "airports/nearest/",
+    "query": {
+      "lat": "43.0389",
+      "lon": "-87.9065",
+      "count": "3"
+    },
+    "auth": "user"
+  },
+  "response": {
+    "status": 200,
+    "schema": "AirportFeatureCollection",
+    "expect": {
+      "/features/0/properties/iata_code": "MKE"
+    },
+    "example": {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "id": 2436,
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              -87.896599,
+              42.947201
+            ]
+          },
+          "properties": {
+            "name": "General Mitchell International Airport",
+            "iata_code": "MKE",
+            "icao_code": "KMKE",
+            "airport_type": "large_airport",
+            "city": "Milwaukee",
+            "country": "US",
+            "continent": "NA",
+            "distance_km": 10.2
+          }
+        },
+        {
+          "id": 1111,
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              -87.92780304,
+              42.59569931
+            ]
+          },
+          "properties": {
+            "name": "Kenosha Regional Airport",
+            "iata_code": "ENW",
+            "icao_code": "KENW",
+            "airport_type": "medium_airport",
+            "city": "Kenosha",
+            "country": "US",
+            "continent": "NA",
+            "distance_km": 49.3
+          }
+        },
+        {
+          "id": 3147,
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              -87.901494,
+              42.114222
+            ]
+          },
+          "properties": {
+            "name": "Chicago Executive Airport",
+            "iata_code": "PWK",
+            "icao_code": "KPWK",
+            "airport_type": "medium_airport",
+            "city": "Chicago/Prospect Heights/Wheeling",
+            "country": "US",
+            "continent": "NA",
+            "distance_km": 102.8
+          }
+        }
+      ]
+    }
+  }
+}

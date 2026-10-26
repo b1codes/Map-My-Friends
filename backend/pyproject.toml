@@ -29,6 +29,9 @@ dev = [
     "debugpy>=1.8.0,<2.0.0",
     # Coverage measurement for the test suite (`make test-cov`).
     "coverage>=7.6.0,<8.0.0",
+    # Validates API and third-party responses against the shared JSON Schemas
+    # in contracts/ (backend/tests/contracts).
+    "jsonschema>=4.23.0,<5.0.0",
 ]
 
 [build-system]

@@ -1,0 +1,19 @@
+{
+  "description": "Sign in with a username and password.",
+  "consumer": "AuthService.login",
+  "provider_state": "registered_user",
+  "request": {
+    "method": "POST",
+    "path": "user/auth/token/",
+    "auth": "none",
+    "json": { "username": "ada", "password": "Analytical-Engine-1843" }
+  },
+  "response": {
+    "status": 200,
+    "schema": "TokenPair",
+    "example": {
+      "refresh": "eyJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCJ9.refresh-signature",
+      "access": "eyJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIn0.access-signature"
+    }
+  }
+}
