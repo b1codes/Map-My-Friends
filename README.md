@@ -63,7 +63,7 @@ graph TD
 ## 🛠 Prerequisites
 
 1.  **Docker Desktop:** Required to run the backend and database.
-2.  **Flutter SDK:** Required for running the mobile app locally.
+2.  **Flutter SDK, via [FVM](https://fvm.app):** The project pins its Flutter version in `.fvmrc`, and CI reads the same file. Install FVM (`brew tap leoafarias/fvm && brew install fvm`), then run `fvm install` at the repo root and prefix Flutter commands with `fvm` (e.g. `fvm flutter test`).
 3.  **Git:** To clone the repo.
 
 ---
@@ -98,11 +98,12 @@ Open a **new terminal** tab (leave Docker running in the first one).
 ```bash
 cd frontend
 
-# 1. Install Dart dependencies
-flutter pub get
+# 1. Install the pinned Flutter SDK (reads ../.fvmrc) and Dart dependencies
+fvm install
+fvm flutter pub get
 
 # 2. Run the App (Select your Simulator/Emulator)
-flutter run
+fvm flutter run
 ```
 
 #### DEV sign-in (local only)
@@ -144,6 +145,8 @@ compound.
 ---
 
 ## 🔌 API Endpoints
+
+The exact request and response of every call the app makes are in [`contracts/`](contracts/README.md). Both the Flutter and Django test suites are held to them.
 
 ### Authentication (`/api/user/auth/`)
 | Method | Endpoint | Description |
@@ -193,6 +196,7 @@ Since the backend runs inside a Docker container, you must execute commands *ins
 | **Open Python Shell** | `make shell` |
 | **Access Database** | `make db` |
 | **Run Tests** | `make test` |
+| **Run E2E Journeys** | `make e2e` (see [frontend/integration_test](frontend/integration_test/README.md)) |
 | **Install Dependencies** | `make install` |
 | **Add Package** | `make add` |
 | **Update Dependencies** | `make update` |
@@ -205,6 +209,9 @@ Since the backend runs inside a Docker container, you must execute commands *ins
 map-my-friends/
 ├── docker-compose.yml          # Orchestrates Django (api) and PostGIS (db)
 ├── Makefile                    # Shortcuts for Docker commands
+├── contracts/                  # API and third-party contracts both test suites check (see contracts/README.md)
+├── docker-compose.e2e.yml      # Throwaway full stack for the E2E journeys (make e2e)
+├── docs/manual-qa.md           # The few checks automation can't do (Auth0, OS prompts, real devices)
 │
 ├── backend/                    # Django Backend
 │   ├── Dockerfile              # Python environment (w/ GDAL)
@@ -234,6 +241,7 @@ map-my-friends/
         │   ├── people/         # People list, Add/Edit person
         │   └── profile/        # User profile (Me screen)
         └── services/           # API services & networking
+    └── integration_test/       # E2E journeys against the full stack (see its README)
 ```
 
 ---

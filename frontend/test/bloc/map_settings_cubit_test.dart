@@ -26,6 +26,34 @@ void main() {
       expect(mapSettingsCubit.state, const MapSettingsState());
     });
 
+    // Regression: the saved indexes were used unchecked, so a value from an
+    // older or newer build (an enum gained or lost a case) threw a RangeError
+    // in the constructor and the app could not start.
+    for (final saved in [99, -1]) {
+      test(
+        'falls back to defaults when saved enum indexes are $saved',
+        () async {
+          SharedPreferences.setMockInitialValues({
+            'map_show_controls': false,
+            'map_type': saved,
+            'map_theme_mode': saved,
+            'map_airport_filter': saved,
+            'map_station_filter': saved,
+            'map_distance_unit': saved,
+          });
+          final prefs = await SharedPreferences.getInstance();
+
+          final cubit = MapSettingsCubit(prefs: prefs);
+          addTearDown(cubit.close);
+
+          expect(
+            cubit.state,
+            const MapSettingsState().copyWith(showControls: false),
+          );
+        },
+      );
+    }
+
     test('initial state loads values from prefs', () async {
       SharedPreferences.setMockInitialValues({
         'map_show_controls': false,
@@ -146,5 +174,52 @@ void main() {
         expect(prefs.getInt('map_distance_unit'), DistanceUnit.imperial.index);
       },
     );
+
+    blocTest<MapSettingsCubit, MapSettingsState>(
+      'toggling twice returns to the original value and persists it',
+      build: () => mapSettingsCubit,
+      act: (cubit) => cubit
+        ..toggleAirports()
+        ..toggleAirports(),
+      expect: () => [
+        const MapSettingsState(showAirports: true),
+        const MapSettingsState(),
+      ],
+      verify: (_) => expect(prefs.getBool('map_show_airports'), false),
+    );
+
+    test('settings changed in one session are restored in the next', () async {
+      mapSettingsCubit
+        ..toggleControls()
+        ..toggleStations()
+        ..setMapType(MapType.minimal)
+        ..setMapTheme(ThemeMode.dark)
+        ..setAirportFilter(AirportFilter.regional)
+        ..setStationFilter(StationFilter.commuter)
+        ..setDistanceUnit(DistanceUnit.imperial);
+      final changed = mapSettingsCubit.state;
+
+      final next = MapSettingsCubit(prefs: prefs);
+      expect(next.state, changed);
+      expect(
+        next.state,
+        const MapSettingsState(
+          showControls: false,
+          showStations: true,
+          mapType: MapType.minimal,
+          themeMode: ThemeMode.dark,
+          airportFilter: AirportFilter.regional,
+          stationFilter: StationFilter.commuter,
+          distanceUnit: DistanceUnit.imperial,
+        ),
+      );
+      await next.close();
+    });
+
+    test('copyWith with no arguments is an identical value', () {
+      const state = MapSettingsState(mapType: MapType.satellite);
+      expect(state.copyWith(), state);
+      expect(state.copyWith(mapType: MapType.minimal), isNot(state));
+    });
   });
 }

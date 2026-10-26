@@ -1,0 +1,6 @@
+{
+  "description": "The Auth0 tenant both sides must agree on. The Flutter app signs users in against domain/client_id and asks for an access token for audience; Django accepts only tokens issued by https://<domain>/ for that audience. Checked against frontend/lib/services/api_config.dart and backend/config/settings.py defaults.",
+  "domain": "b1codes.us.auth0.com",
+  "audience": "https://api.mapmyfriends.com/",
+  "client_id": "aKyq4Ew0FhtHow6vTmz4IK8WjdJPVt35"
+}

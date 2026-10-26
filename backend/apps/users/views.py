@@ -112,8 +112,10 @@ class PasswordResetRequestView(generics.GenericAPIView):
                 },
                 status=status.HTTP_200_OK,
             )
-        except User.DoesNotExist:
-            # Don't reveal whether the email exists
+        except (User.DoesNotExist, User.MultipleObjectsReturned):
+            # Don't reveal whether the email exists. Several accounts can share
+            # an address (e.g. an unverified Auth0 login); we can't tell which
+            # is meant, and the response must not reveal that duplicates exist.
             return Response(
                 {
                     "message": "Password reset email sent.",
@@ -151,7 +153,9 @@ class PasswordResetConfirmView(generics.GenericAPIView):
                     {"error": "Invalid or expired token."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        except User.DoesNotExist:
+        except (User.DoesNotExist, ValueError, TypeError):
+            # ValueError/TypeError: user_id is not coercible to a primary key
+            # (e.g. "abc" or a list), which is a bad request, not a server error.
             return Response(
                 {"error": "Invalid request."}, status=status.HTTP_400_BAD_REQUEST
             )

@@ -1,0 +1,88 @@
+{
+  "description": "Driving route between two person-only trip stops. The planner asks for the full GeoJSON geometry so it can draw the road path.",
+  "consumer": "RoutingService.getRoute (frontend)",
+  "provider": "OSRM public demo server",
+  "live": true,
+  "request": {
+    "method": "GET",
+    "url": "https://router.project-osrm.org/route/v1/driving/-87.9065,43.0389;-87.9173923,43.0343496",
+    "query": {
+      "overview": "full",
+      "geometries": "geojson"
+    },
+    "auth": "none"
+  },
+  "response": {
+    "status": 200,
+    "schema": "route.schema.json",
+    "example": {
+      "code": "Ok",
+      "routes": [
+        {
+          "legs": [
+            {
+              "steps": [],
+              "weight": 167.7,
+              "summary": "",
+              "duration": 167.7,
+              "distance": 1385
+            }
+          ],
+          "weight_name": "routability",
+          "geometry": {
+            "coordinates": [
+              [
+                -87.906566,
+                43.038896
+              ],
+              [
+                -87.906563,
+                43.038867
+              ],
+              [
+                -87.906548,
+                43.038772
+              ],
+              [
+                -87.906647,
+                43.038766
+              ],
+              [
+                -87.917499,
+                43.034548
+              ],
+              [
+                -87.917392,
+                43.034548
+              ]
+            ],
+            "type": "LineString"
+          },
+          "weight": 167.7,
+          "duration": 167.7,
+          "distance": 1385
+        }
+      ],
+      "waypoints": [
+        {
+          "hint": "xJqPgpYikIIXAAAABAAAAHIAAAAMAAAAf2qpQTXITkAk6stCsv0pQRcAAAAEAAAAcgAAAAwAAADDfwAA-qbC-rC4kAI8p8L6tLiQAgQA_woAAAAA",
+          "location": [
+            -87.906566,
+            43.038896
+          ],
+          "name": "North Milwaukee Street",
+          "distance": 5.397843886
+        },
+        {
+          "hint": "pouPgv___38UAAAASgAAACsAAAAyAAAAoooLQYq1sEF7aZFBi5SnQRQAAABKAAAAKwAAADIAAADDfwAAsHzC-rSnkAKwfML67qaQAggArwUAAAAA",
+          "location": [
+            -87.917392,
+            43.034548
+          ],
+          "name": "",
+          "distance": 21.99645821
+        }
+      ]
+    }
+  }
+}

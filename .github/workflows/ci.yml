@@ -108,8 +108,9 @@ jobs:
           # Floating on latest stable meant CI and the production web build
           # used a Flutter nobody had run: it broke version solving on the
           # exact intl pin, and dart format disagreed with local output.
-          # Bump this deliberately, together with the team's SDK.
-          flutter-version: '3.41.7'
+          # The pin lives in .fvmrc so local (fvm) and CI read one value;
+          # bump it with `fvm use <version>` at the repo root.
+          flutter-version-file: ${{ github.workspace }}/.fvmrc
           cache: true
 
       - name: Install Dependencies
@@ -144,7 +145,7 @@ jobs:
           channel: 'stable'
           # Same pin as validate-frontend; widgetbook 3.23 is the newest
           # release that supports it (see frontend/widgetbook/pubspec.yaml).
-          flutter-version: '3.41.7'
+          flutter-version-file: ${{ github.workspace }}/.fvmrc
           cache: true
 
       - name: Install Dependencies
@@ -167,6 +168,53 @@ jobs:
       # Opens every catalog entry and fails on anything it throws.
       - name: Run Catalog Smoke Test
         run: flutter test
+
+  # -----------------------------------------------------------------
+  # END-TO-END JOURNEYS
+  # -----------------------------------------------------------------
+  # The real app in headless Chrome against the real API and Firestore
+  # emulator (docker-compose.e2e.yml), with Nominatim, OSRM and map tiles
+  # stubbed. scripts/e2e.sh is the same entry point as `make e2e` locally.
+  e2e:
+    name: E2E Journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Set up Chrome and chromedriver
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # ratchet:browser-actions/setup-chrome@v2
+        with:
+          install-chromedriver: true
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # ratchet:subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version-file: ${{ github.workspace }}/.fvmrc
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: frontend
+        run: flutter pub get
+
+      - name: Run Journeys
+        env:
+          CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
+          CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
+        run: scripts/e2e.sh
+
+      - name: Upload Failure Screenshots and Stack Logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: e2e-failure
+          path: |
+            frontend/build/e2e/screenshots/
+            frontend/build/e2e/stack.log
+          if-no-files-found: ignore
 
   # -----------------------------------------------------------------
   # INFRASTRUCTURE VALIDATION

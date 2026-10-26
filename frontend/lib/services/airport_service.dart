@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart' show rootBundle;
 import '../models/airport.dart';
 import 'api_config.dart';
@@ -7,7 +8,7 @@ import 'auth_service.dart';
 
 class AirportService {
   late final Dio _dio;
-  final AuthService _authService = AuthService();
+  final AuthService _authService;
 
   // Singleton pattern
   static final AirportService _instance = AirportService._internal();
@@ -16,14 +17,25 @@ class AirportService {
     return _instance;
   }
 
-  AirportService._internal() {
-    _dio = Dio(
-      BaseOptions(
-        baseUrl: ApiConfig.baseUrl,
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 3),
-      ),
-    );
+  /// A non-singleton instance for tests: [dio] carries a fake HTTP adapter,
+  /// and the auth interceptor is attached to it exactly as in production.
+  @visibleForTesting
+  factory AirportService.forTesting({
+    required Dio dio,
+    required AuthService authService,
+  }) => AirportService._internal(dio: dio, authService: authService);
+
+  AirportService._internal({Dio? dio, AuthService? authService})
+    : _authService = authService ?? AuthService() {
+    _dio =
+        dio ??
+        Dio(
+          BaseOptions(
+            baseUrl: ApiConfig.baseUrl,
+            connectTimeout: const Duration(seconds: 5),
+            receiveTimeout: const Duration(seconds: 3),
+          ),
+        );
 
     _dio.interceptors.add(
       InterceptorsWrapper(

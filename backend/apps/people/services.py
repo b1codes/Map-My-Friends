@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import time
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 from geopy.exc import GeocoderServiceError, GeocoderTimedOut
@@ -23,6 +24,14 @@ USER_AGENT = "map_my_friends_global_connect"
 MAX_ATTEMPTS = 3
 
 
+class GeocodingUnavailable(ValidationError):
+    """The geocoder could not be reached, as opposed to finding no match.
+
+    A ValidationError subclass so existing callers that catch ValidationError
+    keep working; callers that care can map an outage to a retryable error.
+    """
+
+
 def geocode_address(
     city: str,
     state: str,
@@ -31,10 +40,14 @@ def geocode_address(
 ) -> tuple[float, float, str | None]:
     """Resolve an address to (latitude, longitude, timezone).
 
-    Raises ValidationError if the address cannot be resolved or the service is
-    unavailable after MAX_ATTEMPTS.
+    Raises ValidationError if the address cannot be resolved, or its subclass
+    GeocodingUnavailable if the service is unavailable after MAX_ATTEMPTS.
     """
-    geolocator = Nominatim(user_agent=USER_AGENT)
+    geolocator = Nominatim(
+        user_agent=USER_AGENT,
+        domain=settings.NOMINATIM_DOMAIN,
+        scheme=settings.NOMINATIM_SCHEME,
+    )
     finder = TimezoneFinder()
 
     # Structured query gives better international accuracy than a free-text one.
@@ -49,7 +62,7 @@ def geocode_address(
             if attempt < MAX_ATTEMPTS - 1:
                 time.sleep(1)
                 continue
-            raise ValidationError(
+            raise GeocodingUnavailable(
                 _("Geocoding service unavailable. Please try again later.")
             )
 

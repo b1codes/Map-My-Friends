@@ -1,4 +1,5 @@
 import requests
+from django.conf import settings
 from rest_framework.exceptions import APIException
 
 
@@ -9,9 +10,6 @@ class RoutingError(APIException):
 
 
 class OSRMService:
-    # ... (existing code)
-    BASE_URL = "https://router.project-osrm.org/route/v1/driving"
-
     @classmethod
     def get_route(cls, coordinates: list[list[float]]) -> dict:
         if not coordinates or len(coordinates) < 2:
@@ -21,7 +19,7 @@ class OSRMService:
             raise RoutingError("Maximum of 25 coordinates allowed.")
 
         coords_str = ";".join([f"{lon},{lat}" for lon, lat in coordinates])
-        url = f"{cls.BASE_URL}/{coords_str}?overview=full&geometries=geojson"
+        url = f"{settings.OSRM_BASE_URL}/{coords_str}?overview=full&geometries=geojson"
 
         try:
             response = requests.get(url, timeout=10)

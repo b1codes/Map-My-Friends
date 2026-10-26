@@ -246,14 +246,9 @@ class TripsScreen extends StatelessWidget {
             child: ThermalResponse(
               borderRadius: MapGlass.radiusSm,
               onTap: () {
-                context.read<TripBloc>().add(
-                  SaveTrip(
-                    name: trip.name,
-                    startDate: trip.startDate,
-                    endDate: trip.endDate,
-                    status: status,
-                  ),
-                );
+                // This trip, by id. SaveTrip would save whatever the
+                // planner has open, which can be another trip or none.
+                context.read<TripBloc>().add(UpdateTripStatus(trip, status));
                 Navigator.pop(context);
               },
               child: GlassInlay(

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Overpass API JSON output for a node query, as fetch_stations reads it",
+  "description": "fetch_stations keeps nodes with an id, lat, lon and a name tag, and classifies them from their tags. Untagged nodes have no tags key at all.",
+  "type": "object",
+  "required": [
+    "elements"
+  ],
+  "properties": {
+    "elements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "type",
+          "id"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "node",
+              "way",
+              "relation"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "lon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "tags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "if": {
+          "properties": {
+            "type": {
+              "const": "node"
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "lat",
+            "lon"
+          ]
+        }
+      }
+    }
+  }
+}

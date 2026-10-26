@@ -118,4 +118,31 @@ void main() {
 
     expect(seen.navShape, NavShape.bar);
   });
+
+  group('short height', () {
+    test('is decided by height alone', () {
+      expect(const MapWindow(Size(844, 390)).isShortHeight, isTrue);
+      expect(const MapWindow(Size(390, 844)).isShortHeight, isFalse);
+      expect(const MapWindow(Size(2000, 599)).isShortHeight, isTrue);
+      expect(const MapWindow(Size(100, 600)).isShortHeight, isFalse);
+    });
+  });
+
+  test('thresholds are inclusive', () {
+    const exact = MapWindow(Size(600, 600));
+    expect(exact.isWide, isTrue);
+    expect(exact.usesRail, isTrue);
+    expect(exact.navBarInset, 0);
+    expect(const MapWindow(Size(599.9, 900)).isWide, isFalse);
+    expect(const MapWindow(Size(599.9, 900)).usesBar, isTrue);
+  });
+
+  test('windows of the same size are equal', () {
+    const a = MapWindow(Size(390, 844));
+    const b = MapWindow(Size(390, 844));
+    expect(a, b);
+    expect(a.hashCode, b.hashCode);
+    expect(a, isNot(const MapWindow(Size(844, 390))));
+    expect(a == Object(), isFalse);
+  });
 }

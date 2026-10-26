@@ -11,6 +11,7 @@ Layout:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, fields
 from datetime import UTC, datetime
 
@@ -72,6 +73,22 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def _is_valid_id(doc_id: str) -> bool:
+    """Whether doc_id can name a document directly in a collection.
+
+    Ids reach the repositories from request bodies and query strings. Firestore
+    rejects an empty id, "." / "..", and reserved __names__ outright (a 500 if
+    it reached the client), and a "/" would address a different, deeper path.
+    Such ids can never name a real record, so they are treated as not found.
+    """
+    return (
+        bool(doc_id)
+        and "/" not in doc_id
+        and doc_id not in {".", ".."}
+        and re.fullmatch(r"__.*__", doc_id) is None
+    )
+
+
 class PersonRepository:
     def _collection(self):
         return fs.collection(PEOPLE)
@@ -104,12 +121,40 @@ class PersonRepository:
     def get_for_owner(
         self, person_id: str, owner_key: str | None
     ) -> PersonRecord | None:
+        if not _is_valid_id(person_id):
+            return None
         doc = self._collection().document(person_id).get()
         if not doc.exists:
             return None
         if (doc.to_dict() or {}).get("owner_key") != owner_key:
             return None
         return self._hydrate(doc)
+
+    def get_many_for_owner(
+        self, person_ids, owner_key: str | None
+    ) -> dict[str, PersonRecord]:
+        """The owner's people among person_ids, keyed by id, in one read.
+
+        Ids that are unknown, malformed or someone else's are left out. The
+        contact-log recency fields are not filled in: they cost a query per
+        person, and trip stops (the caller) don't show them.
+        """
+        refs = [
+            self._collection().document(person_id)
+            for person_id in dict.fromkeys(person_ids)
+            if _is_valid_id(person_id)
+        ]
+        if not refs:
+            return {}
+        found = {}
+        for doc in fs.get_client().get_all(refs):
+            data = doc.to_dict() if doc.exists else None
+            if data is None or data.get("owner_key") != owner_key:
+                continue
+            found[doc.id] = PersonRecord(
+                id=doc.id, **{k: v for k, v in data.items() if k in _PERSON_FIELDS}
+            )
+        return found
 
     def create(self, owner_key: str | None, data: dict) -> PersonRecord:
         payload = {k: v for k, v in data.items() if k in _PERSON_WRITABLE_FIELDS}
@@ -124,6 +169,8 @@ class PersonRepository:
     def update(
         self, person_id: str, owner_key: str | None, data: dict
     ) -> PersonRecord | None:
+        if not _is_valid_id(person_id):
+            return None
         ref = self._collection().document(person_id)
         doc = ref.get()
         if not doc.exists or (doc.to_dict() or {}).get("owner_key") != owner_key:
@@ -135,6 +182,8 @@ class PersonRepository:
         return self._hydrate(ref.get())
 
     def delete(self, person_id: str, owner_key: str | None) -> bool:
+        if not _is_valid_id(person_id):
+            return False
         ref = self._collection().document(person_id)
         doc = ref.get()
         if not doc.exists or (doc.to_dict() or {}).get("owner_key") != owner_key:
@@ -151,6 +200,8 @@ class ContactLogRepository:
         self._people = PersonRepository()
 
     def _person_ref_if_owned(self, person_id: str, owner_key: str | None):
+        if not _is_valid_id(person_id):
+            return None
         ref = fs.collection(PEOPLE).document(person_id)
         doc = ref.get()
         if not doc.exists or (doc.to_dict() or {}).get("owner_key") != owner_key:

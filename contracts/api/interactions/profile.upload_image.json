@@ -1,0 +1,36 @@
+{
+  "description": "Upload a new profile photo as multipart form data.",
+  "consumer": "AuthService.uploadProfileImage -> ProfileBloc",
+  "provider_state": "registered_user",
+  "request": {
+    "method": "PATCH",
+    "path": "user/profile/",
+    "auth": "user",
+    "multipart": {
+      "fields": {},
+      "files": { "profile_image": { "filename": "avatar.png", "content_type": "image/png" } }
+    }
+  },
+  "response": {
+    "status": 200,
+    "schema": "Profile",
+    "example": {
+      "username": "ada",
+      "email": "ada@example.com",
+      "profile_image": "http://localhost:8000/media/user_profiles/dcdd291d976d4b2b8b5eca523e342871.png",
+      "city": "",
+      "state": "",
+      "country": "",
+      "street": "",
+      "birth_date": null,
+      "phone_number": "",
+      "pin_color": "#2196F3",
+      "pin_style": "teardrop",
+      "pin_icon_type": "none",
+      "pin_emoji": null,
+      "distance_unit": "metric",
+      "first_name": "Ada",
+      "last_name": "Lovelace"
+    }
+  }
+}

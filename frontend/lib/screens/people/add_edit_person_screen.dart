@@ -27,7 +27,11 @@ import '../../components/shared/glass_header.dart';
 class AddEditPersonScreen extends StatefulWidget {
   final Person? person;
 
-  const AddEditPersonScreen({super.key, this.person});
+  /// Loads the nearby hubs. Defaults to the app's shared [ApiService]; tests
+  /// pass a fake.
+  final ApiService? apiService;
+
+  const AddEditPersonScreen({super.key, this.person, this.apiService});
 
   @override
   State<AddEditPersonScreen> createState() => _AddEditPersonScreenState();
@@ -108,7 +112,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
 
     setState(() => _isLoadingHubs = true);
     try {
-      final apiService = ApiService();
+      final apiService = widget.apiService ?? ApiService();
       final airports = await apiService.getNearestAirports(
         widget.person!.latitude!,
         widget.person!.longitude!,
@@ -118,16 +122,17 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
         widget.person!.longitude!,
       );
 
+      // The user may have left the form while the hubs were loading.
+      if (!mounted) return;
       setState(() {
         _nearbyAirports = airports;
         _nearbyStations = stations;
         _isLoadingHubs = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoadingHubs = false);
-      if (mounted) {
-        GlassToast.show(context, 'Failed to load hubs: $e');
-      }
+      GlassToast.show(context, 'Failed to load hubs: $e');
     }
   }
 

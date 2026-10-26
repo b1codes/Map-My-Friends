@@ -3,13 +3,14 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.common.testing import FirestoreTestMixin
+from apps.common.testing import FirestoreTestMixin, ThrottleIsolationMixin
 from apps.people.repositories import ContactLogRepository, PersonRepository
 from apps.trips.repositories import TripRepository
 
 
-class JWTAuthTests(APITestCase):
+class JWTAuthTests(ThrottleIsolationMixin, APITestCase):
     def setUp(self):
+        super().setUp()
         self.username = "testuser"
         self.password = "StrongPass123!"
         self.user = User.objects.create_user(
@@ -66,8 +67,9 @@ class JWTAuthTests(APITestCase):
         self.assertEqual(response.data["username"], self.username)
 
 
-class SecurityBehaviorTests(APITestCase):
+class SecurityBehaviorTests(ThrottleIsolationMixin, APITestCase):
     def setUp(self):
+        super().setUp()
         self.register_url = reverse("register")
         self.reset_url = reverse("password_reset")
 

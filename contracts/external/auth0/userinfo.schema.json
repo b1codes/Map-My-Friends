@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Auth0 /userinfo response",
+  "description": "Read only when a first-time user's access token carries no email claim: email, then given_name (falling back to nickname) and family_name fill in the new Django user.",
+  "type": "object",
+  "required": [
+    "sub"
+  ],
+  "properties": {
+    "sub": {
+      "type": "string",
+      "minLength": 1
+    },
+    "email": {
+      "type": "string"
+    },
+    "email_verified": {
+      "type": "boolean"
+    },
+    "given_name": {
+      "type": "string"
+    },
+    "family_name": {
+      "type": "string"
+    },
+    "nickname": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    }
+  }
+}

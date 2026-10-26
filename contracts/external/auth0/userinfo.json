@@ -1,0 +1,27 @@
+{
+  "description": "Profile of the user an access token belongs to.",
+  "consumer": "Auth0JSONWebTokenAuthentication (backend)",
+  "provider": "Auth0 tenant",
+  "live": false,
+  "live_note": "Needs a real user's access token, so it is not checked nightly. The schema follows Auth0's documented OIDC standard claims.",
+  "request": {
+    "method": "GET",
+    "url": "https://b1codes.us.auth0.com/userinfo",
+    "auth": "user"
+  },
+  "response": {
+    "status": 200,
+    "schema": "userinfo.schema.json",
+    "example": {
+      "sub": "google-oauth2|104807611830372981423",
+      "given_name": "Grace",
+      "family_name": "Hopper",
+      "nickname": "grace",
+      "name": "Grace Hopper",
+      "picture": "https://lh3.googleusercontent.com/a/example",
+      "updated_at": "2026-10-20T18:30:00.000Z",
+      "email": "grace@example.com",
+      "email_verified": true
+    }
+  }
+}

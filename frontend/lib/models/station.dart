@@ -32,16 +32,16 @@ class Station {
       uicRef: json['uic_ref'],
       city: json['city'],
       country: json['country'],
-      latitude: json['latitude'] ?? 0.0,
-      longitude: json['longitude'] ?? 0.0,
+      latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
       distanceKm: (json['distance_km'] as num?)?.toDouble(),
     );
   }
 
   factory Station.fromGeoJson(Map<String, dynamic> json) {
     final properties = json['properties'] as Map<String, dynamic>;
-    final geometry = json['geometry'] as Map<String, dynamic>;
-    final coordinates = geometry['coordinates'] as List<dynamic>?;
+    final geometry = json['geometry'] as Map<String, dynamic>?;
+    final coordinates = geometry?['coordinates'] as List<dynamic>?;
 
     return Station(
       id: json['id'],

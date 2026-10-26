@@ -1,11 +1,16 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:auth0_flutter/auth0_flutter.dart';
 import 'api_config.dart';
 
 class AuthService {
-  final Dio _dio = Dio(
+  /// Builds every Dio this service uses; tests swap it for one with a fake
+  /// HTTP adapter.
+  final Dio Function(BaseOptions options) _newDio;
+
+  late final Dio _dio = _newDio(
     BaseOptions(
       baseUrl: ApiConfig.baseUrl,
       connectTimeout: const Duration(seconds: 5),
@@ -14,7 +19,7 @@ class AuthService {
   );
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
-  late final Auth0 _auth0;
+  final Auth0 _auth0;
 
   static const String _accessTokenKey = 'access_token';
   static const String _refreshTokenKey = 'refresh_token';
@@ -27,9 +32,19 @@ class AuthService {
     return _instance;
   }
 
-  AuthService._internal() {
-    _auth0 = Auth0(ApiConfig.auth0Domain, ApiConfig.auth0ClientId);
-  }
+  /// A non-singleton instance for tests. Token storage is still
+  /// [FlutterSecureStorage]; seed it with `setMockInitialValues`.
+  @visibleForTesting
+  factory AuthService.forTesting({
+    required Dio Function(BaseOptions options) dioFactory,
+    Auth0? auth0,
+  }) => AuthService._internal(dioFactory: dioFactory, auth0: auth0);
+
+  AuthService._internal({
+    Dio Function(BaseOptions options)? dioFactory,
+    Auth0? auth0,
+  }) : _newDio = dioFactory ?? Dio.new,
+       _auth0 = auth0 ?? Auth0(ApiConfig.auth0Domain, ApiConfig.auth0ClientId);
 
   /// Get authenticated Dio instance with JWT token
   Future<Dio> _getAuthenticatedDio() async {
@@ -37,7 +52,7 @@ class AuthService {
     if (token == null) {
       throw Exception('Not authenticated');
     }
-    return Dio(
+    return _newDio(
       BaseOptions(
         baseUrl: ApiConfig.baseUrl,
         connectTimeout: const Duration(seconds: 10),
@@ -241,6 +256,16 @@ class AuthService {
       if (response.statusCode == 200) {
         final newAccessToken = response.data['access'] as String;
         await _storage.write(key: _accessTokenKey, value: newAccessToken);
+        // The server rotates refresh tokens (ROTATE_REFRESH_TOKENS), so the
+        // one just sent is spent; with the blacklist on, reusing it at the
+        // next refresh would sign the user out.
+        final rotatedRefreshToken = response.data['refresh'] as String?;
+        if (rotatedRefreshToken != null) {
+          await _storage.write(
+            key: _refreshTokenKey,
+            value: rotatedRefreshToken,
+          );
+        }
         return newAccessToken;
       }
     } catch (e) {

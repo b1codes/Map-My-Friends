@@ -1,0 +1,33 @@
+{
+  "description": "Log a touchpoint. contacted_at is sent in UTC.",
+  "consumer": "ApiService.addContactLog",
+  "provider_state": "user_with_person",
+  "request": {
+    "method": "POST",
+    "path": "contact-logs/",
+    "auth": "user",
+    "json": {
+      "person": "Pp5ltxR4W9tpvZTZUlY7",
+      "channel": "CALL",
+      "contacted_at": "2026-10-20T18:30:00.000Z",
+      "note": "Caught up about COBOL"
+    }
+  },
+  "response": {
+    "status": 201,
+    "schema": "ContactLog",
+    "expect": {
+      "/person": "Pp5ltxR4W9tpvZTZUlY7",
+      "/channel": "CALL",
+      "/note": "Caught up about COBOL"
+    },
+    "example": {
+      "id": "MdSXYBzGfdyHp1R17jee",
+      "person": "Pp5ltxR4W9tpvZTZUlY7",
+      "channel": "CALL",
+      "contacted_at": "2026-10-20T18:30:00+00:00",
+      "note": "Caught up about COBOL",
+      "created_at": "2026-10-26T14:58:09.245762+00:00"
+    }
+  }
+}

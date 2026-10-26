@@ -32,6 +32,7 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'bloc/map/map_settings_cubit.dart';
 import 'bloc/trip/trip_bloc.dart';
+import 'bloc/trip/trip_event.dart';
 import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -66,14 +67,6 @@ class MyApp extends StatelessWidget {
         BlocProvider<LocationBloc>(
           create: (context) => LocationBloc()..add(LoadLocation()),
         ),
-        BlocProvider<PeopleBloc>(
-          create: (context) =>
-              PeopleBloc(apiService: apiService)..add(LoadPeople()),
-        ),
-        BlocProvider<PulseBloc>(
-          create: (context) => PulseBloc(apiService: apiService),
-        ),
-        BlocProvider<ProfileBloc>(create: (context) => ProfileBloc()),
         BlocProvider<ThemeCubit>(create: (context) => ThemeCubit()),
         BlocProvider<MapSettingsCubit>(
           create: (context) => MapSettingsCubit(prefs: prefs),
@@ -84,28 +77,74 @@ class MyApp extends StatelessWidget {
         BlocProvider<StationBloc>(
           create: (context) => StationBloc()..add(LoadMapStations()),
         ),
-        BlocProvider<TripBloc>(create: (context) => TripBloc()),
       ],
-      child: BlocBuilder<ThemeCubit, ThemeMode>(
-        builder: (context, themeMode) {
-          return MaterialApp(
-            title: 'Map My Friends',
-            localizationsDelegates: const [
-              AppLocalizations.delegate,
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            supportedLocales: const [
-              Locale('en'), // English
-              Locale('es'), // Spanish
-            ],
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: themeMode,
-            home: const AuthWrapper(),
-          );
-        },
+      child: SignedInScope(
+        providers: [
+          BlocProvider<PeopleBloc>(
+            create: (context) =>
+                PeopleBloc(apiService: apiService)..add(LoadPeople()),
+          ),
+          BlocProvider<PulseBloc>(
+            create: (context) => PulseBloc(apiService: apiService),
+          ),
+          BlocProvider<ProfileBloc>(create: (context) => ProfileBloc()),
+          BlocProvider<TripBloc>(create: (context) => TripBloc()),
+        ],
+        child: BlocBuilder<ThemeCubit, ThemeMode>(
+          builder: (context, themeMode) {
+            return MaterialApp(
+              title: 'Map My Friends',
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: const [
+                Locale('en'), // English
+                Locale('es'), // Spanish
+              ],
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
+              themeMode: themeMode,
+              home: const AuthWrapper(),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Provides the blocs that hold one account's data (people, pulse, profile,
+/// trips), and recreates them each time someone signs in or out.
+///
+/// They used to sit beside the app-wide blocs and live as long as the app.
+/// Signing out and into another account in the same session then showed
+/// the previous account's people, trips and half-planned trip. Recreating
+/// them on every sign-in and sign-out also rebuilds the app below, so the
+/// navigation stack starts fresh too. Device-level state (theme, map
+/// settings, location, the static airport and station data) stays outside.
+class SignedInScope extends StatelessWidget {
+  final List<BlocProvider> providers;
+  final Widget child;
+
+  const SignedInScope({
+    super.key,
+    required this.providers,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<AuthBloc, AuthState>(
+      buildWhen: (previous, current) =>
+          (previous is Authenticated) != (current is Authenticated),
+      builder: (context, state) => MultiBlocProvider(
+        // A new key is a new element, so every provider creates afresh.
+        key: ValueKey<bool>(state is Authenticated),
+        providers: providers,
+        child: child,
       ),
     );
   }
@@ -149,6 +188,10 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     // Load profile data (custom pin settings) on app launch
     context.read<ProfileBloc>().add(LoadProfile());
+    // Saved trips belong to whoever just signed in. Nothing else fetches
+    // them until a trip is saved or deleted, so without this My Trips is
+    // empty after every launch.
+    context.read<TripBloc>().add(const FetchUserTrips());
   }
 
   Widget _getScreen(int index) {

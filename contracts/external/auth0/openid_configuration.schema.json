@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Auth0 OpenID Connect discovery document",
+  "description": "Django does not read this document; it hardcodes the issuer, JWKS and userinfo URLs from AUTH0_DOMAIN. The live check uses it to prove those hardcoded URLs are still the tenant's real ones.",
+  "type": "object",
+  "required": [
+    "issuer",
+    "jwks_uri",
+    "userinfo_endpoint",
+    "id_token_signing_alg_values_supported"
+  ],
+  "properties": {
+    "issuer": {
+      "type": "string",
+      "pattern": "^https://.+/$"
+    },
+    "jwks_uri": {
+      "type": "string",
+      "pattern": "^https://"
+    },
+    "userinfo_endpoint": {
+      "type": "string",
+      "pattern": "^https://"
+    },
+    "id_token_signing_alg_values_supported": {
+      "type": "array",
+      "contains": {
+        "const": "RS256"
+      }
+    }
+  }
+}
