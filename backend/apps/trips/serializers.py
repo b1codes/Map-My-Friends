@@ -1,5 +1,12 @@
 from rest_framework import serializers
 
+from apps.airports import reference as airport_reference
+from apps.airports.serializers import AirportSerializer
+from apps.common.ownership import owner_key_for
+from apps.people.repositories import PersonRepository
+from apps.stations import reference as station_reference
+from apps.stations.serializers import StationSerializer
+
 STATUS_CHOICES = ["DRAFT", "BOOKED", "CANCELLED"]
 TRANSPORT_CHOICES = ["FLIGHT", "TRAIN", "BUS", "CAR"]
 
@@ -47,6 +54,38 @@ class PointField(serializers.Field):
         return {"lat": lat, "lng": lng}
 
 
+class StopPersonSerializer(serializers.Serializer):
+    """A person on a trip stop, flat rather than GeoJSON.
+
+    TripStop.fromJson parses people_detail with Person.fromJson, which reads
+    `latitude`/`longitude` keys instead of a geometry.
+    """
+
+    id = serializers.CharField(read_only=True)
+    tag = serializers.CharField(read_only=True)
+    first_name = serializers.CharField(read_only=True)
+    last_name = serializers.CharField(read_only=True)
+    city = serializers.CharField(read_only=True)
+    state = serializers.CharField(read_only=True)
+    country = serializers.CharField(read_only=True)
+    street = serializers.CharField(read_only=True, allow_null=True)
+    birthday = serializers.CharField(read_only=True, allow_null=True)
+    phone_number = serializers.CharField(read_only=True, allow_null=True)
+    latitude = serializers.FloatField(source="lat", read_only=True, allow_null=True)
+    longitude = serializers.FloatField(source="lng", read_only=True, allow_null=True)
+    profile_image = serializers.SerializerMethodField()
+    timezone = serializers.CharField(read_only=True, allow_null=True)
+    pin_color = serializers.CharField(read_only=True)
+    pin_style = serializers.CharField(read_only=True)
+    pin_icon_type = serializers.CharField(read_only=True)
+    pin_emoji = serializers.CharField(read_only=True, allow_null=True)
+
+    def get_profile_image(self, obj):
+        from apps.common.storage import upload_url
+
+        return upload_url(obj.profile_image, self.context.get("request"))
+
+
 class TripStopSerializer(serializers.Serializer):
     id = serializers.CharField(read_only=True)
     trip = serializers.CharField(source="trip_id", read_only=True)
@@ -63,6 +102,33 @@ class TripStopSerializer(serializers.Serializer):
     )
     snapshot_address = serializers.CharField(read_only=True, allow_blank=True)
     snapshot_metadata = serializers.DictField(read_only=True)
+    # What the planner draws and routes with after a reload: TripStop.fromJson
+    # builds its people and hub from these, not from the bare ids above.
+    people_detail = serializers.SerializerMethodField()
+    airport_detail = serializers.SerializerMethodField()
+    station_detail = serializers.SerializerMethodField()
+
+    def get_people_detail(self, obj):
+        # The views prefetch the owner's people into the context (see
+        # stop_context), so ids that are not the owner's never resolve.
+        people = self.context.get("people", {})
+        return [
+            StopPersonSerializer(people[person_id], context=self.context).data
+            for person_id in obj.person_ids
+            if person_id in people
+        ]
+
+    def get_airport_detail(self, obj):
+        if not obj.airport_id:
+            return None
+        airport = airport_reference.get_by_id(obj.airport_id)
+        return AirportSerializer(airport).data if airport else None
+
+    def get_station_detail(self, obj):
+        if not obj.station_id:
+            return None
+        station = station_reference.get_by_id(obj.station_id)
+        return StationSerializer(station).data if station else None
 
     def to_internal_value(self, data):
         ret = super().to_internal_value(data)
@@ -91,6 +157,14 @@ class TripLegSerializer(serializers.Serializer):
         max_length=100, required=False, allow_blank=True
     )
     ticket_data = serializers.DictField(required=False)
+
+
+def stop_context(request, stops) -> dict:
+    """Serializer context for stops: the request, plus the owner's people the
+    stops name, read in one batch rather than once per stop."""
+    person_ids = [person_id for stop in stops for person_id in stop.person_ids]
+    people = PersonRepository().get_many_for_owner(person_ids, owner_key_for(request))
+    return {"request": request, "people": people}
 
 
 class TripSerializer(serializers.Serializer):

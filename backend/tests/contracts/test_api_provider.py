@@ -46,9 +46,10 @@ PNG = bytes.fromhex(
 # by this suite and not yet fixed. Each runs as an expected failure, so fixing
 # one fails the suite until its entry is removed.
 KNOWN_GAPS = {
-    "trips.create": "Trip stops lack people_detail/airport_detail/station_detail.",
-    "trips.list": "Trip stops lack people_detail/airport_detail/station_detail.",
-    "trips.update": "Trip stops lack the *_detail fields, and leg edits are lost.",
+    # https://app.clickup.com/t/86bcqv41c
+    "trips.update": "Leg edits are lost: the client sends stops and legs "
+    "together, replacing the stops regenerates the legs under new ids, and "
+    "the edits then patch legs that no longer exist.",
 }
 
 

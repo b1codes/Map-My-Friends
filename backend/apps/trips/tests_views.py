@@ -6,6 +6,7 @@ from rest_framework.test import APITestCase
 
 from apps.common import firestore as fs
 from apps.common.testing import FirestoreTestMixin, ThrottleIsolationMixin
+from apps.people.repositories import PersonRepository
 from apps.trips.repositories import TripRepository
 
 TRIPS_URL = "/api/trips/"
@@ -98,6 +99,90 @@ class TripListRetrieveTests(TripViewTestCase):
     def test_retrieve_unknown_trip_returns_404(self):
         response = self.client.get(f"{TRIPS_URL}does-not-exist/")
         self.assertEqual(response.status_code, 404)
+
+
+class TripStopDetailTests(TripViewTestCase):
+    """Stops carry the people and hub the Flutter planner draws and routes
+    with after a reload (TripStop.fromJson reads the *_detail fields)."""
+
+    def setUp(self):
+        super().setUp()
+        self.grace = PersonRepository().create(
+            "owner-a",
+            {
+                "tag": "FRIEND",
+                "first_name": "Grace",
+                "last_name": "Hopper",
+                "city": "Milwaukee",
+                "state": "WI",
+                "country": "USA",
+                "lat": 43.0389,
+                "lng": -87.9065,
+                "timezone": "America/Chicago",
+            },
+        )
+
+    def test_person_stop_carries_the_person_flat(self):
+        trip = self.create_trip(stops=[stop(0, people=[self.grace.id])])
+
+        (detail,) = trip["stops"][0]["people_detail"]
+        self.assertEqual(detail["id"], self.grace.id)
+        self.assertEqual(detail["first_name"], "Grace")
+        self.assertEqual(detail["tag"], "FRIEND")
+        self.assertEqual(detail["latitude"], 43.0389)
+        self.assertEqual(detail["longitude"], -87.9065)
+        self.assertNotIn("geometry", detail)
+        self.assertIsNone(trip["stops"][0]["airport_detail"])
+        self.assertIsNone(trip["stops"][0]["station_detail"])
+
+    def test_hub_stops_carry_the_airport_and_station_features(self):
+        trip = self.create_trip(stops=[stop(0, airport=2364), stop(1, station=1753)])
+
+        airport_stop, station_stop = trip["stops"]
+        self.assertEqual(airport_stop["airport_detail"]["id"], 2364)
+        self.assertEqual(
+            airport_stop["airport_detail"]["properties"]["iata_code"], "MDW"
+        )
+        self.assertEqual(station_stop["station_detail"]["id"], 1753)
+        self.assertEqual(airport_stop["people_detail"], [])
+
+    def test_unknown_hub_ids_have_no_detail(self):
+        trip = self.create_trip(stops=[stop(0, airport=999999, station=999999)])
+        self.assertIsNone(trip["stops"][0]["airport_detail"])
+        self.assertIsNone(trip["stops"][0]["station_detail"])
+
+    def test_another_owners_person_is_never_detailed(self):
+        # Stop people ids are not validated on write, so the read side must
+        # not resolve someone else's person through a trip.
+        theirs = PersonRepository().create(
+            "owner-b", {"tag": "FRIEND", "first_name": "Secret", "lat": 1, "lng": 1}
+        )
+        trip = self.create_trip(stops=[stop(0, people=[theirs.id, self.grace.id])])
+
+        stop_data = trip["stops"][0]
+        self.assertEqual(stop_data["people"], [theirs.id, self.grace.id])
+        self.assertEqual([p["id"] for p in stop_data["people_detail"]], [self.grace.id])
+
+    def test_list_retrieve_update_and_stops_action_all_detail(self):
+        trip = self.create_trip(stops=[stop(0, people=[self.grace.id])])
+        url = f"{TRIPS_URL}{trip['id']}/"
+
+        responses = {
+            "list": self.client.get(TRIPS_URL).data[0]["stops"][0],
+            "retrieve": self.client.get(url).data["stops"][0],
+            "update": self.client.patch(
+                url, {"stops": [stop(0, people=[self.grace.id])]}, format="json"
+            ).data["stops"][0],
+            "stops": self.client.get(f"{url}stops/").data[0],
+            "add stop": self.client.post(
+                f"{url}stops/", stop(1, people=[self.grace.id]), format="json"
+            ).data,
+        }
+        for name, stop_data in responses.items():
+            with self.subTest(name):
+                self.assertEqual(
+                    [p["first_name"] for p in stop_data["people_detail"]], ["Grace"]
+                )
 
 
 class TripCreateTests(TripViewTestCase):

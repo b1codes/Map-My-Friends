@@ -74,6 +74,44 @@ class PersonRepositoryTests(FirestoreTestMixin, SimpleTestCase):
         self.assertIsNotNone(self.people.get_for_owner(person.id, "owner-a"))
 
 
+class GetManyForOwnerTests(FirestoreTestMixin, SimpleTestCase):
+    collections_to_purge = ["people"]
+
+    def setUp(self):
+        super().setUp()
+        self.people = PersonRepository()
+
+    def test_returns_the_owners_people_keyed_by_id(self):
+        ada = self.people.create("owner-a", PERSON_DATA)
+        grace = self.people.create("owner-a", {**PERSON_DATA, "first_name": "Grace"})
+
+        found = self.people.get_many_for_owner([grace.id, ada.id], "owner-a")
+
+        self.assertEqual(set(found), {ada.id, grace.id})
+        self.assertEqual(found[grace.id].first_name, "Grace")
+        self.assertEqual(found[ada.id].lat, 51.5074)
+
+    def test_leaves_out_other_owners_unknown_and_malformed_ids(self):
+        mine = self.people.create("owner-a", PERSON_DATA)
+        theirs = self.people.create("owner-b", PERSON_DATA)
+
+        found = self.people.get_many_for_owner(
+            [mine.id, theirs.id, "missing", "a/b", "__x__", ""], "owner-a"
+        )
+
+        self.assertEqual(set(found), {mine.id})
+
+    def test_repeated_ids_are_read_once(self):
+        mine = self.people.create("owner-a", PERSON_DATA)
+        self.assertEqual(
+            set(self.people.get_many_for_owner([mine.id, mine.id], "owner-a")),
+            {mine.id},
+        )
+
+    def test_no_ids_means_no_read(self):
+        self.assertEqual(self.people.get_many_for_owner([], "owner-a"), {})
+
+
 class ContactLogRepositoryTests(FirestoreTestMixin, SimpleTestCase):
     collections_to_purge = ["people"]
 
