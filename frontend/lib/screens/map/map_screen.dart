@@ -28,6 +28,7 @@ import '../../bloc/station/station_state.dart';
 import '../../bloc/trip/trip_bloc.dart';
 import '../../bloc/trip/trip_state.dart';
 import '../../components/map/horizontal_trip_planner.dart';
+import '../../services/api_config.dart';
 import '../../components/shared/thermal_response.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/app_theme.dart';
@@ -63,6 +64,10 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   String _getTileUrl(BuildContext context, MapSettingsState settings) {
+    if (ApiConfig.tileUrlOverride.isNotEmpty) {
+      return ApiConfig.tileUrlOverride;
+    }
+
     final isDark = _isDark(context, settings);
 
     if (settings.mapType == MapType.satellite) {

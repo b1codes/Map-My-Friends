@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import requests
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from apps.trips.services import OSRMService, RoutingError, TransportLookupService
 
@@ -39,6 +39,20 @@ class OSRMServiceTests(SimpleTestCase):
             "https://router.project-osrm.org/route/v1/driving/"
             "-87.6298,41.8781;-0.1278,51.5074?overview=full&geometries=geojson",
             timeout=10,
+        )
+
+    @override_settings(OSRM_BASE_URL="http://stubs:8090/route/v1/driving")
+    def test_base_url_comes_from_settings(self, mock_get):
+        mock_get.return_value = osrm_response(
+            {"code": "Ok", "routes": [{"geometry": GEOMETRY}]}
+        )
+
+        OSRMService.get_route([CHICAGO, LONDON])
+
+        self.assertTrue(
+            mock_get.call_args.args[0].startswith(
+                "http://stubs:8090/route/v1/driving/-87.6298,41.8781;"
+            )
         )
 
     def test_rejects_fewer_than_two_coordinates(self, mock_get):

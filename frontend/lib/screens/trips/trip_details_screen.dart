@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../models/trip.dart';
 import '../../components/shared/glass_container.dart';
 import '../../utils/app_theme.dart';
+import '../../services/api_config.dart';
 import '../../services/routing_service.dart';
 import '../../bloc/map/map_settings_cubit.dart';
 import '../../utils/window_size.dart';
@@ -168,7 +169,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                 : settingsState.themeMode == ThemeMode.dark;
 
             String tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-            if (settingsState.mapType == MapType.satellite) {
+            if (ApiConfig.tileUrlOverride.isNotEmpty) {
+              tileUrl = ApiConfig.tileUrlOverride;
+            } else if (settingsState.mapType == MapType.satellite) {
               tileUrl =
                   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
             } else if (settingsState.mapType == MapType.minimal) {

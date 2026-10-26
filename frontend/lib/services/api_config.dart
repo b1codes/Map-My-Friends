@@ -2,7 +2,15 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 class ApiConfig {
+  /// Replaces every per-platform default below when set, e.g.
+  /// `--dart-define=API_BASE_URL=http://localhost:8100/api/` (the E2E stack).
+  static const String _baseUrlOverride = String.fromEnvironment('API_BASE_URL');
+
   static String get baseUrl {
+    if (_baseUrlOverride.isNotEmpty) {
+      return _baseUrlOverride;
+    }
+
     if (kReleaseMode) {
       // Production URL
       return 'https://your-production-url.com/api/';
@@ -25,6 +33,19 @@ class ApiConfig {
     // Fallback
     return 'http://localhost:8000/api/';
   }
+
+  /// OSRM's driving-route endpoint, without the trailing coordinates.
+  static const String osrmBaseUrl = String.fromEnvironment(
+    'OSRM_BASE_URL',
+    defaultValue: 'https://router.project-osrm.org/route/v1/driving',
+  );
+
+  /// A single tile URL template that replaces every map style's own tile
+  /// server. Empty (the default) keeps the per-style servers. The E2E suite
+  /// points it at a local stub so tests never load public tile servers.
+  static const String tileUrlOverride = String.fromEnvironment(
+    'TILE_URL_TEMPLATE',
+  );
 
   static const String auth0Domain = String.fromEnvironment(
     'AUTH0_DOMAIN',

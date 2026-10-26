@@ -95,7 +95,11 @@ WSGI_APPLICATION = "config.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "django_internal.sqlite3",
+        # Overridable so a throwaway stack (the E2E suite) doesn't write its
+        # users into the bind-mounted development database.
+        "NAME": os.environ.get(
+            "DJANGO_SQLITE_PATH", BASE_DIR / "django_internal.sqlite3"
+        ),
     }
 }
 
@@ -234,3 +238,12 @@ AUTH0_AUDIENCE = os.environ.get("AUTH0_AUDIENCE", "https://api.mapmyfriends.com/
 # firebase-admin auto-detects FIRESTORE_EMULATOR_HOST; when it is set the
 # client talks to the local emulator and no credentials are required.
 FIRESTORE_PROJECT_ID = os.environ.get("FIRESTORE_PROJECT_ID", "map-my-friends-local")
+
+# Third-party services. The defaults are the public hosts the app uses in
+# production; the E2E stack (docker-compose.e2e.yml) points them at local stubs
+# so journeys are deterministic and don't load volunteer-run servers.
+NOMINATIM_DOMAIN = os.environ.get("NOMINATIM_DOMAIN", "nominatim.openstreetmap.org")
+NOMINATIM_SCHEME = os.environ.get("NOMINATIM_SCHEME", "https")
+OSRM_BASE_URL = os.environ.get(
+    "OSRM_BASE_URL", "https://router.project-osrm.org/route/v1/driving"
+)

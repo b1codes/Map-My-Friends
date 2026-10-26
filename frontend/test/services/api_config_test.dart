@@ -25,4 +25,13 @@ void main() {
     expect(ApiConfig.auth0ClientId, isNot('YOUR_AUTH0_CLIENT_ID'));
     expect(ApiConfig.auth0Audience, 'https://api.mapmyfriends.com/');
   });
+
+  test('third-party endpoints default to the public servers', () {
+    expect(
+      ApiConfig.osrmBaseUrl,
+      'https://router.project-osrm.org/route/v1/driving',
+    );
+    // Empty means each map style keeps its own tile server.
+    expect(ApiConfig.tileUrlOverride, isEmpty);
+  });
 }

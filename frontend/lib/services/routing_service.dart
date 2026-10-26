@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:latlong2/latlong.dart';
 import '../models/trip.dart';
+import 'api_config.dart';
 
 class RoutingService {
   /// A plain Dio, deliberately not `ApiService.dio`: OSRM is a public
@@ -76,7 +77,7 @@ class RoutingService {
       final coordinates =
           '${start.longitude},${start.latitude};${end.longitude},${end.latitude}';
       final url =
-          'https://router.project-osrm.org/route/v1/driving/$coordinates?overview=full&geometries=geojson';
+          '${ApiConfig.osrmBaseUrl}/$coordinates?overview=full&geometries=geojson';
 
       final response = await _dio.get(url);
 
