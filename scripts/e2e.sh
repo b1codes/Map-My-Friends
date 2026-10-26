@@ -20,7 +20,8 @@
 #   E2E_DRIVER_PORT   chromedriver port        (default 4444)
 #   E2E_HEADED=1      show the browser instead of running headless
 #   E2E_KEEP_STACK=1  leave the stack running afterwards (for debugging)
-#   E2E_WINDOW        browser window size      (default 1280,800)
+#   E2E_WINDOW        browser window size      (default 1280,1000; journeys
+#                     always see 1280x720, see journeyWindow in support/e2e.dart)
 #
 # Distinct ports and project names let several runs share one machine.
 set -euo pipefail
@@ -33,7 +34,7 @@ export E2E_API_PORT="${E2E_API_PORT:-8100}"
 export E2E_STUBS_PORT="${E2E_STUBS_PORT:-8190}"
 PROJECT="${E2E_PROJECT:-map-my-friends-e2e}"
 DRIVER_PORT="${E2E_DRIVER_PORT:-4444}"
-WINDOW="${E2E_WINDOW:-1280,800}"
+WINDOW="${E2E_WINDOW:-1280,1000}"
 API_URL="http://localhost:${E2E_API_PORT}/api/"
 STUBS_URL="http://localhost:${E2E_STUBS_PORT}"
 
@@ -46,8 +47,10 @@ cleanup() {
   local status=$?
   [[ -n "$DRIVER_PID" ]] && kill "$DRIVER_PID" 2>/dev/null || true
   if [[ $status -ne 0 ]]; then
-    echo "--- E2E failed; last API log lines ---" >&2
-    compose logs --tail=80 api >&2 || true
+    mkdir -p "$FRONTEND/build/e2e"
+    compose logs --no-color api stubs >"$FRONTEND/build/e2e/stack.log" 2>&1 || true
+    echo "--- E2E failed; last API log lines (all of it: build/e2e/stack.log) ---" >&2
+    compose logs --no-color --tail=40 api >&2 || true
   fi
   if [[ "${E2E_KEEP_STACK:-}" != "1" ]]; then
     compose down -v --remove-orphans >/dev/null 2>&1 || true

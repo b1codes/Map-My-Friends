@@ -206,12 +206,14 @@ jobs:
           CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
         run: scripts/e2e.sh
 
-      - name: Upload Failure Screenshots
+      - name: Upload Failure Screenshots and Stack Logs
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
         with:
-          name: e2e-screenshots
-          path: frontend/build/e2e/screenshots/
+          name: e2e-failure
+          path: |
+            frontend/build/e2e/screenshots/
+            frontend/build/e2e/stack.log
           if-no-files-found: ignore
 
   # -----------------------------------------------------------------

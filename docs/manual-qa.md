@@ -16,7 +16,7 @@ The E2E journeys cover username and password accounts. Auth0 redirects to a host
 
 ## Location
 
-Headless Chrome has no location, so the E2E journeys run with it unavailable.
+The E2E journeys always run as a user who declined the location prompt.
 
 - [ ] **First launch:** the OS permission prompt appears. After you allow it, the map centres on you.
 - [ ] **Deny:** the map still works without your position. Asking again from Settings shows "Location permission denied".

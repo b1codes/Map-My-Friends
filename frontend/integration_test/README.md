@@ -48,9 +48,10 @@ void main() {
 
 The helpers are in [`support/e2e.dart`](support/e2e.dart):
 
-- **`journey`** is `testWidgets` plus a screenshot of the screen on failure. Screenshots are saved to `frontend/build/e2e/screenshots/`, and CI uploads them as the `e2e-screenshots` artifact.
+- **`journey`** is `testWidgets` plus a screenshot of the screen on failure. Screenshots are saved to `frontend/build/e2e/screenshots/`, and CI uploads them, with the API and stub logs, as the `e2e-failure` artifact.
 - **`pumpUntil` / `pumpUntilGone`** replace `pumpAndSettle`. The app animates forever (the ambient background and the pulse indicators), so it never settles. On a timeout the failure lists the text on screen.
 - **`launchApp`** clears device storage first, so it behaves like a first visit. `launchApp(keepDeviceState: true)` is a returning user, and it's how journeys check that something survives a restart.
+- **Same conditions on every machine:** every launch runs as a user who declined the location prompt, so the map stays on its fallback centre (San Francisco). Headless Chrome otherwise has no location on macOS but reports one on the Linux CI runner. Journeys also always see a 1280×720 window (`journeyWindow`), whatever size the real browser viewport is.
 - **`enterField('Label', text)`, `tapText`, `tapOn`, `toast(...)` and `tab('People')`** find things the way a user does: by visible label, or by the navigation's semantics label.
 - **`JourneyUser`** gives every journey its own user. It can also register one and get a signed-in `Dio` (`user.api()`) to arrange state the journey isn't about.
 

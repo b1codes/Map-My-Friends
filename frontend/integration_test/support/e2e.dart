@@ -9,6 +9,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:map_my_friends/main.dart' as app;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,6 +28,14 @@ const String journeyPassword = 'Journey-pass-2026!';
 /// How long to wait for the app to reach an expected screen. Generous: the
 /// first API call after a cold start also warms Django and the emulator.
 const Duration defaultTimeout = Duration(seconds: 30);
+
+/// The window every journey sees, in logical pixels, whatever the browser's
+/// real viewport is. Headless Chrome's viewport for the same window size
+/// differs by platform (657px tall on macOS, 600px on the Linux CI runner),
+/// and the layout differs between those heights, so journeys pin one
+/// laptop-sized window. scripts/e2e.sh opens the browser
+/// larger than this so the whole of it is visible in failure screenshots.
+const Size journeyWindow = Size(1280, 720);
 
 IntegrationTestWidgetsFlutterBinding get binding =>
     IntegrationTestWidgetsFlutterBinding.instance;
@@ -62,6 +71,10 @@ void journey(
     // Navigation is found by semantics label (see [tab]), so the semantics
     // tree must be built, as it is for a screen-reader user.
     final semantics = tester.ensureSemantics();
+    tester.view
+      ..devicePixelRatio = 1
+      ..physicalSize = journeyWindow;
+    addTearDown(tester.view.reset);
     try {
       await body(tester);
     } catch (_) {
@@ -115,9 +128,29 @@ Future<void> launchApp(
   imageCache
     ..clear()
     ..clearLiveImages();
+  // Location is the one browser capability that differs between machines:
+  // headless Chrome has none on macOS but reports a position on the Linux CI
+  // runner, which moves the map away from the people a journey seeded. Every
+  // journey runs as a user who declined the location prompt; the prompt
+  // itself is on the manual QA checklist.
+  GeolocatorPlatform.instance = _LocationDeclined();
   app.main();
   // The first frames are the auth check; let it start before callers wait.
   await tester.pump(const Duration(milliseconds: 100));
+}
+
+/// A device where the user answered "Don't allow" to the location prompt.
+class _LocationDeclined extends GeolocatorPlatform {
+  @override
+  Future<bool> isLocationServiceEnabled() async => true;
+
+  @override
+  Future<LocationPermission> checkPermission() async =>
+      LocationPermission.denied;
+
+  @override
+  Future<LocationPermission> requestPermission() async =>
+      LocationPermission.denied;
 }
 
 /// Pumps frames until [finder] matches, or fails after [timeout].
