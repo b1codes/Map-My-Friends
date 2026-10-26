@@ -283,7 +283,9 @@ void main() {
     verifyNever(() => tripBloc.add(any()));
   });
 
-  testWidgets('choosing a status closes the status dialog', (tester) async {
+  testWidgets('choosing a status updates that trip and closes the dialog', (
+    tester,
+  ) async {
     withTrips([_draft]);
     await pumpTrips(tester);
 
@@ -293,8 +295,10 @@ void main() {
     await tester.tap(find.text('BOOKED'));
     await _settle(tester);
 
-    // Which event this should send is a reported bug (it saves the trip
-    // loaded in the planner, not this one), so only the dialog is checked.
+    // The trip chosen in the list, not whatever the planner has open.
+    verify(
+      () => tripBloc.add(UpdateTripStatus(_draft, TripStatus.booked)),
+    ).called(1);
     expect(find.text('Update Trip Status'), findsNothing);
   });
 

@@ -27,6 +27,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     on<ClearTrip>(_onClearTrip);
     on<OptimizeTrip>(_onOptimizeTrip);
     on<SaveTrip>(_onSaveTrip);
+    on<UpdateTripStatus>(_onUpdateTripStatus);
     on<UpdateLegDetails>(_onUpdateLegDetails);
     on<FetchUserTrips>(_onFetchUserTrips);
     on<LoadTrip>(_onLoadTrip);
@@ -240,6 +241,19 @@ class TripBloc extends Bloc<TripEvent, TripState> {
           legs: savedTrip.legs,
         ),
       );
+      add(const FetchUserTrips());
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, error: e.toString()));
+    }
+  }
+
+  Future<void> _onUpdateTripStatus(
+    UpdateTripStatus event,
+    Emitter<TripState> emit,
+  ) async {
+    emit(state.copyWith(isLoading: true, clearError: true));
+    try {
+      await _apiService.updateTrip(event.trip.copyWith(status: event.status));
       add(const FetchUserTrips());
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString()));

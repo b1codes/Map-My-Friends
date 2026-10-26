@@ -243,31 +243,27 @@ void main() {
       await pumpUntil(tester, find.textContaining('Grace'));
     });
 
-    journey(
-      'booking a trip that isn\'t open in the planner keeps its stops',
-      skip:
-          'Known bug: Update Status saves the planner\'s current trip, so '
-          'with the planner cleared it creates a new, empty trip',
-      (tester) async {
-        final world = await TripWorld.create('status');
-        await launchSignedIn(tester, world.user);
-        await planAndSaveTrip(tester, world);
+    journey('booking a trip that isn\'t open in the planner keeps its stops', (
+      tester,
+    ) async {
+      final world = await TripWorld.create('status');
+      await launchSignedIn(tester, world.user);
+      await planAndSaveTrip(tester, world);
 
-        await goToTab(tester, 'Map');
-        await tapOn(tester, find.bySemanticsLabel('Clear Trip'));
-        await pumpUntilGone(tester, planner);
+      await goToTab(tester, 'Map');
+      await tapOn(tester, find.bySemanticsLabel('Clear Trip'));
+      await pumpUntilGone(tester, planner);
 
-        await goToTab(tester, 'Trips');
-        await tripMenu(tester, draftTripName, 'Update Status');
-        await tapText(tester, 'BOOKED');
-        await pumpUntil(tester, find.text('Booked'));
+      await goToTab(tester, 'Trips');
+      await tripMenu(tester, draftTripName, 'Update Status');
+      await tapText(tester, 'BOOKED');
+      await pumpUntil(tester, find.text('Booked'));
 
-        final trips = await world.savedTrips();
-        expect(trips, hasLength(1));
-        expect(trips.single['status'], 'BOOKED');
-        expect(trips.single['stops'], hasLength(3));
-      },
-    );
+      final trips = await world.savedTrips();
+      expect(trips, hasLength(1));
+      expect(trips.single['status'], 'BOOKED');
+      expect(trips.single['stops'], hasLength(3));
+    });
 
     journey('a deleted trip is gone for good', (tester) async {
       final world = await TripWorld.create('delete');

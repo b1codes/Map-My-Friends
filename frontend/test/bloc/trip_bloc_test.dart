@@ -716,6 +716,66 @@ void main() {
     );
   });
 
+  group('UpdateTripStatus', () {
+    final saved = Trip(
+      id: 'saved-1',
+      name: 'Road Trip',
+      date: DateTime(2026, 8, 1),
+      startDate: DateTime(2026, 8, 1),
+      stops: [
+        _stop(0, lat: 1, lng: 1, id: 's1'),
+        _stop(1, lat: 2, lng: 2),
+      ],
+    );
+    final plannerStops = [_stop(0, lat: 9, lng: 9)];
+
+    blocTest<TripBloc, TripState>(
+      'updates that trip by id, not the one open in the planner',
+      build: () {
+        when(
+          () => apiService.updateTrip(any()),
+        ).thenAnswer((inv) async => inv.positionalArguments.first as Trip);
+        when(() => apiService.getTrips()).thenAnswer((_) async => [saved]);
+        return tripBloc;
+      },
+      // A different, unsaved trip is open in the planner.
+      seed: () => TripState(stops: plannerStops),
+      act: (bloc) => bloc.add(UpdateTripStatus(saved, TripStatus.booked)),
+      verify: (bloc) {
+        final sent =
+            verify(() => apiService.updateTrip(captureAny())).captured.single
+                as Trip;
+        expect(sent, saved.copyWith(status: TripStatus.booked));
+        verifyNever(() => apiService.createTrip(any()));
+        verify(() => apiService.getTrips()).called(1);
+        expect(bloc.state.stops, plannerStops);
+        expect(bloc.state.currentTripId, isNull);
+        expect(bloc.state.userTrips, [saved]);
+      },
+    );
+
+    blocTest<TripBloc, TripState>(
+      'reports a failure and keeps the planner',
+      build: () {
+        when(
+          () => apiService.updateTrip(any()),
+        ).thenThrow(Exception('Failed to update trip'));
+        return tripBloc;
+      },
+      seed: () => TripState(stops: plannerStops, currentTripId: 'other'),
+      act: (bloc) => bloc.add(UpdateTripStatus(saved, TripStatus.booked)),
+      expect: () => [
+        TripState(stops: plannerStops, currentTripId: 'other', isLoading: true),
+        TripState(
+          stops: plannerStops,
+          currentTripId: 'other',
+          error: 'Exception: Failed to update trip',
+        ),
+      ],
+      verify: (_) => verifyNever(() => apiService.getTrips()),
+    );
+  });
+
   group('FetchUserTrips', () {
     blocTest<TripBloc, TripState>(
       'emits [isLoading: true, isLoading: false] with trips',
