@@ -160,7 +160,7 @@ void main() {
       },
       skip:
           'Known bug: ThemeCubit keeps the app theme in memory only, so '
-          'it resets to System on every launch',
+          'it resets to System on every launch (ClickUp 86bcrpgxf)',
     );
   });
 }

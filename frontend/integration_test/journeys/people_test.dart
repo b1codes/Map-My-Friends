@@ -174,7 +174,7 @@ void main() {
       skip:
           'Known bug: a failed add replaces the People list with '
           '"Couldn\'t load your people" and a raw DioException, not the '
-          "API's reason",
+          "API's reason (ClickUp 86bcrpgwe)",
     );
 
     journey('people saved earlier are listed after signing in', (tester) async {
