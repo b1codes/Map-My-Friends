@@ -23,7 +23,9 @@ from .support import external_contracts, resolve_pointer, schema_errors
 
 LIVE = os.environ.get("CONTRACT_LIVE") == "1"
 # Overpass and the OSRM demo server are shared public services that shed load
-# with 429/502/503/504; those are retried, anything else fails at once.
+# with 429/502/503/504; those are retried, anything else fails at once. A
+# provider still shedding load after every attempt is an outage, not drift,
+# so that check is skipped with a warning on the workflow run instead.
 RETRYABLE = {429, 502, 503, 504}
 ATTEMPTS = 4
 
@@ -65,6 +67,14 @@ class LiveProviderContractTests(SimpleTestCase):
         if not contract.spec["live"]:
             raise SkipTest(contract.spec["live_note"])
         status, body = _fetch(contract.spec["request"])
+        if status in RETRYABLE:
+            message = (
+                f"{contract.id}: provider unavailable ({status}) "
+                f"after {ATTEMPTS} attempts"
+            )
+            # A GitHub Actions annotation, so the skip shows on the run summary.
+            print(f"::warning title=Live contract not checked::{message}")
+            raise SkipTest(message)
         expected = contract.spec["response"]
         self.assertEqual(status, expected["status"], contract.id)
         self.assertEqual(schema_errors(contract.validator(), body), [], contract.id)

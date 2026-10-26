@@ -146,6 +146,8 @@ compound.
 
 ## 🔌 API Endpoints
 
+The exact request and response of every call the app makes are in [`contracts/`](contracts/README.md). Both the Flutter and Django test suites are held to them.
+
 ### Authentication (`/api/user/auth/`)
 | Method | Endpoint | Description |
 | --- | --- | --- |
@@ -206,6 +208,7 @@ Since the backend runs inside a Docker container, you must execute commands *ins
 map-my-friends/
 ├── docker-compose.yml          # Orchestrates Django (api) and PostGIS (db)
 ├── Makefile                    # Shortcuts for Docker commands
+├── contracts/                  # API and third-party contracts both test suites check (see contracts/README.md)
 │
 ├── backend/                    # Django Backend
 │   ├── Dockerfile              # Python environment (w/ GDAL)
