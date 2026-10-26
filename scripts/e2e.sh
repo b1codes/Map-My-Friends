@@ -83,25 +83,28 @@ for _ in $(seq 1 60); do
   sleep 2
 done
 
-# --- 2. chromedriver ------------------------------------------------------
-chrome_version() {
-  local chrome="${CHROME_EXECUTABLE:-}"
-  if [[ -z "$chrome" ]]; then
-    for candidate in \
-      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-      google-chrome google-chrome-stable chromium chromium-browser; do
-      if [[ -x "$candidate" ]] || command -v "$candidate" >/dev/null 2>&1; then
-        chrome="$candidate"
-        break
-      fi
-    done
-  fi
-  [[ -n "$chrome" ]] || { echo "Chrome not found; set CHROME_EXECUTABLE." >&2; return 1; }
-  "$chrome" --version | grep -oE '[0-9]+(\.[0-9]+){3}'
-}
+# --- 2. Chrome and chromedriver -------------------------------------------
+# The same Chrome is handed to chromedriver (via flutter drive's
+# --chrome-binary) and used to pick the chromedriver version; a machine with
+# two Chromes (a CI runner, after setup-chrome) would otherwise mismatch.
+CHROME="${CHROME_EXECUTABLE:-}"
+if [[ -z "$CHROME" ]]; then
+  for candidate in \
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+    google-chrome google-chrome-stable chromium chromium-browser; do
+    if [[ -x "$candidate" ]]; then
+      CHROME="$candidate"
+      break
+    elif command -v "$candidate" >/dev/null 2>&1; then
+      CHROME="$(command -v "$candidate")"
+      break
+    fi
+  done
+fi
+[[ -n "$CHROME" ]] || { echo "Chrome not found; set CHROME_EXECUTABLE." >&2; exit 1; }
 
 if [[ -z "${CHROMEDRIVER:-}" ]]; then
-  VERSION="$(chrome_version)"
+  VERSION="$("$CHROME" --version | grep -oE '[0-9]+(\.[0-9]+){3}')"
   CACHE="$FRONTEND/build/e2e/chromedriver"
   CHROMEDRIVER="$(find "$CACHE" -path "*-$VERSION/*" -name chromedriver -type f 2>/dev/null | head -1 || true)"
   if [[ -z "$CHROMEDRIVER" ]]; then
@@ -112,6 +115,7 @@ if [[ -z "${CHROMEDRIVER:-}" ]]; then
   fi
 fi
 
+echo "==> Chrome: $CHROME"
 echo "==> chromedriver: $CHROMEDRIVER (port $DRIVER_PORT)"
 "$CHROMEDRIVER" --port="$DRIVER_PORT" >"$FRONTEND/build/e2e-chromedriver.log" 2>&1 &
 DRIVER_PID=$!
@@ -129,6 +133,7 @@ cd "$FRONTEND"
   --target="$TARGET" \
   -d web-server \
   --browser-name=chrome \
+  --chrome-binary="$CHROME" \
   "${HEADLESS[@]}" \
   --browser-dimension="$WINDOW" \
   --driver-port="$DRIVER_PORT" \
