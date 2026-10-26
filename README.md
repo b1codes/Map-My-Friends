@@ -196,6 +196,7 @@ Since the backend runs inside a Docker container, you must execute commands *ins
 | **Open Python Shell** | `make shell` |
 | **Access Database** | `make db` |
 | **Run Tests** | `make test` |
+| **Run E2E Journeys** | `make e2e` (see [frontend/integration_test](frontend/integration_test/README.md)) |
 | **Install Dependencies** | `make install` |
 | **Add Package** | `make add` |
 | **Update Dependencies** | `make update` |
@@ -209,6 +210,8 @@ map-my-friends/
 ├── docker-compose.yml          # Orchestrates Django (api) and PostGIS (db)
 ├── Makefile                    # Shortcuts for Docker commands
 ├── contracts/                  # API and third-party contracts both test suites check (see contracts/README.md)
+├── docker-compose.e2e.yml      # Throwaway full stack for the E2E journeys (make e2e)
+├── docs/manual-qa.md           # The few checks automation can't do (Auth0, OS prompts, real devices)
 │
 ├── backend/                    # Django Backend
 │   ├── Dockerfile              # Python environment (w/ GDAL)
@@ -238,6 +241,7 @@ map-my-friends/
         │   ├── people/         # People list, Add/Edit person
         │   └── profile/        # User profile (Me screen)
         └── services/           # API services & networking
+    └── integration_test/       # E2E journeys against the full stack (see its README)
 ```
 
 ---
