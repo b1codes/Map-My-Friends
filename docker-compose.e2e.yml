@@ -1,0 +1,57 @@
+# Full stack for the E2E journeys in frontend/integration_test/.
+#
+# A separate compose project from docker-compose.yml, so it runs beside the
+# development stack without touching its data or ports:
+#   - the API listens on :8100 (the app is built with API_BASE_URL to match)
+#   - the Firestore emulator keeps its data in memory, so every `up` is empty
+#   - Django's own tables go to a throwaway SQLite file inside the container
+#   - Nominatim, OSRM and map tiles are answered by docker/e2e-stubs on :8190
+#
+# Run the journeys with `make e2e`; scripts/e2e.sh documents each step.
+name: map-my-friends-e2e
+
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: map-my-friends-backend
+    # A fresh process per run also resets DRF's in-memory throttle counters,
+    # which the journeys' sign-ups and sign-ins would otherwise accumulate.
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py runserver 0.0.0.0:8000 --noreload"
+    volumes:
+      - ./backend:/app
+      - /app/.venv
+      - /app/media # uploads stay in the container, not in backend/media
+    ports:
+      - "${E2E_API_PORT:-8100}:8000"
+    depends_on:
+      - firestore
+      - stubs
+    environment:
+      - FIRESTORE_EMULATOR_HOST=firestore:8080
+      - FIRESTORE_PROJECT_ID=map-my-friends-local
+      - DJANGO_DEBUG=True
+      - DJANGO_SQLITE_PATH=/tmp/e2e.sqlite3
+      - NOMINATIM_DOMAIN=stubs:8090
+      - NOMINATIM_SCHEME=http
+      - OSRM_BASE_URL=http://stubs:8090/route/v1/driving
+
+  firestore:
+    build:
+      context: ./docker/firebase-emulator
+    volumes:
+      - ./firebase.json:/workspace/firebase.json:ro
+      - ./firestore.rules:/workspace/firestore.rules:ro
+      - ./firestore.indexes.json:/workspace/firestore.indexes.json:ro
+      - ./.firebaserc:/workspace/.firebaserc:ro
+
+  stubs:
+    image: python:3.14-slim
+    command: python /stubs/server.py
+    volumes:
+      - ./docker/e2e-stubs:/stubs:ro
+    ports:
+      - "${E2E_STUBS_PORT:-8190}:8090"

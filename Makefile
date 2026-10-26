@@ -48,6 +48,12 @@ test-cov:
 	docker compose exec api coverage report
 	docker compose exec api coverage html
 
+# E2E journeys (frontend/integration_test) in headless Chrome against a fresh
+# throwaway stack (docker-compose.e2e.yml), separate from the one `make up`
+# runs. One journey file: `make e2e JOURNEY=integration_test/journeys/auth_test.dart`.
+e2e:
+	scripts/e2e.sh $(JOURNEY)
+
 # Poetry helpers
 install:
 	docker compose exec api poetry install
