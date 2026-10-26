@@ -153,28 +153,24 @@ void main() {
       expect((stops[2] as Map)['people'], hasLength(1));
     });
 
-    journey(
-      'saved trips are listed again after the app is reopened',
-      skip:
-          'Known bug: My Trips only fetches trips after a save or delete, '
-          'so a reopened app lists none',
-      (tester) async {
-        final world = await TripWorld.create('reopen');
-        await launchSignedIn(tester, world.user);
-        await planAndSaveTrip(tester, world);
+    journey('saved trips are listed again after the app is reopened', (
+      tester,
+    ) async {
+      final world = await TripWorld.create('reopen');
+      await launchSignedIn(tester, world.user);
+      await planAndSaveTrip(tester, world);
 
-        await launchApp(tester, keepDeviceState: true);
-        await pumpUntil(tester, mainShell);
-        await goToTab(tester, 'Trips');
-        await pumpUntil(tester, tripCard(draftTripName));
+      await launchApp(tester, keepDeviceState: true);
+      await pumpUntil(tester, mainShell);
+      await goToTab(tester, 'Trips');
+      await pumpUntil(tester, tripCard(draftTripName));
 
-        // Opening a draft loads it into the planner with its people and hub.
-        await tapOn(tester, tripCard(draftTripName));
-        await pumpUntil(tester, plannerStop('Grace'));
-        expect(plannerStop('Alan'), findsOneWidget);
-        expect(plannerStop(world.adaAirportCode), findsOneWidget);
-      },
-    );
+      // Opening a draft loads it into the planner with its people and hub.
+      await tapOn(tester, tripCard(draftTripName));
+      await pumpUntil(tester, plannerStop('Grace'));
+      expect(plannerStop('Alan'), findsOneWidget);
+      expect(plannerStop(world.adaAirportCode), findsOneWidget);
+    });
 
     journey('the leg between two people follows the OSRM driving route', (
       tester,

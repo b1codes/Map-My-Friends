@@ -268,6 +268,14 @@ void main() {
       verify(() => profileBloc.add(LoadProfile())).called(1);
     });
 
+    testWidgets("loads the signed-in user's saved trips on launch", (
+      tester,
+    ) async {
+      await pumpUnder(tester, const MainScreen());
+
+      verify(() => tripBloc.add(const FetchUserTrips())).called(1);
+    });
+
     testWidgets('opens on the map', (tester) async {
       await pumpUnder(tester, const MainScreen());
 

@@ -32,6 +32,7 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'bloc/map/map_settings_cubit.dart';
 import 'bloc/trip/trip_bloc.dart';
+import 'bloc/trip/trip_event.dart';
 import 'package:flutter_map_tile_caching/flutter_map_tile_caching.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -149,6 +150,10 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     // Load profile data (custom pin settings) on app launch
     context.read<ProfileBloc>().add(LoadProfile());
+    // Saved trips belong to whoever just signed in. Nothing else fetches
+    // them until a trip is saved or deleted, so without this My Trips is
+    // empty after every launch.
+    context.read<TripBloc>().add(const FetchUserTrips());
   }
 
   Widget _getScreen(int index) {
