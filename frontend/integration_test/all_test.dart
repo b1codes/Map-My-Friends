@@ -2,7 +2,11 @@
 // which is most of a run's time. scripts/e2e.sh runs this by default; pass a
 // single journey file to it to run just that one.
 import 'journeys/auth_test.dart' as auth;
+import 'journeys/map_test.dart' as map;
+import 'journeys/profile_test.dart' as profile;
 
 void main() {
   auth.main();
+  map.main();
+  profile.main();
 }

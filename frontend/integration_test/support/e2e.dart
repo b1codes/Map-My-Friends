@@ -28,11 +28,13 @@ const String journeyPassword = 'Journey-pass-2026!';
 /// first API call after a cold start also warms Django and the emulator.
 const Duration defaultTimeout = Duration(seconds: 30);
 
-late final IntegrationTestWidgetsFlutterBinding binding;
+IntegrationTestWidgetsFlutterBinding get binding =>
+    IntegrationTestWidgetsFlutterBinding.instance;
 
-/// Call once at the top of every journey file's `main`.
+/// Call at the top of every journey file's `main`. Safe to call more than
+/// once, as all_test.dart does by running several files' `main`s.
 void setUpE2E() {
-  binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   if (apiBaseUrl.isEmpty || stubsUrl.isEmpty) {
     // Without the defines the app would talk to the development stack on
     // :8000 and fill it with journey users. Refuse rather than do that.
@@ -45,8 +47,18 @@ void setUpE2E() {
 
 /// A journey test: a [testWidgets] that saves a screenshot when it fails, so
 /// a CI failure shows the screen the app was actually on.
-void journey(String description, Future<void> Function(WidgetTester) body) {
-  testWidgets(description, (tester) async {
+///
+/// [skip] is the reason a journey is switched off, e.g. 'Known bug: ...
+/// (ClickUp link)'. A journey that exposes a bug keeps asserting the right
+/// behaviour and is skipped until the bug is fixed, rather than rewritten to
+/// expect the wrong one.
+void journey(
+  String description,
+  Future<void> Function(WidgetTester) body, {
+  String? skip,
+}) {
+  if (skip != null) debugPrint('Skipping "$description": $skip');
+  testWidgets(skip: skip != null, description, (tester) async {
     // Navigation is found by semantics label (see [tab]), so the semantics
     // tree must be built, as it is for a screen-reader user.
     final semantics = tester.ensureSemantics();
@@ -87,11 +99,22 @@ Future<void> launchApp(
   WidgetTester tester, {
   bool keepDeviceState = false,
 }) async {
+  // Tear down the previous launch first. runApp with a root of the same type
+  // would update the old tree in place: its blocs (signed in or not), pushed
+  // routes and screen state would all survive, so nothing would relaunch.
+  await tester.pumpWidget(const SizedBox.shrink());
+
   if (!keepDeviceState) {
     await const FlutterSecureStorage().deleteAll();
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
   }
+  // A relaunch is a new page with nothing decoded yet. Without this, images
+  // (map tiles, avatars) from an earlier journey come from Flutter's
+  // in-memory cache and never reach the server.
+  imageCache
+    ..clear()
+    ..clearLiveImages();
   app.main();
   // The first frames are the auth check; let it start before callers wait.
   await tester.pump(const Duration(milliseconds: 100));
@@ -225,6 +248,15 @@ Future<void> goToTab(WidgetTester tester, String name) async {
   await settle(tester);
 }
 
+/// A person's pin on the map (PersonMapMarker's semantics label).
+Finder pinOf(String fullName) => find.bySemanticsLabel('Friend: $fullName');
+
+/// Leaves a pushed screen through its header's back button.
+Future<void> goBack(WidgetTester tester) async {
+  await tapOn(tester, find.byTooltip('Back'));
+  await settle(tester);
+}
+
 /// Signs in through the login form and waits for the main shell.
 Future<void> signInThroughUi(
   WidgetTester tester,
@@ -288,18 +320,52 @@ class JourneyUser {
     return user;
   }
 
-  /// An API client signed in as this user.
+  /// Adds a person to this user's account through the API. [city] must be
+  /// one the stub geocoder knows (CITIES in docker/e2e-stubs/server.py). The
+  /// default is the map's fallback centre, so the pin is on screen without
+  /// location access.
+  Future<void> addPerson({
+    required String firstName,
+    required String lastName,
+    String city = 'San Francisco',
+    String state = 'CA',
+    String country = 'USA',
+  }) async {
+    await (await api()).post(
+      'people/',
+      data: {
+        'first_name': firstName,
+        'last_name': lastName,
+        'city': city,
+        'state': state,
+        'country': country,
+        'tag': 'FRIEND',
+      },
+    );
+  }
+
+  Dio? _api;
+
+  /// An API client signed in as this user. Signs in once per user: sign-ins
+  /// count against the API's anonymous throttle like any other.
   Future<Dio> api() async {
+    if (_api != null) return _api!;
     final response = await E2EApi.anonymous().post(
       'user/auth/token/',
       data: {'username': username, 'password': journeyPassword},
     );
-    return E2EApi.authenticated(response.data['access'] as String);
+    return _api = E2EApi.authenticated(response.data['access'] as String);
   }
 }
 
 class E2EApi {
-  static Dio anonymous() => Dio(BaseOptions(baseUrl: apiBaseUrl));
+  /// For sign-up and sign-in. These are throttled per client address (sign-up
+  /// to 10 a minute), and a full run arranges more users than that, so a 429
+  /// is waited out and retried. Journeys that exercise the UI's own sign-up
+  /// and sign-in still meet the real throttle.
+  static Dio anonymous() =>
+      Dio(BaseOptions(baseUrl: apiBaseUrl))
+        ..interceptors.add(_WaitOutThrottle());
 
   static Dio authenticated(String accessToken) => Dio(
     BaseOptions(
@@ -316,4 +382,39 @@ class E2EApi {
 
   static Future<void> clearStubLog() =>
       Dio().delete('$stubsUrl/_stub/requests');
+}
+
+/// Retries a throttled (429) request after the wait DRF reports.
+///
+/// The wait has to come from the body ("Expected available in 42 seconds."):
+/// the browser hides the Retry-After header of a cross-origin response.
+class _WaitOutThrottle extends Interceptor {
+  static const int _maxAttempts = 4;
+
+  @override
+  Future<void> onError(
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
+    final options = err.requestOptions;
+    final attempt = (options.extra['throttleAttempt'] as int?) ?? 1;
+    if (err.response?.statusCode != 429 || attempt >= _maxAttempts) {
+      return handler.next(err);
+    }
+    final detail = '${err.response?.data}';
+    final seconds =
+        int.tryParse(
+          RegExp(r'available in (\d+) second').firstMatch(detail)?.group(1) ??
+              '',
+        ) ??
+        15;
+    debugPrint('Throttled on ${options.path}; retrying in ${seconds + 1}s.');
+    await Future<void>.delayed(Duration(seconds: seconds + 1));
+    options.extra['throttleAttempt'] = attempt + 1;
+    try {
+      handler.resolve(await E2EApi.anonymous().fetch(options));
+    } on DioException catch (e) {
+      handler.next(e);
+    }
+  }
 }

@@ -83,6 +83,8 @@ class Handler(BaseHTTPRequestHandler):
         # The app calls OSRM and loads tiles straight from the browser.
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Headers", "*")
+        # DELETE (clearing the log from a journey) isn't CORS-safelisted.
+        self.send_header("Access-Control-Allow-Methods", "GET, DELETE, OPTIONS")
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
