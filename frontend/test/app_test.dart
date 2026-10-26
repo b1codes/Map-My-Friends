@@ -261,6 +261,83 @@ void main() {
     });
   });
 
+  group('SignedInScope', () {
+    /// Pumps a scope whose one provider counts how often it is created, and
+    /// reads it so the lazy provider actually builds.
+    Future<List<ThemeCubit>> pumpScope(
+      WidgetTester tester,
+      StreamController<AuthState> auth,
+    ) async {
+      final created = <ThemeCubit>[];
+      whenListen(
+        authBloc,
+        auth.stream,
+        initialState: const Authenticated(accessToken: 'a', refreshToken: 'r'),
+      );
+      await tester.pumpWidget(
+        BlocProvider<AuthBloc>.value(
+          value: authBloc,
+          child: SignedInScope(
+            providers: [
+              BlocProvider<ThemeCubit>(
+                create: (_) {
+                  final cubit = ThemeCubit();
+                  created.add(cubit);
+                  return cubit;
+                },
+              ),
+            ],
+            child: Builder(
+              builder: (context) {
+                context.watch<ThemeCubit>();
+                return const SizedBox();
+              },
+            ),
+          ),
+        ),
+      );
+      return created;
+    }
+
+    testWidgets('signing out and in again starts with new blocs', (
+      tester,
+    ) async {
+      final auth = StreamController<AuthState>();
+      addTearDown(auth.close);
+      final created = await pumpScope(tester, auth);
+      expect(created, hasLength(1));
+
+      for (final state in <AuthState>[
+        const Unauthenticated(),
+        AuthLoading(),
+        const Authenticated(accessToken: 'b', refreshToken: 'r', username: 'b'),
+      ]) {
+        auth.add(state);
+        await tester.pumpAndSettle();
+      }
+
+      // One for the signed-out screen, one for the next account.
+      expect(created, hasLength(3));
+      expect(created.first.isClosed, isTrue);
+    });
+
+    testWidgets('keeps the blocs while the same session stays signed in', (
+      tester,
+    ) async {
+      final auth = StreamController<AuthState>();
+      addTearDown(auth.close);
+      final created = await pumpScope(tester, auth);
+
+      const refreshed = Authenticated(accessToken: 'new', refreshToken: 'r2');
+      auth.add(refreshed);
+      await tester.pumpAndSettle();
+
+      expect(authBloc.state, refreshed);
+      expect(created, hasLength(1));
+      expect(created.single.isClosed, isFalse);
+    });
+  });
+
   group('MainScreen', () {
     testWidgets('loads the profile on launch', (tester) async {
       await pumpUnder(tester, const MainScreen());

@@ -5,6 +5,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:map_my_friends/components/people/person_card.dart';
+
 import '../support/e2e.dart';
 
 /// The form's submit button; the screen's title says 'Create Account' too.
@@ -118,5 +120,56 @@ void main() {
       await pumpUntil(tester, toast('a password reset link has been sent'));
       await pumpUntil(tester, loginScreen, reason: 'the login form');
     });
+    journey(
+      'after signing out, the next account sees none of the last one\'s data',
+      (tester) async {
+        final first = await JourneyUser.registered('switchfrom');
+        await first.addPerson(firstName: 'Grace', lastName: 'Hopper');
+        await (await first.api()).post(
+          'trips/',
+          data: {
+            'name': 'Visit Grace',
+            'date': '2026-11-14',
+            'status': 'DRAFT',
+            'stops': <Object>[],
+            'legs': <Object>[],
+          },
+        );
+        final second = await JourneyUser.registered('switchto');
+
+        // The first account uses People, Trips and the planner.
+        await launchSignedIn(tester, first);
+        await goToTab(tester, 'People');
+        await tapOn(
+          tester,
+          find.ancestor(
+            of: find.text('Grace Hopper'),
+            matching: find.byType(PersonCard),
+          ),
+        );
+        await tapText(tester, 'Add to Trip Planner');
+        await pumpUntil(tester, toast('to trip'));
+        await tapOn(tester, find.byTooltip('Back'));
+        await goToTab(tester, 'Trips');
+        await pumpUntil(tester, find.text('Visit Grace'));
+
+        // Same browser tab, no reload: sign out, then in as someone else.
+        await goToTab(tester, 'Me');
+        await tapText(tester, 'Logout');
+        await signInThroughUi(tester, second.username);
+
+        await goToTab(tester, 'People');
+        await pumpUntil(tester, find.text('No Friends Added Yet'));
+        expect(find.text('Grace Hopper'), findsNothing);
+
+        await goToTab(tester, 'Trips');
+        await pumpUntil(tester, find.text('No Trips Yet'));
+        expect(find.text('Visit Grace'), findsNothing);
+
+        // The planner the first account left behind isn't carried over.
+        await goToTab(tester, 'Map');
+        expect(find.bySemanticsLabel('Save Trip'), findsNothing);
+      },
+    );
   });
 }
