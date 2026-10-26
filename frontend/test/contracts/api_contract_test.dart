@@ -357,9 +357,7 @@ final Map<String, Driver> drivers = {
 /// Gaps between the contract and what the app does, found by this suite and
 /// not yet fixed. Each driver must still fail, so fixing one fails the suite
 /// until its entry is removed.
-const knownGaps = <String, String>{
-  'auth.token.refresh': 'The rotated refresh token is discarded.',
-};
+const knownGaps = <String, String>{};
 
 void main() {
   test('every contract has a consumer driver, and every driver a contract', () {

@@ -455,6 +455,25 @@ void main() {
       });
     });
 
+    test(
+      'stores the rotated refresh token when the server sends one',
+      () async {
+        seedTokens(access: 'old', refresh: 'spent', username: 'u');
+        adapter.reply('POST', 'user/auth/token/refresh/', 200, {
+          'access': 'new',
+          'refresh': 'rotated',
+        });
+
+        expect(await auth.refreshAccessToken(), 'new');
+
+        expect(await storedValues(), {
+          accessKey: 'new',
+          refreshKey: 'rotated',
+          usernameKey: 'u',
+        });
+      },
+    );
+
     test('logs out and returns null when the refresh is rejected', () async {
       seedTokens(access: 'old', refresh: 'expired', username: 'u');
       adapter.reply('POST', 'user/auth/token/refresh/', 401);

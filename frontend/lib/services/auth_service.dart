@@ -256,6 +256,16 @@ class AuthService {
       if (response.statusCode == 200) {
         final newAccessToken = response.data['access'] as String;
         await _storage.write(key: _accessTokenKey, value: newAccessToken);
+        // The server rotates refresh tokens (ROTATE_REFRESH_TOKENS), so the
+        // one just sent is spent; with the blacklist on, reusing it at the
+        // next refresh would sign the user out.
+        final rotatedRefreshToken = response.data['refresh'] as String?;
+        if (rotatedRefreshToken != null) {
+          await _storage.write(
+            key: _refreshTokenKey,
+            value: rotatedRefreshToken,
+          );
+        }
         return newAccessToken;
       }
     } catch (e) {
