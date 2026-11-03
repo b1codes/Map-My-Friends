@@ -52,7 +52,7 @@ class AirportService {
             if (newToken != null) {
               error.requestOptions.headers['Authorization'] =
                   'Bearer $newToken';
-              final response = await _dio.fetch(error.requestOptions);
+              final response = await _dio.fetch<dynamic>(error.requestOptions);
               return handler.resolve(response);
             }
           }
@@ -65,8 +65,10 @@ class AirportService {
   /// Load all airports from the bundled JSON asset (for map layer).
   Future<List<Airport>> loadAirportsFromAsset() async {
     final jsonString = await rootBundle.loadString('assets/data/airports.json');
-    final List<dynamic> jsonList = json.decode(jsonString);
-    return jsonList.map((json) => Airport.fromJson(json)).toList();
+    final jsonList = json.decode(jsonString) as List<dynamic>;
+    return jsonList
+        .map((json) => Airport.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
   /// Fetch the nearest airports from the backend API (for profile sections).
@@ -76,7 +78,7 @@ class AirportService {
     int count = 3,
   }) async {
     try {
-      final response = await _dio.get(
+      final response = await _dio.get<dynamic>(
         'airports/nearest/',
         queryParameters: {'lat': lat, 'lon': lon, 'count': count},
       );
@@ -85,9 +87,13 @@ class AirportService {
         if (data is Map<String, dynamic> &&
             data['type'] == 'FeatureCollection') {
           final features = data['features'] as List;
-          return features.map((json) => Airport.fromGeoJson(json)).toList();
+          return features
+              .map((json) => Airport.fromGeoJson(json as Map<String, dynamic>))
+              .toList();
         } else if (data is List) {
-          return data.map((json) => Airport.fromGeoJson(json)).toList();
+          return data
+              .map((json) => Airport.fromGeoJson(json as Map<String, dynamic>))
+              .toList();
         }
         throw Exception('Unexpected response format');
       } else {

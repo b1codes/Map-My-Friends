@@ -61,7 +61,7 @@ class PersonDetailsScreen extends StatelessWidget {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
+                    MaterialPageRoute<void>(
                       builder: (context) => AddEditPersonScreen(person: person),
                     ),
                   );

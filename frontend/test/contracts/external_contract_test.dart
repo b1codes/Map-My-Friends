@@ -59,8 +59,10 @@ void main() {
 
     test('the route follows the contract geometry, as [lat, lng]', () {
       final example = contract.example as Map<String, dynamic>;
-      final coordinates =
-          example['routes'][0]['geometry']['coordinates'] as List<dynamic>;
+      final routes = example['routes'] as List<dynamic>;
+      final geometry = (routes[0] as Map)['geometry'] as Map;
+      final coordinates = (geometry['coordinates'] as List<dynamic>)
+          .cast<List<dynamic>>();
       expect(route, [
         for (final c in coordinates)
           LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()),

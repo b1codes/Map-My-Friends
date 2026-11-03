@@ -77,7 +77,7 @@ void main() {
       expect(cubit.state.stationFilter, StationFilter.major);
       expect(cubit.state.distanceUnit, DistanceUnit.imperial);
 
-      cubit.close();
+      await cubit.close();
     });
 
     blocTest<MapSettingsCubit, MapSettingsState>(

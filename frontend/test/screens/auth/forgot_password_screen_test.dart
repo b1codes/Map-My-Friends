@@ -48,7 +48,7 @@ void main() {
                 child: TextButton(
                   onPressed: () => Navigator.push(
                     context,
-                    MaterialPageRoute(
+                    MaterialPageRoute<void>(
                       builder: (_) => const ForgotPasswordScreen(),
                     ),
                   ),

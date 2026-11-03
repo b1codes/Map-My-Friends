@@ -339,7 +339,7 @@ class JourneyUser {
     String? lastName,
   }) async {
     final user = JourneyUser.fresh(prefix);
-    await E2EApi.anonymous().post(
+    await E2EApi.anonymous().post<dynamic>(
       'user/auth/register/',
       data: {
         'username': user.username,
@@ -364,7 +364,7 @@ class JourneyUser {
     String state = 'CA',
     String country = 'USA',
   }) async {
-    await (await api()).post(
+    await (await api()).post<dynamic>(
       'people/',
       data: {
         'first_name': firstName,
@@ -383,11 +383,13 @@ class JourneyUser {
   /// count against the API's anonymous throttle like any other.
   Future<Dio> api() async {
     if (_api != null) return _api!;
-    final response = await E2EApi.anonymous().post(
+    final response = await E2EApi.anonymous().post<dynamic>(
       'user/auth/token/',
       data: {'username': username, 'password': journeyPassword},
     );
-    return _api = E2EApi.authenticated(response.data['access'] as String);
+    return _api = E2EApi.authenticated(
+      (response.data as Map)['access'] as String,
+    );
   }
 }
 
@@ -409,12 +411,12 @@ class E2EApi {
 
   /// The third-party calls the stub server has answered since [clearStubLog].
   static Future<List<Map<String, dynamic>>> stubLog() async {
-    final response = await Dio().get('$stubsUrl/_stub/requests');
+    final response = await Dio().get<dynamic>('$stubsUrl/_stub/requests');
     return (response.data as List).cast<Map<String, dynamic>>();
   }
 
   static Future<void> clearStubLog() =>
-      Dio().delete('$stubsUrl/_stub/requests');
+      Dio().delete<dynamic>('$stubsUrl/_stub/requests');
 }
 
 /// Retries a throttled (429) request after the wait DRF reports.

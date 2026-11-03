@@ -54,8 +54,10 @@ class StationService {
   /// Load all stations from the bundled JSON asset (for map layer).
   Future<List<Station>> loadStationsFromAsset() async {
     final jsonString = await rootBundle.loadString('assets/data/stations.json');
-    final List<dynamic> jsonList = json.decode(jsonString);
-    return jsonList.map((json) => Station.fromJson(json)).toList();
+    final jsonList = json.decode(jsonString) as List<dynamic>;
+    return jsonList
+        .map((json) => Station.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
   /// Fetch the nearest stations from the backend API.
@@ -65,7 +67,7 @@ class StationService {
     int count = 3,
   }) async {
     try {
-      final response = await _dio.get(
+      final response = await _dio.get<dynamic>(
         'stations/nearest/',
         queryParameters: {'lat': lat, 'lon': lon, 'count': count},
       );
@@ -74,9 +76,13 @@ class StationService {
         if (data is Map<String, dynamic> &&
             data['type'] == 'FeatureCollection') {
           final features = data['features'] as List;
-          return features.map((json) => Station.fromGeoJson(json)).toList();
+          return features
+              .map((json) => Station.fromGeoJson(json as Map<String, dynamic>))
+              .toList();
         } else if (data is List) {
-          return data.map((json) => Station.fromGeoJson(json)).toList();
+          return data
+              .map((json) => Station.fromGeoJson(json as Map<String, dynamic>))
+              .toList();
         }
         throw Exception('Unexpected response format');
       } else {

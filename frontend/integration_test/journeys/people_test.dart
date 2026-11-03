@@ -40,8 +40,9 @@ Future<void> enterAddress(
 /// The people the API holds for [user], as GeoJSON features.
 Future<List<Map<String, dynamic>>> peopleOnServer(JourneyUser user) async {
   final api = await user.api();
-  final response = await api.get('people/');
-  return (response.data['features'] as List).cast<Map<String, dynamic>>();
+  final response = await api.get<dynamic>('people/');
+  return ((response.data as Map)['features'] as List)
+      .cast<Map<String, dynamic>>();
 }
 
 /// Creates a person for [api]'s user through the API (geocoded by the stub,
@@ -56,7 +57,7 @@ Future<String> seedPerson(
   String tag = 'FRIEND',
   int? cadenceDays,
 }) async {
-  final response = await api.post(
+  final response = await api.post<dynamic>(
     'people/',
     data: {
       'first_name': firstName,
@@ -68,8 +69,14 @@ Future<String> seedPerson(
       'contact_cadence_days': ?cadenceDays,
     },
   );
-  return response.data['id'] as String;
+  return (response.data as Map)['id'] as String;
 }
+
+Map<String, dynamic> _properties(Object? feature) =>
+    (feature as Map<String, dynamic>)['properties'] as Map<String, dynamic>;
+
+Map<String, dynamic> _geometry(Object? feature) =>
+    (feature as Map<String, dynamic>)['geometry'] as Map<String, dynamic>;
 
 void main() {
   setUpE2E();
@@ -99,8 +106,8 @@ void main() {
 
       var saved = await peopleOnServer(user);
       expect(saved, hasLength(1));
-      expect(saved.single['geometry']['coordinates'], [-0.1278, 51.5074]);
-      expect(saved.single['properties']['timezone'], 'Europe/London');
+      expect(_geometry(saved.single)['coordinates'], [-0.1278, 51.5074]);
+      expect(_properties(saved.single)['timezone'], 'Europe/London');
 
       // Edit: moving them re-geocodes the new address.
       await tapOn(tester, personCard('Ada Lovelace'));
@@ -119,9 +126,9 @@ void main() {
       await pumpUntil(tester, find.text('Paris, Ile-de-France France'));
 
       saved = await peopleOnServer(user);
-      expect(saved.single['properties']['city'], 'Paris');
-      expect(saved.single['geometry']['coordinates'], [2.3522, 48.8566]);
-      expect(saved.single['properties']['timezone'], 'Europe/Paris');
+      expect(_properties(saved.single)['city'], 'Paris');
+      expect(_geometry(saved.single)['coordinates'], [2.3522, 48.8566]);
+      expect(_properties(saved.single)['timezone'], 'Europe/Paris');
 
       // The edit is what the app shows when the user comes back later.
       await launchApp(tester, keepDeviceState: true);
@@ -218,8 +225,9 @@ void main() {
         findsOneWidget,
       );
 
-      final body = (await api.get('contact-logs/')).data;
-      final logs = (body is Map ? body['results'] : body) as List;
+      final body = (await api.get<dynamic>('contact-logs/')).data;
+      final logs = ((body is Map ? body['results'] : body) as List)
+          .cast<Map<String, dynamic>>();
       expect(logs, hasLength(1));
       expect(logs.single['person'], personId);
       expect(logs.single['channel'], 'CALL');
@@ -252,8 +260,8 @@ void main() {
       await pumpUntil(tester, find.text('Stay in touch every 37 days'));
 
       await _pumpUntilServer(() async {
-        final person = (await api.get('people/$personId/')).data;
-        return person['properties']['contact_cadence_days'] == 37;
+        final person = (await api.get<dynamic>('people/$personId/')).data;
+        return _properties(person)['contact_cadence_days'] == 37;
       }, reason: 'contact_cadence_days 37 on the API');
 
       // Opening the sheet again later starts from the saved rhythm.
@@ -298,7 +306,7 @@ void main() {
         country: 'USA',
       );
       for (final (person, daysAgo) in [(overdue, 30), (recent, 2)]) {
-        await api.post(
+        await api.post<dynamic>(
           'contact-logs/',
           data: {
             'person': person,

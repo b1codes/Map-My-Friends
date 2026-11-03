@@ -38,8 +38,8 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     if (event.person.latitude == null || event.person.longitude == null) return;
 
     // Auto-fill hub if available
-    Airport? preferredAirport = event.person.preferredAirport;
-    Station? preferredStation = event.person.preferredStation;
+    final Airport? preferredAirport = event.person.preferredAirport;
+    final Station? preferredStation = event.person.preferredStation;
 
     LatLng location = LatLng(event.person.latitude!, event.person.longitude!);
     if (preferredAirport != null) {
@@ -148,7 +148,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     ReorderStops event,
     Emitter<TripState> emit,
   ) async {
-    var newStops = List<TripStop>.from(state.stops);
+    final newStops = List<TripStop>.from(state.stops);
     int newIndex = event.newIndex;
     if (event.oldIndex < newIndex) newIndex -= 1;
     final item = newStops.removeAt(event.oldIndex);

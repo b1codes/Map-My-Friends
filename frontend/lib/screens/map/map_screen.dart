@@ -185,7 +185,7 @@ class _MapScreenState extends State<MapScreen> {
 
                     return BlocBuilder<LocalMapSettingsCubit, MapSettingsState>(
                       builder: (context, settingsState) {
-                        List<Marker> markers = [];
+                        final List<Marker> markers = [];
                         if (locationState is LocationLoaded &&
                             locationState.position != null) {
                           final profileState = context
@@ -255,7 +255,7 @@ class _MapScreenState extends State<MapScreen> {
                                     child: PersonMapMarker(
                                       person: p,
                                       onTap: () {
-                                        showModalBottomSheet(
+                                        showModalBottomSheet<void>(
                                           context: context,
                                           backgroundColor: Colors.transparent,
                                           builder: (context) =>
@@ -480,7 +480,7 @@ class _MapScreenState extends State<MapScreen> {
                                                       .firstWhere(
                                                         (p) => p.id == id,
                                                       );
-                                                  showModalBottomSheet(
+                                                  showModalBottomSheet<void>(
                                                     context: context,
                                                     backgroundColor:
                                                         Colors.transparent,
@@ -506,7 +506,7 @@ class _MapScreenState extends State<MapScreen> {
                                                         (a) =>
                                                             a.iataCode == iata,
                                                       );
-                                                  showModalBottomSheet(
+                                                  showModalBottomSheet<void>(
                                                     context: context,
                                                     backgroundColor:
                                                         Colors.transparent,
@@ -531,7 +531,7 @@ class _MapScreenState extends State<MapScreen> {
                                                       .firstWhere(
                                                         (s) => s.osmId == osmId,
                                                       );
-                                                  showModalBottomSheet(
+                                                  showModalBottomSheet<void>(
                                                     context: context,
                                                     backgroundColor:
                                                         Colors.transparent,
@@ -546,7 +546,7 @@ class _MapScreenState extends State<MapScreen> {
                                           }
                                         },
                                         onClusterTap: (clusterNode) {
-                                          List<dynamic> clusterItems = [];
+                                          final List<dynamic> clusterItems = [];
                                           for (var marker
                                               in clusterNode.markers) {
                                             if (marker.key
@@ -611,7 +611,7 @@ class _MapScreenState extends State<MapScreen> {
                                           }
 
                                           if (clusterItems.isNotEmpty) {
-                                            showModalBottomSheet(
+                                            showModalBottomSheet<void>(
                                               context: context,
                                               backgroundColor:
                                                   Colors.transparent,

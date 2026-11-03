@@ -188,7 +188,9 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
   }
 
   void _showColorPicker() {
-    Color pickerColor = Color(int.parse(_pinColor.replaceFirst('#', '0xFF')));
+    final Color pickerColor = Color(
+      int.parse(_pinColor.replaceFirst('#', '0xFF')),
+    );
     GlassDialog.panel(
       context,
       title: 'Pick a Pin Color',

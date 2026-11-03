@@ -44,7 +44,7 @@ class LocationBloc extends Bloc<LocationEvent, LocationState> {
 
       // When we reach here, permissions are granted and we can
       // continue accessing the position of the device.
-      Position position = await Geolocator.getCurrentPosition();
+      final Position position = await Geolocator.getCurrentPosition();
       emit(LocationLoaded(position: position));
     } catch (e) {
       emit(LocationError(e.toString()));

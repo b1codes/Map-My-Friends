@@ -96,10 +96,14 @@ class Person {
       preferredAirportId: json['preferred_airport']?.toString(),
       preferredStationId: json['preferred_station']?.toString(),
       preferredAirport: json['preferred_airport_detail'] != null
-          ? Airport.fromGeoJson(json['preferred_airport_detail'])
+          ? Airport.fromGeoJson(
+              json['preferred_airport_detail'] as Map<String, dynamic>,
+            )
           : null,
       preferredStation: json['preferred_station_detail'] != null
-          ? Station.fromGeoJson(json['preferred_station_detail'])
+          ? Station.fromGeoJson(
+              json['preferred_station_detail'] as Map<String, dynamic>,
+            )
           : null,
       contactCadenceDays: _cadenceFrom(json),
       lastContactedAt: _lastContactedFrom(json),
@@ -139,10 +143,14 @@ class Person {
       preferredAirportId: properties['preferred_airport']?.toString(),
       preferredStationId: properties['preferred_station']?.toString(),
       preferredAirport: properties['preferred_airport_detail'] != null
-          ? Airport.fromGeoJson(properties['preferred_airport_detail'])
+          ? Airport.fromGeoJson(
+              properties['preferred_airport_detail'] as Map<String, dynamic>,
+            )
           : null,
       preferredStation: properties['preferred_station_detail'] != null
-          ? Station.fromGeoJson(properties['preferred_station_detail'])
+          ? Station.fromGeoJson(
+              properties['preferred_station_detail'] as Map<String, dynamic>,
+            )
           : null,
       contactCadenceDays: _cadenceFrom(properties),
       lastContactedAt: _lastContactedFrom(properties),

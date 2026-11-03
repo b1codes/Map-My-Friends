@@ -64,14 +64,14 @@ class AuthService {
 
   Future<Map<String, String>> login(String username, String password) async {
     try {
-      final response = await _dio.post(
+      final response = await _dio.post<dynamic>(
         'user/auth/token/',
         data: {'username': username, 'password': password},
       );
 
       if (response.statusCode == 200) {
-        final accessToken = response.data['access'] as String;
-        final refreshToken = response.data['refresh'] as String;
+        final accessToken = (response.data as Map)['access'] as String;
+        final refreshToken = (response.data as Map)['refresh'] as String;
 
         await _storage.write(key: _accessTokenKey, value: accessToken);
         await _storage.write(key: _refreshTokenKey, value: refreshToken);
@@ -127,7 +127,7 @@ class AuthService {
   Future<Map<String, String>> loginWithAuth0({String? connection}) async {
     // If we're using the placeholder Client ID, run in mock mode
     if (ApiConfig.auth0ClientId == 'YOUR_AUTH0_CLIENT_ID') {
-      await Future.delayed(const Duration(milliseconds: 800));
+      await Future<void>.delayed(const Duration(milliseconds: 800));
       final mockUsername = connection == 'google-oauth2'
           ? 'google_user'
           : (connection == 'apple' ? 'apple_user' : 'auth0_user');
@@ -186,7 +186,7 @@ class AuthService {
     String? firstNameHp,
   }) async {
     try {
-      final response = await _dio.post(
+      final response = await _dio.post<dynamic>(
         'user/auth/register/',
         data: {
           'username': username,
@@ -216,7 +216,10 @@ class AuthService {
 
   Future<void> requestPasswordReset(String email) async {
     try {
-      await _dio.post('user/auth/password-reset/', data: {'email': email});
+      await _dio.post<dynamic>(
+        'user/auth/password-reset/',
+        data: {'email': email},
+      );
     } on DioException catch (e) {
       throw Exception('Password reset request failed: ${e.message}');
     }
@@ -248,18 +251,19 @@ class AuthService {
     if (refreshToken == null) return null;
 
     try {
-      final response = await _dio.post(
+      final response = await _dio.post<dynamic>(
         'user/auth/token/refresh/',
         data: {'refresh': refreshToken},
       );
 
       if (response.statusCode == 200) {
-        final newAccessToken = response.data['access'] as String;
+        final newAccessToken = (response.data as Map)['access'] as String;
         await _storage.write(key: _accessTokenKey, value: newAccessToken);
         // The server rotates refresh tokens (ROTATE_REFRESH_TOKENS), so the
         // one just sent is spent; with the blacklist on, reusing it at the
         // next refresh would sign the user out.
-        final rotatedRefreshToken = response.data['refresh'] as String?;
+        final rotatedRefreshToken =
+            (response.data as Map)['refresh'] as String?;
         if (rotatedRefreshToken != null) {
           await _storage.write(
             key: _refreshTokenKey,
@@ -276,7 +280,7 @@ class AuthService {
   }
 
   Future<String?> getAccessToken() async {
-    return await _storage.read(key: _accessTokenKey);
+    return _storage.read(key: _accessTokenKey);
   }
 
   // ============ Profile Methods ============
@@ -285,7 +289,7 @@ class AuthService {
   Future<Map<String, dynamic>> getProfile() async {
     try {
       final dio = await _getAuthenticatedDio();
-      final response = await dio.get('user/profile/');
+      final response = await dio.get<dynamic>('user/profile/');
 
       if (response.statusCode == 200) {
         return response.data as Map<String, dynamic>;
@@ -334,7 +338,7 @@ class AuthService {
       if (pinEmoji != null) data['pin_emoji'] = pinEmoji;
       if (distanceUnit != null) data['distance_unit'] = distanceUnit;
 
-      final response = await dio.patch('user/profile/', data: data);
+      final response = await dio.patch<dynamic>('user/profile/', data: data);
 
       if (response.statusCode == 200) {
         return response.data as Map<String, dynamic>;
@@ -369,7 +373,7 @@ class AuthService {
         ),
       );
 
-      final response = await dio.patch(
+      final response = await dio.patch<dynamic>(
         'user/profile/',
         data: formData,
         options: Options(contentType: 'multipart/form-data'),

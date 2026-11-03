@@ -181,7 +181,7 @@ class UnifiedClusterModal extends StatelessWidget {
             Navigator.pop(context); // close modal
             Navigator.push(
               context,
-              MaterialPageRoute(
+              MaterialPageRoute<void>(
                 builder: (context) => PersonDetailsScreen(personId: p.id),
               ),
             );
@@ -225,7 +225,7 @@ class UnifiedClusterModal extends StatelessWidget {
       ),
       onTap: () {
         Navigator.pop(context); // close modal
-        showModalBottomSheet(
+        showModalBottomSheet<void>(
           context: context,
           backgroundColor: Colors.transparent,
           builder: (context) => AirportBottomSheet(airport: a),
@@ -297,7 +297,7 @@ class UnifiedClusterModal extends StatelessWidget {
       ),
       onTap: () {
         Navigator.pop(context); // close modal
-        showModalBottomSheet(
+        showModalBottomSheet<void>(
           context: context,
           backgroundColor: Colors.transparent,
           builder: (context) => StationBottomSheet(station: s),

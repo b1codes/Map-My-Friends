@@ -108,11 +108,13 @@ void main() {
     await tester.pump();
   }
 
-  StreamController<PulseState> streamFrom(PulseState initial) {
+  /// Starts the bloc at [initial] and returns a function that emits
+  /// later states.
+  void Function(PulseState) streamFrom(PulseState initial) {
     final controller = StreamController<PulseState>();
     addTearDown(() => unawaited(controller.close()));
     whenListen(bloc, controller.stream, initialState: initial);
-    return controller;
+    return controller.add;
   }
 
   Finder calendarDay(int day) => find.descendant(
@@ -448,11 +450,11 @@ void main() {
 
   group('PulseScreen action errors', () {
     testWidgets('a new nonce with an error toasts once', (tester) async {
-      final states = streamFrom(_sample());
+      final emit = streamFrom(_sample());
       await pumpPulse(tester);
 
       final failed = _sample();
-      states.add(
+      emit(
         PulseLoaded(
           people: failed.people,
           logs: failed.logs,
@@ -473,11 +475,11 @@ void main() {
     testWidgets('a later state carrying the same nonce does not toast again', (
       tester,
     ) async {
-      final states = streamFrom(_sample());
+      final emit = streamFrom(_sample());
       await pumpPulse(tester);
       final base = _sample();
 
-      states.add(
+      emit(
         PulseLoaded(
           people: base.people,
           logs: base.logs,
@@ -496,7 +498,7 @@ void main() {
       expect(find.textContaining('Could not update cadence'), findsNothing);
 
       // A different list, so it is a genuinely new state, but the same nonce.
-      states.add(
+      emit(
         PulseLoaded(
           people: base.people.sublist(1),
           logs: base.logs,
@@ -509,7 +511,7 @@ void main() {
       expect(find.textContaining('Could not update cadence'), findsNothing);
 
       // A repeat of the identical failure still notifies: new nonce.
-      states.add(
+      emit(
         PulseLoaded(
           people: base.people,
           logs: base.logs,
@@ -523,13 +525,11 @@ void main() {
     });
 
     testWidgets('a nonce change without an error is silent', (tester) async {
-      final states = streamFrom(_sample());
+      final emit = streamFrom(_sample());
       await pumpPulse(tester);
       final base = _sample();
 
-      states.add(
-        PulseLoaded(people: base.people, logs: base.logs, actionNonce: 3),
-      );
+      emit(PulseLoaded(people: base.people, logs: base.logs, actionNonce: 3));
       await tester.pump();
       await tester.pump();
 

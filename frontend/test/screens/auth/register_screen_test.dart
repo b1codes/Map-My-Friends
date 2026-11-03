@@ -163,7 +163,8 @@ void main() {
 
     /// Pushes the screen over a host page, as the login screen does, so the
     /// pops it performs have somewhere to land.
-    Future<StreamController<AuthState>> pumpPushed(WidgetTester tester) async {
+    /// Pushes the screen and returns a function that emits auth states.
+    Future<void Function(AuthState)> pumpPushed(WidgetTester tester) async {
       final controller = StreamController<AuthState>.broadcast();
       addTearDown(controller.close);
       when(() => authBloc.stream).thenAnswer((_) => controller.stream);
@@ -181,7 +182,9 @@ void main() {
                   child: TextButton(
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                      MaterialPageRoute<void>(
+                        builder: (_) => const RegisterScreen(),
+                      ),
                     ),
                     child: const Text('host'),
                   ),
@@ -194,7 +197,7 @@ void main() {
       await tester.tap(find.text('host'));
       await tester.pumpAndSettle();
       expect(find.byType(RegisterScreen), findsOneWidget);
-      return controller;
+      return controller.add;
     }
 
     testWidgets('rejects a username shorter than three characters', (
@@ -353,9 +356,9 @@ void main() {
     testWidgets('RegistrationSuccess shows its message and returns to login', (
       tester,
     ) async {
-      final states = await pumpPushed(tester);
+      final emit = await pumpPushed(tester);
 
-      states.add(const RegistrationSuccess());
+      emit(const RegistrationSuccess());
       await tester.pumpAndSettle();
 
       expect(find.byType(RegisterScreen), findsNothing);
@@ -367,9 +370,9 @@ void main() {
     });
 
     testWidgets('AuthError keeps the user on the form', (tester) async {
-      final states = await pumpPushed(tester);
+      final emit = await pumpPushed(tester);
 
-      states.add(const AuthError(message: 'Username taken'));
+      emit(const AuthError(message: 'Username taken'));
       await tester.pumpAndSettle();
 
       expect(find.byType(RegisterScreen), findsOneWidget);

@@ -60,7 +60,9 @@ void main() {
       await settle(tester);
       await saveProfile(tester);
 
-      final saved = (await (await user.api()).get('user/profile/')).data;
+      final saved = (await (await user.api()).get<Map<String, dynamic>>(
+        'user/profile/',
+      )).data!;
       expect(saved['first_name'], 'Morgan');
       expect(saved['last_name'], 'Rivera');
       expect(saved['city'], 'Boston');

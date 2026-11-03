@@ -22,7 +22,7 @@ class MapSettingsButton extends StatelessWidget {
         child: ThermalResponse(
           borderRadius: MapGlass.radiusLg,
           onTap: () {
-            showModalBottomSheet(
+            showModalBottomSheet<void>(
               context: context,
               backgroundColor: Colors.transparent,
               builder: (_) {

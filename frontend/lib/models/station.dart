@@ -25,13 +25,13 @@ class Station {
 
   factory Station.fromJson(Map<String, dynamic> json) {
     return Station(
-      id: json['id'],
-      name: json['name'],
-      osmId: json['osm_id'],
-      stationType: json['station_type'] ?? 'regional_station',
-      uicRef: json['uic_ref'],
-      city: json['city'],
-      country: json['country'],
+      id: json['id'] as int?,
+      name: json['name'] as String,
+      osmId: json['osm_id'] as int,
+      stationType: json['station_type'] as String? ?? 'regional_station',
+      uicRef: json['uic_ref'] as String?,
+      city: json['city'] as String?,
+      country: json['country'] as String?,
       latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
       longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
       distanceKm: (json['distance_km'] as num?)?.toDouble(),
@@ -44,13 +44,13 @@ class Station {
     final coordinates = geometry?['coordinates'] as List<dynamic>?;
 
     return Station(
-      id: json['id'],
-      name: properties['name'],
-      osmId: properties['osm_id'],
-      stationType: properties['station_type'],
-      uicRef: properties['uic_ref'],
-      city: properties['city'],
-      country: properties['country'],
+      id: json['id'] as int?,
+      name: properties['name'] as String,
+      osmId: properties['osm_id'] as int,
+      stationType: properties['station_type'] as String?,
+      uicRef: properties['uic_ref'] as String?,
+      city: properties['city'] as String?,
+      country: properties['country'] as String?,
       latitude: coordinates != null ? (coordinates[1] as num).toDouble() : 0.0,
       longitude: coordinates != null ? (coordinates[0] as num).toDouble() : 0.0,
       distanceKm: (properties['distance_km'] as num?)?.toDouble(),

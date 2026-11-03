@@ -122,7 +122,9 @@ class _MeScreenState extends State<MeScreen> {
   }
 
   void _showColorPicker() {
-    Color pickerColor = Color(int.parse(_pinColor.replaceFirst('#', '0xFF')));
+    final Color pickerColor = Color(
+      int.parse(_pinColor.replaceFirst('#', '0xFF')),
+    );
     GlassDialog.panel(
       context,
       title: 'Pick a Pin Color',
@@ -221,7 +223,7 @@ class _MeScreenState extends State<MeScreen> {
                 label: 'Settings',
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(
+                  MaterialPageRoute<void>(
                     builder: (context) => const SettingsScreen(),
                   ),
                 ),

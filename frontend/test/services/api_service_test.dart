@@ -65,7 +65,7 @@ Map<String, dynamic> tripJson(String id, {String name = 'Road trip'}) => {
       },
     },
   ],
-  'legs': [],
+  'legs': <dynamic>[],
 };
 
 Map<String, dynamic> airportFeature(int id) => {

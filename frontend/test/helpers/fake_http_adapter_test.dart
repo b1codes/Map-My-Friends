@@ -17,7 +17,7 @@ void main() {
       {'id': '1'},
     ]);
 
-    final response = await dio.get('people/');
+    final response = await dio.get<dynamic>('people/');
 
     expect(response.statusCode, 200);
     expect(response.data, [
@@ -27,13 +27,15 @@ void main() {
   });
 
   test('matches absolute URLs by their full path', () async {
-    adapter.reply('GET', '/route/v1/driving/1,2;3,4', 200, {'routes': []});
+    adapter.reply('GET', '/route/v1/driving/1,2;3,4', 200, {
+      'routes': <dynamic>[],
+    });
 
-    final response = await dio.get(
+    final response = await dio.get<dynamic>(
       'https://router.example.org/route/v1/driving/1,2;3,4',
     );
 
-    expect(response.data, {'routes': []});
+    expect(response.data, {'routes': <dynamic>[]});
   });
 
   test('queued handlers are consumed in order and the last repeats', () async {
@@ -41,7 +43,7 @@ void main() {
     adapter.reply('GET', 'x/', 200, 'ok');
     final codes = <int>[];
     for (var i = 0; i < 3; i++) {
-      final r = await dio.get(
+      final r = await dio.get<dynamic>(
         'x/',
         options: Options(validateStatus: (_) => true),
       );
@@ -52,7 +54,7 @@ void main() {
 
   test('an unrouted request fails loudly with a 599', () async {
     await expectLater(
-      dio.get('nope/'),
+      dio.get<dynamic>('nope/'),
       throwsA(
         isA<DioException>().having(
           (e) => e.response?.statusCode,

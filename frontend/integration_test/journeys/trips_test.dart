@@ -29,11 +29,11 @@ class TripWorld {
     final user = await JourneyUser.registered(prefix);
     final api = await user.api();
 
-    final nearest = await api.get(
+    final nearest = await api.get<dynamic>(
       'airports/nearest/',
       queryParameters: {'lat': '51.5074', 'lon': '-0.1278', 'count': '1'},
     );
-    final airport = (nearest.data['features'] as List).first as Map;
+    final airport = ((nearest.data as Map)['features'] as List).first as Map;
 
     await user.addPerson(
       firstName: 'Grace',
@@ -48,7 +48,7 @@ class TripWorld {
       state: 'MA',
     );
     // addPerson sets no hub; Ada's preferred airport makes her stop a hub.
-    await api.post(
+    await api.post<dynamic>(
       'people/',
       data: {
         'first_name': 'Ada',
@@ -69,7 +69,7 @@ class TripWorld {
 
   /// The trips the API holds for this user.
   Future<List<Map<String, dynamic>>> savedTrips() async {
-    final response = await (await user.api()).get('trips/');
+    final response = await (await user.api()).get<dynamic>('trips/');
     return (response.data as List).cast<Map<String, dynamic>>();
   }
 }

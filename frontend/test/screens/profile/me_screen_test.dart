@@ -186,7 +186,9 @@ void main() {
 
   /// Mounts the screen, then delivers [state] as a change, the way a real
   /// LoadProfile round-trip arrives.
-  Future<StreamController<ProfileState>> pumpWithProfile(
+  /// Pumps the screen with [state] and returns a function that emits
+  /// later states.
+  Future<void Function(ProfileState)> pumpWithProfile(
     WidgetTester tester, [
     ProfileState state = _loaded,
   ]) async {
@@ -197,7 +199,7 @@ void main() {
     controller.add(state);
     await tester.pump();
     await tester.pump();
-    return controller;
+    return controller.add;
   }
 
   Finder field(String label) => find.widgetWithText(TextFormField, label);
@@ -263,10 +265,10 @@ void main() {
 
     testWidgets('does not overwrite what the user is typing when the profile '
         'reloads', (tester) async {
-      final states = await pumpWithProfile(tester);
+      final emit = await pumpWithProfile(tester);
 
       await tester.enterText(field('City (Required)'), 'Paris');
-      states.add(_loaded.copyWith(city: 'Rome', email: 'new@example.com'));
+      emit(_loaded.copyWith(city: 'Rome', email: 'new@example.com'));
       await tester.pump();
       await tester.pump();
 

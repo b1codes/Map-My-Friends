@@ -31,7 +31,7 @@ class RoutingService {
   Future<List<LatLng>> getRoute(List<TripStop> stops) async {
     if (stops.length < 2) return [];
 
-    List<LatLng> fullPath = [];
+    final List<LatLng> fullPath = [];
 
     for (int i = 0; i < stops.length - 1; i++) {
       final start = stops[i];
@@ -79,16 +79,20 @@ class RoutingService {
       final url =
           '${ApiConfig.osrmBaseUrl}/$coordinates?overview=full&geometries=geojson';
 
-      final response = await _dio.get(url);
+      final response = await _dio.get<dynamic>(url);
 
       if (response.statusCode == 200) {
-        final data = response.data;
-        if (data['routes'] != null && data['routes'].isNotEmpty) {
-          final List<dynamic> coords =
-              data['routes'][0]['geometry']['coordinates'];
-          return coords
-              .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
-              .toList();
+        final routes = (response.data as Map)['routes'] as List?;
+        if (routes != null && routes.isNotEmpty) {
+          final geometry = (routes[0] as Map)['geometry'] as Map;
+          final coords = geometry['coordinates'] as List;
+          return coords.map((c) {
+            final point = c as List;
+            return LatLng(
+              (point[1] as num).toDouble(),
+              (point[0] as num).toDouble(),
+            );
+          }).toList();
         }
       }
     } catch (e) {

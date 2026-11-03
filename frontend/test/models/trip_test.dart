@@ -275,11 +275,10 @@ void main() {
       expect(json['start_date'], '2026-08-01');
       expect(json['end_date'], '2026-08-09');
       expect(json['status'], 'BOOKED');
-      expect((json['stops'] as List).single['location']['coordinates'], [
-        2.0,
-        1.0,
-      ]);
-      expect((json['legs'] as List).single['departure_stop'], 'a');
+      final stop = (json['stops'] as List).single as Map<String, dynamic>;
+      expect((stop['location'] as Map)['coordinates'], [2.0, 1.0]);
+      final leg = (json['legs'] as List).single as Map<String, dynamic>;
+      expect(leg['departure_stop'], 'a');
     });
 
     test('fromJson tolerates a missing legs list and null dates', () {

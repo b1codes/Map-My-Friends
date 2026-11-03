@@ -190,7 +190,7 @@ class TripsScreen extends StatelessWidget {
             if (trip.status == TripStatus.booked) {
               Navigator.push(
                 context,
-                MaterialPageRoute(
+                MaterialPageRoute<void>(
                   builder: (context) => TripDetailsScreen(trip: trip),
                 ),
               );

@@ -61,7 +61,7 @@ class ApiService {
               // Retry the request with new token
               error.requestOptions.headers['Authorization'] =
                   'Bearer $newToken';
-              final response = await _dio.fetch(error.requestOptions);
+              final response = await _dio.fetch<dynamic>(error.requestOptions);
               return handler.resolve(response);
             }
           }
@@ -73,15 +73,19 @@ class ApiService {
 
   Future<List<Person>> getPeople() async {
     try {
-      final response = await _dio.get('people/');
+      final response = await _dio.get<dynamic>('people/');
       if (response.statusCode == 200) {
         final data = response.data;
         if (data is Map<String, dynamic> &&
             data['type'] == 'FeatureCollection') {
           final features = data['features'] as List;
-          return features.map((json) => Person.fromGeoJson(json)).toList();
+          return features
+              .map((json) => Person.fromGeoJson(json as Map<String, dynamic>))
+              .toList();
         } else if (data is List) {
-          return data.map((json) => Person.fromJson(json)).toList();
+          return data
+              .map((json) => Person.fromJson(json as Map<String, dynamic>))
+              .toList();
         } else {
           throw Exception('Unexpected response format');
         }
@@ -141,9 +145,9 @@ class ApiService {
         imageName: profileImage?.name,
       );
 
-      final response = await _dio.post('people/', data: formData);
+      final response = await _dio.post<dynamic>('people/', data: formData);
       if (response.statusCode == 201) {
-        return Person.fromGeoJson(response.data);
+        return Person.fromGeoJson(response.data as Map<String, dynamic>);
       } else {
         throw Exception('Failed to add person');
       }
@@ -169,9 +173,12 @@ class ApiService {
         imageName: profileImage?.name,
       );
 
-      final response = await _dio.patch('people/${person.id}/', data: formData);
+      final response = await _dio.patch<dynamic>(
+        'people/${person.id}/',
+        data: formData,
+      );
       if (response.statusCode == 200) {
-        return Person.fromGeoJson(response.data);
+        return Person.fromGeoJson(response.data as Map<String, dynamic>);
       } else {
         throw Exception('Failed to update person');
       }
@@ -182,7 +189,7 @@ class ApiService {
 
   Future<void> deletePerson(String id) async {
     try {
-      final response = await _dio.delete('people/$id/');
+      final response = await _dio.delete<dynamic>('people/$id/');
       if (response.statusCode != 204) {
         throw Exception('Failed to delete person');
       }
@@ -194,7 +201,7 @@ class ApiService {
   // Contact log methods (Keep-in-Touch)
   Future<List<ContactLog>> getContactLogs({String? personId}) async {
     try {
-      final response = await _dio.get(
+      final response = await _dio.get<dynamic>(
         'contact-logs/',
         queryParameters: personId != null ? {'person': personId} : null,
       );
@@ -215,7 +222,7 @@ class ApiService {
 
   Future<ContactLog> addContactLog(ContactLog log) async {
     try {
-      final response = await _dio.post(
+      final response = await _dio.post<dynamic>(
         'contact-logs/',
         data: log.toCreateJson(),
       );
@@ -232,7 +239,7 @@ class ApiService {
   // Trip methods
   Future<List<Trip>> getTrips() async {
     try {
-      final response = await _dio.get('trips/');
+      final response = await _dio.get<dynamic>('trips/');
       if (response.statusCode == 200) {
         final data = response.data;
         final results = data is Map ? data['results'] as List : data as List;
@@ -249,7 +256,7 @@ class ApiService {
 
   Future<Trip> createTrip(Trip trip) async {
     try {
-      final response = await _dio.post('trips/', data: trip.toJson());
+      final response = await _dio.post<dynamic>('trips/', data: trip.toJson());
       if (response.statusCode == 201) {
         return Trip.fromJson(response.data as Map<String, dynamic>);
       } else {
@@ -263,7 +270,7 @@ class ApiService {
   Future<Trip> updateTrip(Trip trip) async {
     try {
       if (trip.id == null) throw Exception('Trip ID is required for update');
-      final response = await _dio.patch(
+      final response = await _dio.patch<dynamic>(
         'trips/${trip.id}/',
         data: trip.toJson(),
       );
@@ -279,7 +286,7 @@ class ApiService {
 
   Future<void> deleteTrip(String id) async {
     try {
-      final response = await _dio.delete('trips/$id/');
+      final response = await _dio.delete<dynamic>('trips/$id/');
       if (response.statusCode != 204) {
         throw Exception('Failed to delete trip');
       }
@@ -295,13 +302,15 @@ class ApiService {
     int count = 5,
   }) async {
     try {
-      final response = await _dio.get(
+      final response = await _dio.get<dynamic>(
         'airports/nearest/',
         queryParameters: {'lat': lat, 'lon': lon, 'count': count},
       );
       if (response.statusCode == 200) {
-        final features = response.data['features'] as List;
-        return features.map((json) => Airport.fromGeoJson(json)).toList();
+        final features = (response.data as Map)['features'] as List;
+        return features
+            .map((json) => Airport.fromGeoJson(json as Map<String, dynamic>))
+            .toList();
       } else {
         throw Exception('Failed to load nearest airports');
       }
@@ -316,13 +325,15 @@ class ApiService {
     int count = 5,
   }) async {
     try {
-      final response = await _dio.get(
+      final response = await _dio.get<dynamic>(
         'stations/nearest/',
         queryParameters: {'lat': lat, 'lon': lon, 'count': count},
       );
       if (response.statusCode == 200) {
-        final features = response.data['features'] as List;
-        return features.map((json) => Station.fromGeoJson(json)).toList();
+        final features = (response.data as Map)['features'] as List;
+        return features
+            .map((json) => Station.fromGeoJson(json as Map<String, dynamic>))
+            .toList();
       } else {
         throw Exception('Failed to load nearest stations');
       }

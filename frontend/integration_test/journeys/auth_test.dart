@@ -125,7 +125,7 @@ void main() {
       (tester) async {
         final first = await JourneyUser.registered('switchfrom');
         await first.addPerson(firstName: 'Grace', lastName: 'Hopper');
-        await (await first.api()).post(
+        await (await first.api()).post<dynamic>(
           'trips/',
           data: {
             'name': 'Visit Grace',

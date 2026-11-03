@@ -37,7 +37,7 @@ class PersonMapMarker extends StatelessWidget {
               if (!open || !context.mounted) return;
               Navigator.push(
                 context,
-                MaterialPageRoute(
+                MaterialPageRoute<void>(
                   builder: (context) =>
                       PersonDetailsScreen(personId: person.id),
                 ),

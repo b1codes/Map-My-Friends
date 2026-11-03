@@ -440,7 +440,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
   }
 
   void _showLegDetails(BuildContext context, TripLeg leg) {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -455,7 +455,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
     final onSurface = theme.colorScheme.onSurface;
 
     String name = '';
-    String address = stop.snapshotAddress ?? '';
+    final String address = stop.snapshotAddress ?? '';
 
     if (stop.snapshotMetadata != null) {
       final peopleData = stop.snapshotMetadata!['people'];
@@ -468,7 +468,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
           name = peopleData.toString();
         }
       } else if (stop.snapshotMetadata!['hub'] != null) {
-        name = stop.snapshotMetadata!['hub']['name'];
+        name = (stop.snapshotMetadata!['hub'] as Map)['name'] as String;
       }
     }
 

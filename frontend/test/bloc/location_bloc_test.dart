@@ -9,7 +9,7 @@ class FakeGeolocator extends GeolocatorPlatform {
   bool serviceEnabled = true;
   LocationPermission permission = LocationPermission.whileInUse;
   LocationPermission requestResult = LocationPermission.whileInUse;
-  Object? positionError;
+  Exception? positionError;
   Position position = _position(41.8781, -87.6298);
 
   int requestCalls = 0;

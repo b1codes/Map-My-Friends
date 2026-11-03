@@ -298,7 +298,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     : () {
                                         Navigator.push(
                                           context,
-                                          MaterialPageRoute(
+                                          MaterialPageRoute<void>(
                                             builder: (context) =>
                                                 const ForgotPasswordScreen(),
                                           ),
@@ -610,7 +610,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 : () {
                                     Navigator.push(
                                       context,
-                                      MaterialPageRoute(
+                                      MaterialPageRoute<void>(
                                         builder: (context) =>
                                             const RegisterScreen(),
                                       ),
