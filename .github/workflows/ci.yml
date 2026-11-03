@@ -10,6 +10,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Every job only reads the repository.
+permissions:
+  contents: read
+
 jobs:
   # -----------------------------------------------------------------
   # BACKEND VALIDATION
@@ -26,8 +30,12 @@ jobs:
         with:
           python-version: '3.12'
 
+      # The version comes from `required-version` in backend/pyproject.toml,
+      # which also stops a different local Ruff from running.
       - name: Install Ruff
-        run: pip install ruff
+        run: |
+          version=$(python -c "import tomllib; print(tomllib.load(open('backend/pyproject.toml', 'rb'))['tool']['ruff']['required-version'])")
+          pip install "ruff${version}"
 
       - name: Run Ruff Format Check
         run: ruff format --check backend/
@@ -253,6 +261,22 @@ jobs:
             frontend/build/e2e/screenshots/
             frontend/build/e2e/stack.log
           if-no-files-found: ignore
+
+  # -----------------------------------------------------------------
+  # WORKFLOW VALIDATION
+  # -----------------------------------------------------------------
+  # actionlint checks every workflow's syntax, expressions, action inputs and
+  # job graph, and runs shellcheck on each `run:` script. The image is pinned
+  # by digest in the Makefile, so local and CI runs match.
+  lint-workflows:
+    name: Lint Workflows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Run actionlint
+        run: make lint-workflows
 
   # -----------------------------------------------------------------
   # INFRASTRUCTURE VALIDATION

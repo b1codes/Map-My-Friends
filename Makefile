@@ -57,7 +57,31 @@ test-frontend-cov:
 	cd frontend && $(FLUTTER) test --exclude-tags golden --coverage --test-randomize-ordering-seed random
 	cd frontend && $(DART) run tool/check_coverage.dart
 
-.PHONY: test-cov test-frontend-cov
+# Static analysis, the same as CI. Ruff's version is read from
+# `required-version` in backend/pyproject.toml; actionlint is pinned by digest
+# here, and CI runs this target.
+RUFF_VERSION := $(shell sed -n 's/^required-version = "==\(.*\)"/\1/p' backend/pyproject.toml)
+ACTIONLINT_IMAGE := rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+
+lint: lint-backend lint-frontend lint-workflows
+
+lint-backend:
+	uvx ruff@$(RUFF_VERSION) format --check backend/
+	uvx ruff@$(RUFF_VERSION) check backend/
+
+lint-frontend:
+	cd frontend && $(DART) format --set-exit-if-changed .
+	cd frontend && $(FLUTTER) analyze
+
+lint-workflows:
+	docker run --rm -v "$(CURDIR):/repo" -w /repo $(ACTIONLINT_IMAGE) -color
+
+# Everything the per-PR CI gates check except the Widgetbook catalog and the
+# E2E journeys (`make e2e`). Needs the dev stack up (`make up`) for the
+# backend tests.
+check: lint test-cov test-frontend-cov
+
+.PHONY: test-cov test-frontend-cov lint lint-backend lint-frontend lint-workflows check
 
 # E2E journeys (frontend/integration_test) in headless Chrome against a fresh
 # throwaway stack (docker-compose.e2e.yml), separate from the one `make up`
