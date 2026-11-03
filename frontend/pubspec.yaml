@@ -77,6 +77,9 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.4
   bloc_test: ^9.1.7
   mocktail: ^1.0.4
+  # Real fonts, the reference platform and the comparator for goldens.
+  golden_harness:
+    path: golden_harness
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

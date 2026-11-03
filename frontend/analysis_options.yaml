@@ -8,9 +8,11 @@ include: package:flutter_lints/flutter.yaml
 
 analyzer:
   exclude:
-    # A separate package with its own dependencies, analyzed by its own CI
-    # step. From here its imports only resolve after a `pub get` inside it.
+    # Separate packages with their own dependencies, each analyzed by its own
+    # CI step. From here their imports only resolve after a `pub get` inside
+    # each.
     - widgetbook/**
+    - golden_harness/**
 
   language:
     # No implicit downcasts from dynamic. Most of the app's data arrives as

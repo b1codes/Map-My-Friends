@@ -1,0 +1,28 @@
+name: golden_harness
+description: "What every Map My Friends golden test shares: real fonts, the reference platform, and the comparator."
+publish_to: 'none'
+version: 1.0.0
+
+environment:
+  sdk: ^3.10.7
+
+# A dev dependency of the app and of the Widgetbook catalog, by path. Nothing
+# here ships in the app.
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  # Constrained to what the app already resolves.
+  clock: ^1.1.2
+  google_fonts: ^8.1.0
+  http: ^1.1.0
+  meta: ^1.16.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - fonts/
