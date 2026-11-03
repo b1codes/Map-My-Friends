@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -193,7 +194,7 @@ class HorizontalTripPlanner extends StatelessWidget {
                   height: 140,
                   child: _ActionGroup(
                     onSave: () {
-                      final now = DateTime.now();
+                      final now = clock.now();
                       final dateStr = DateFormat('yyyy-MM-dd').format(now);
                       context.read<TripBloc>().add(
                         SaveTrip(

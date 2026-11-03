@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -385,7 +386,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
               widget.person!.timezone!.isNotEmpty) {
             try {
               final location = tz.getLocation(widget.person!.timezone!);
-              final now = tz.TZDateTime.now(location);
+              final now = tz.TZDateTime.from(clock.now(), location);
               timeString = DateFormat.jm().format(now);
             } catch (_) {}
           }
@@ -596,9 +597,9 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                             onTap: () async {
                               final date = await showDatePicker(
                                 context: context,
-                                initialDate: _birthday ?? DateTime.now(),
+                                initialDate: _birthday ?? clock.now(),
                                 firstDate: DateTime(1900),
-                                lastDate: DateTime.now(),
+                                lastDate: clock.now(),
                               );
                               if (date != null) {
                                 setState(() => _birthday = date);

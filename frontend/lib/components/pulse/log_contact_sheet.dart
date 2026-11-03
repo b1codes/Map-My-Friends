@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -62,7 +63,7 @@ class _LogContactSheetState extends State<LogContactSheet> {
   @override
   void initState() {
     super.initState();
-    _date = DateUtils.dateOnly(DateTime.now());
+    _date = DateUtils.dateOnly(clock.now());
     _cadence =
         widget.person.contactCadenceDays ??
         ContactRecency.defaultCadenceForTag(widget.person.relationshipTag);
@@ -82,7 +83,7 @@ class _LogContactSheetState extends State<LogContactSheet> {
   }
 
   String get _dateLabel {
-    final today = DateUtils.dateOnly(DateTime.now());
+    final today = DateUtils.dateOnly(clock.now());
     final yesterday = today.subtract(const Duration(days: 1));
     if (DateUtils.isSameDay(_date, today)) return 'Today';
     if (DateUtils.isSameDay(_date, yesterday)) return 'Yesterday';
@@ -90,7 +91,7 @@ class _LogContactSheetState extends State<LogContactSheet> {
   }
 
   Future<void> _pickDate() async {
-    final today = DateUtils.dateOnly(DateTime.now());
+    final today = DateUtils.dateOnly(clock.now());
     final picked = await showDatePicker(
       context: context,
       initialDate: _date,
@@ -173,16 +174,15 @@ class _LogContactSheetState extends State<LogContactSheet> {
                 _DateChip(
                   label: 'Today',
                   selected: _dateLabel == 'Today',
-                  onTap: () => setState(
-                    () => _date = DateUtils.dateOnly(DateTime.now()),
-                  ),
+                  onTap: () =>
+                      setState(() => _date = DateUtils.dateOnly(clock.now())),
                 ),
                 _DateChip(
                   label: 'Yesterday',
                   selected: _dateLabel == 'Yesterday',
                   onTap: () => setState(
                     () => _date = DateUtils.dateOnly(
-                      DateTime.now().subtract(const Duration(days: 1)),
+                      clock.now().subtract(const Duration(days: 1)),
                     ),
                   ),
                 ),

@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:latlong2/latlong.dart';
 import '../../models/trip.dart';
@@ -218,7 +219,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
       final tripToSave = Trip(
         id: state.currentTripId,
         name: event.name,
-        date: event.startDate ?? DateTime.now(),
+        date: event.startDate ?? clock.now(),
         startDate: event.startDate,
         endDate: event.endDate,
         status: event.status,

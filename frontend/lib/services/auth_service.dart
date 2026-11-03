@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:clock/clock.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -132,7 +133,7 @@ class AuthService {
           ? 'google_user'
           : (connection == 'apple' ? 'apple_user' : 'auth0_user');
       final mockToken =
-          'mock_auth0_jwt_token_${mockUsername}_${DateTime.now().millisecondsSinceEpoch}';
+          'mock_auth0_jwt_token_${mockUsername}_${clock.now().millisecondsSinceEpoch}';
 
       await _storage.write(key: _accessTokenKey, value: mockToken);
       await _storage.write(key: _refreshTokenKey, value: 'mock_refresh_token');

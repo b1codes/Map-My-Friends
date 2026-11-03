@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -35,7 +36,7 @@ class _PulseScreenState extends State<PulseScreen> {
   DateTime? _selectedDay;
   int _lastNonce = 0;
 
-  DateTime get _now => widget.now ?? DateTime.now();
+  DateTime get _now => widget.now ?? clock.now();
 
   @override
   void initState() {

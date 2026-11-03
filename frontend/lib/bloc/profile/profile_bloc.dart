@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'profile_event.dart';
 import 'profile_state.dart';
@@ -105,7 +106,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
   String? _processImageUrl(String? url) {
     if (url == null) return null;
     // Add timestamp to force cache refresh
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final timestamp = clock.now().millisecondsSinceEpoch;
     if (url.contains('?')) {
       return '$url&t=$timestamp';
     }

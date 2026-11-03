@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
@@ -393,9 +394,9 @@ class _MeScreenState extends State<MeScreen> {
                                             DateTime.tryParse(
                                               _birthDateController.text,
                                             ) ??
-                                            DateTime.now(),
+                                            clock.now(),
                                         firstDate: DateTime(1900),
-                                        lastDate: DateTime.now(),
+                                        lastDate: clock.now(),
                                       );
                                       if (date != null) {
                                         _birthDateController.text =
