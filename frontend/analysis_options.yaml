@@ -1,12 +1,9 @@
-# This file configures the analyzer, which statically analyzes Dart code to
-# check for errors, warnings, and lints.
+# Static analysis for the app, its tests and the E2E journeys. CI runs
+# `flutter analyze`, which fails on any issue, including infos.
 #
-# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
-# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
-# invoked from the command line by running `flutter analyze`.
-
-# The following line activates a set of recommended lints for Flutter apps,
-# packages, and plugins designed to encourage good coding practices.
+# Start from the recommended Flutter lints, then add the stricter checks below.
+# They are chosen to catch bugs, not to enforce a style: `dart format` already
+# owns layout.
 include: package:flutter_lints/flutter.yaml
 
 analyzer:
@@ -15,20 +12,42 @@ analyzer:
     # step. From here its imports only resolve after a `pub get` inside it.
     - widgetbook/**
 
-linter:
-  # The lint rules applied to this project can be customized in the
-  # section below to disable rules from the `package:flutter_lints/flutter.yaml`
-  # included above or to enable additional rules. A list of all available lints
-  # and their documentation is published at https://dart.dev/lints.
-  #
-  # Instead of disabling a lint rule for the entire project in the
-  # section below, it can also be suppressed for a single line of code
-  # or a specific dart file by using the `// ignore: name_of_lint` and
-  # `// ignore_for_file: name_of_lint` syntax on the line or in the file
-  # producing the lint.
-  rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+  language:
+    # No implicit downcasts from dynamic. Most of the app's data arrives as
+    # decoded JSON, and an implicit cast there hides where a bad payload
+    # throws. Casts have to be written out.
+    strict-casts: true
+    # Fail when a type argument or return type would silently fall back to
+    # dynamic, e.g. `dio.get(...)` or `showDialog(...)` with no type.
+    strict-inference: true
+    # No raw generic types like `List` or `Future` with the arguments left off.
+    strict-raw-types: true
 
-# Additional information about this file can be found at
-# https://dart.dev/guides/language/analysis-options
+linter:
+  rules:
+    # Calls on dynamic values aren't type-checked at all.
+    - avoid_dynamic_calls
+
+    # Async mistakes: a future nobody awaits loses its errors, and an open
+    # stream or subscription leaks.
+    - unawaited_futures
+    - unnecessary_await_in_return
+    - cancel_subscriptions
+    - close_sinks
+    - avoid_slow_async_io
+
+    # Errors: throw only Error/Exception types, and never from a finally
+    # block, which discards the original error.
+    - only_throw_errors
+    - throw_in_finally
+
+    # Code that does nothing or doesn't do what it looks like it does.
+    - unnecessary_statements
+    - literal_only_boolean_expressions
+    - no_adjacent_strings_in_list
+    - test_types_in_equals
+    # runtimeType.toString() changes under minification on web.
+    - avoid_type_to_string
+
+    # A local that is never reassigned should say so.
+    - prefer_final_locals
