@@ -19,20 +19,7 @@ import 'package:map_my_friends_widgetbook/main.directories.g.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:widgetbook/widgetbook.dart';
 
-/// A node's place in the tree, as the path Widgetbook routes to.
-String _route(String prefix, WidgetbookNode node) =>
-    '$prefix${node.name}'.replaceAll(' ', '-').toLowerCase();
-
-/// Every use case in the generated tree, as the path Widgetbook routes to.
-List<String> _useCasePaths(List<WidgetbookNode> nodes, [String prefix = '']) {
-  return [
-    for (final node in nodes)
-      if (node is WidgetbookUseCase)
-        _route(prefix, node)
-      else
-        ..._useCasePaths(node.children ?? const [], '$prefix${node.name}/'),
-  ];
-}
+import 'support/catalog.dart';
 
 /// A copy of [nodes] whose use cases wrap what they build in a [_Rendered]
 /// naming their path.
@@ -48,7 +35,7 @@ List<WidgetbookNode> _tagged(List<WidgetbookNode> nodes, [String prefix = '']) {
           name: node.name,
           designLink: node.designLink,
           builder: (context) =>
-              _Rendered(_route(prefix, node), node.builder(context)),
+              _Rendered(routeOf(prefix, node), node.builder(context)),
         )
       else
         node.copyWith(
@@ -86,7 +73,7 @@ void main() {
     AppTheme.resetThemeCache();
   });
 
-  final paths = _useCasePaths(directories);
+  final paths = useCasePaths(directories);
   final tagged = _tagged(directories);
 
   test('the catalog is not empty', () {

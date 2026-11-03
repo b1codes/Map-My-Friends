@@ -20,6 +20,7 @@ Deep links work: `/#/?path=screens/people/peoplescreen/states` opens one entry d
    dart run build_runner build
    ```
 3. Commit the regenerated `lib/main.directories.g.dart`. CI fails if it is out of date.
+4. Record its goldens with `make update-goldens` from the repo root, and commit the images. `test/catalog_golden_test.dart` renders every entry in light and dark and compares each with its image in `test/goldens/`; see [Visual regression](../../docs/testing.md#visual-regression-goldens).
 
 `test/use_cases_smoke_test.dart` opens every entry and fails on anything it throws, so a broken entry shows up in CI, not in review.
 
