@@ -72,9 +72,34 @@ jobs:
         run: |
           docker compose exec -T api python manage.py migrate
 
+      # In random order, so a test that only passes after another one fails
+      # here. The log prints the seed; rerun locally with --shuffle <seed>.
       - name: Run Django Tests
         run: |
-          docker compose exec -T api python manage.py test
+          docker compose exec -T api coverage run manage.py test --shuffle
+
+      # Fails below fail_under in backend/pyproject.toml ([tool.coverage.report]).
+      - name: Check Coverage Gate
+        run: |
+          docker compose exec -T api coverage report
+
+      - name: Publish Coverage Report
+        if: ${{ !cancelled() && hashFiles('backend/.coverage') != '' }}
+        run: |
+          {
+            echo "### Backend branch coverage"
+            echo
+            docker compose exec -T api coverage report --format=markdown || true
+          } >> "$GITHUB_STEP_SUMMARY"
+          docker compose exec -T api coverage html
+
+      - name: Upload Coverage Report
+        if: ${{ !cancelled() && hashFiles('backend/.coverage') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/htmlcov/
+          if-no-files-found: ignore
 
       - name: Stop Docker Compose Services
         if: always()
@@ -127,7 +152,20 @@ jobs:
         # antialiasing differs between macOS and Linux, which shows up as a
         # sub-4%% pixel diff with identical layout. They stay a local tool;
         # run them with `flutter test --tags golden`.
-        run: flutter test --exclude-tags golden
+        # Random order, like the backend; the log prints the seed to rerun with.
+        run: flutter test --exclude-tags golden --coverage --test-randomize-ordering-seed random
+
+      # Fails below the gate in tool/check_coverage.dart, or when a file in
+      # lib/ has code that no test loads. Writes the summary to the job page.
+      - name: Check Coverage Gate
+        run: dart run tool/check_coverage.dart
+
+      - name: Upload Coverage Report
+        if: ${{ !cancelled() && hashFiles('frontend/coverage/lcov.info') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/lcov.info
 
   validate-widgetbook:
     name: Lint, Format, & Test Widgetbook
@@ -234,3 +272,4 @@ jobs:
 
       - name: Format Check
         run: terraform fmt -check -recursive
+

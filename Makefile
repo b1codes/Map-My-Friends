@@ -41,12 +41,23 @@ ui:
 test:
 	docker compose exec api python manage.py test 2>&1 | tee .gemini/last_test_results.txt
 
-# Backend tests under coverage. Scope and exclusions live in
-# backend/pyproject.toml ([tool.coverage.*]); html lands in backend/htmlcov/.
+# Backend tests under coverage, in random order like CI. Scope, exclusions and
+# the gate (fail_under) live in backend/pyproject.toml ([tool.coverage.*]);
+# html lands in backend/htmlcov/. Fails below the gate, as CI does.
 test-cov:
-	docker compose exec api coverage run manage.py test
+	docker compose exec api coverage run manage.py test --shuffle
+	-docker compose exec api coverage html
 	docker compose exec api coverage report
-	docker compose exec api coverage html
+
+# Frontend tests under coverage, in random order like CI, then the coverage
+# gate (frontend/tool/check_coverage.dart).
+FLUTTER ?= fvm flutter
+DART ?= fvm dart
+test-frontend-cov:
+	cd frontend && $(FLUTTER) test --exclude-tags golden --coverage --test-randomize-ordering-seed random
+	cd frontend && $(DART) run tool/check_coverage.dart
+
+.PHONY: test-cov test-frontend-cov
 
 # E2E journeys (frontend/integration_test) in headless Chrome against a fresh
 # throwaway stack (docker-compose.e2e.yml), separate from the one `make up`
