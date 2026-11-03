@@ -77,7 +77,7 @@ if [[ "$(uname -s)-$(uname -m)" == "Linux-x86_64" ]]; then
     # $UPDATE is empty or one flag, and golden_files one word per file.
     # shellcheck disable=SC2046,SC2086
     (cd "$FRONTEND/$package" && "${FLUTTER[@]}" pub get >/dev/null &&
-      "${FLUTTER[@]}" test --tags golden $UPDATE $(golden_files)) || status=1
+      "${FLUTTER[@]}" test --tags golden --test-randomize-ordering-seed random $UPDATE $(golden_files)) || status=1
   done
   if [[ -n "$UPDATE" ]]; then optimize_changed_goldens; fi
   exit $status
@@ -101,7 +101,7 @@ docker run --rm --platform linux/amd64 \
     for package in $PACKAGES; do
       echo "== frontend/$package"
       (cd "/work/$package" && flutter pub get >/dev/null &&
-        flutter test --tags golden $UPDATE $(golden_files)) || status=1
+        flutter test --tags golden --test-randomize-ordering-seed random $UPDATE $(golden_files)) || status=1
     done
     cd /work
     find . -path ./build -prune -o -path "*/build" -prune -o \

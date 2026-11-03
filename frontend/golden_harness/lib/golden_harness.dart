@@ -21,8 +21,8 @@ import 'dart:io';
 
 import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/painting.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/testing.dart';
@@ -87,12 +87,29 @@ void goldenTest(
   );
 }
 
-/// Compares [finder] with the golden at [key].
+/// Compares [finder] with the golden at [key], once every image on screen
+/// has decoded.
+///
+/// An image decodes on the real event loop, which the test's fake clock
+/// doesn't wait for. So whether it's in the frame depends on whether an
+/// earlier test in the same file already cached it, and in random order that
+/// changes from run to run. Decoding them all first makes it never matter.
+/// An image that fails to load (tests have no network) is left as it is.
 Future<void> expectGolden(
   WidgetTester tester,
   Finder finder,
   String key,
 ) async {
+  await tester.runAsync(() async {
+    for (final element in find.byType(Image).evaluate()) {
+      await precacheImage(
+        (element.widget as Image).image,
+        element,
+        onError: (_, _) {},
+      );
+    }
+  });
+  await tester.pump();
   await expectLater(finder, matchesGoldenFile(key));
 }
 
