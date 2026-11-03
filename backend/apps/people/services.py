@@ -58,13 +58,13 @@ def geocode_address(
     for attempt in range(MAX_ATTEMPTS):
         try:
             location = geolocator.geocode(query)
-        except (GeocoderTimedOut, GeocoderServiceError):
+        except (GeocoderTimedOut, GeocoderServiceError) as err:
             if attempt < MAX_ATTEMPTS - 1:
                 time.sleep(1)
                 continue
             raise GeocodingUnavailable(
                 _("Geocoding service unavailable. Please try again later.")
-            )
+            ) from err
 
         if location:
             timezone = finder.timezone_at(lng=location.longitude, lat=location.latitude)

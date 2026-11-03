@@ -45,8 +45,8 @@ class PointField(serializers.Field):
             )
         try:
             lng, lat = float(coordinates[0]), float(coordinates[1])
-        except (TypeError, ValueError):
-            raise serializers.ValidationError("coordinates must be numbers.")
+        except (TypeError, ValueError) as err:
+            raise serializers.ValidationError("coordinates must be numbers.") from err
         if not -90 <= lat <= 90 or not -180 <= lng <= 180:
             raise serializers.ValidationError(
                 "coordinates out of range; expected [longitude, latitude]."

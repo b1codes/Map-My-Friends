@@ -1,4 +1,6 @@
+from django.contrib.auth.models import User
 from django.test import SimpleTestCase
+from rest_framework.test import APITestCase
 
 from apps.stations import reference
 
@@ -43,10 +45,6 @@ class StationReferenceTests(SimpleTestCase):
         self.assertEqual(
             reference.get_nearby(41.8781, -87.6298, station_type="not_a_type"), []
         )
-
-
-from django.contrib.auth.models import User
-from rest_framework.test import APITestCase
 
 
 class NearestStationsEndpointTests(APITestCase):

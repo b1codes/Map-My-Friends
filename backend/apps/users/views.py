@@ -148,11 +148,10 @@ class PasswordResetConfirmView(generics.GenericAPIView):
                     {"message": "Password has been reset successfully."},
                     status=status.HTTP_200_OK,
                 )
-            else:
-                return Response(
-                    {"error": "Invalid or expired token."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            return Response(
+                {"error": "Invalid or expired token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except (User.DoesNotExist, ValueError, TypeError):
             # ValueError/TypeError: user_id is not coercible to a primary key
             # (e.g. "abc" or a list), which is a bad request, not a server error.

@@ -235,12 +235,12 @@ class ContactLogRepository:
 
         records: list[ContactLogRecord] = []
         for ref in person_refs:
-            for doc in (
-                ref.collection(CONTACT_LOGS)
+            records.extend(
+                self._hydrate(doc, ref.id)
+                for doc in ref.collection(CONTACT_LOGS)
                 .order_by("contacted_at", direction="DESCENDING")
                 .stream()
-            ):
-                records.append(self._hydrate(doc, ref.id))
+            )
 
         records.sort(key=lambda r: r.contacted_at, reverse=True)
         return records

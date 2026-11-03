@@ -108,14 +108,13 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop("password_confirm")
         validated_data.pop("first_name_hp", None)
-        user = User.objects.create_user(
+        return User.objects.create_user(
             username=validated_data["username"],
             email=validated_data["email"],
             password=validated_data["password"],
             first_name=validated_data.get("first_name", ""),
             last_name=validated_data.get("last_name", ""),
         )
-        return user
 
 
 class PasswordResetRequestSerializer(serializers.Serializer):

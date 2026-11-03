@@ -40,8 +40,39 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 package-mode = false
+[tool.ruff]
+# CI installs exactly this version (see .github/workflows/ci.yml), and a
+# different local Ruff refuses to run rather than disagree with CI. Run it with
+# `uvx ruff@0.17.3`, or `make lint`.
+required-version = "==0.17.3"
+
 [tool.ruff.lint]
+# Ruff's defaults (pyflakes plus a few pycodestyle errors) and the rule families
+# that find bugs or dead code. Style the formatter already settles is left out.
+extend-select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "I",    # import order
+    "B",    # bugbear: likely bugs, e.g. exception chaining, mutable defaults
+    "BLE",  # blind `except Exception`
+    "C4",   # needless comprehension / collection calls
+    "DJ",   # Django: nullable string fields, model __str__, receiver order
+    "FURB", # modernisations that remove code
+    "LOG",  # logging misuse
+    "G",    # eager string formatting in logging calls
+    "PERF", # avoidable work in loops
+    "PGH",  # blanket `noqa` / `type: ignore`
+    "PIE",  # unnecessary statements
+    "RET",  # inconsistent or unreachable returns
+    "RUF",  # Ruff's own checks, incl. unused `noqa`
+    "SIM",  # simplifiable conditions
+    "T20",  # stray print()
+    "UP",   # syntax older than Python 3.12 needs
+]
 ignore = [
+    # The formatter owns line length. What it leaves long is strings, comments
+    # and docstrings, which it won't split and which read worse split by hand.
+    "E501",
     # Django and DRF configure classes by plain assignment —
     # `permission_classes = [IsAuthenticated]`, `serializer_class = ...`. The
     # rule is right in general and wrong for this idiom: annotating 42 framework

@@ -1,4 +1,6 @@
+from django.contrib.auth.models import User
 from django.test import SimpleTestCase
+from rest_framework.test import APITestCase
 
 from apps.airports import reference
 
@@ -49,10 +51,6 @@ class AirportReferenceTests(SimpleTestCase):
         nearest = reference.get_nearby(41.8781, -87.6298, count=1)[0]
         self.assertGreater(nearest.distance_km, 0)
         self.assertLess(nearest.distance_km, 40)
-
-
-from django.contrib.auth.models import User
-from rest_framework.test import APITestCase
 
 
 class NearestAirportsEndpointTests(APITestCase):

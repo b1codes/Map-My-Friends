@@ -34,7 +34,7 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
         if len(auth_header) == 1:
             msg = _("Invalid Authorization header. No credentials provided.")
             raise exceptions.AuthenticationFailed(msg)
-        elif len(auth_header) > 2:
+        if len(auth_header) > 2:
             msg = _(
                 "Invalid Authorization header. Credentials string should not contain spaces."
             )
@@ -55,10 +55,7 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
         if (settings.DEBUG or TESTING) and token.startswith("mock_auth0_jwt_token_"):
             parts = token.split("_")
             # Format: mock_auth0_jwt_token_{username}_{timestamp}
-            if len(parts) >= 5:
-                username = parts[4]
-            else:
-                username = "mock_auth0_user"
+            username = parts[4] if len(parts) >= 5 else "mock_auth0_user"
 
             email = f"{username}@example.com"
             user, _created = User.objects.get_or_create(
@@ -100,14 +97,18 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
                 audience=auth0_audience,
                 issuer=expected_issuer,
             )
-        except jwt.ExpiredSignatureError:
-            raise exceptions.AuthenticationFailed(_("Token has expired."))
+        except jwt.ExpiredSignatureError as e:
+            raise exceptions.AuthenticationFailed(_("Token has expired.")) from e
         except jwt.InvalidTokenError as e:
             raise exceptions.AuthenticationFailed(
                 _("Invalid token signature or claims: ") + str(e)
-            )
-        except Exception as e:  # noqa: BLE001 - deliberate catch-all so auth never leaks an internal error
-            raise exceptions.AuthenticationFailed(_("Authentication failed: ") + str(e))
+            ) from e
+        except (
+            Exception
+        ) as e:  # deliberate catch-all so auth never leaks an internal error
+            raise exceptions.AuthenticationFailed(
+                _("Authentication failed: ") + str(e)
+            ) from e
 
         sub = payload.get("sub")
         if not sub:

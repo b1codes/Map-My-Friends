@@ -1,4 +1,6 @@
+from django.contrib.auth.models import User
 from django.test import SimpleTestCase
+from rest_framework.test import APITestCase
 
 from apps.common.testing import FirestoreTestMixin
 from apps.trips.repositories import DuplicateSequenceOrder, TripRepository
@@ -117,10 +119,6 @@ class TripRepositoryTests(FirestoreTestMixin, SimpleTestCase):
     def test_delete_by_wrong_owner_refused(self):
         trip = self.trips.create("owner-a", TRIP_DATA)
         self.assertFalse(self.trips.delete(trip.id, "owner-b"))
-
-
-from django.contrib.auth.models import User
-from rest_framework.test import APITestCase
 
 
 class TripEndpointTests(FirestoreTestMixin, APITestCase):

@@ -73,7 +73,8 @@ class LiveProviderContractTests(SimpleTestCase):
                 f"after {ATTEMPTS} attempts"
             )
             # A GitHub Actions annotation, so the skip shows on the run summary.
-            print(f"::warning title=Live contract not checked::{message}")
+            # It only works on stdout, hence print rather than logging.
+            print(f"::warning title=Live contract not checked::{message}")  # noqa: T201
             raise SkipTest(message)
         expected = contract.spec["response"]
         self.assertEqual(status, expected["status"], contract.id)
