@@ -63,4 +63,4 @@ Both suites run in a random order on every CI run, so a test that only passes af
 - It deploys the commit CI tested, not whatever `main` points at by then. The web build checks out that commit, and the server fast-forwards to it.
 - A manual run (`workflow_dispatch`) on `main` deploys `main` as it is, for when CI itself is broken. Use it sparingly.
 
-For this to hold, `main` should be protected with **CI Passed** as a required status check. That's a repository setting, not a file.
+Branch protection on `main` requires **CI Passed** (from GitHub Actions) as well as a code-owner review, so a PR can't merge with a failing job. That's a repository setting, not a file. A new CI job only blocks merges once it's listed in CI Passed's `needs`.
