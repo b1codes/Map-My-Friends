@@ -196,6 +196,8 @@ Since the backend runs inside a Docker container, you must execute commands *ins
 | **Open Python Shell** | `make shell` |
 | **Access Database** | `make db` |
 | **Run Tests** | `make test` |
+| **Run Every CI Gate Locally** | `make check` (lint, plus both suites under their coverage gates; see [docs/testing.md](docs/testing.md)) |
+| **Lint Only** | `make lint` |
 | **Run E2E Journeys** | `make e2e` (see [frontend/integration_test](frontend/integration_test/README.md)) |
 | **Install Dependencies** | `make install` |
 | **Add Package** | `make add` |
@@ -211,6 +213,7 @@ map-my-friends/
 ├── Makefile                    # Shortcuts for Docker commands
 ├── contracts/                  # API and third-party contracts both test suites check (see contracts/README.md)
 ├── docker-compose.e2e.yml      # Throwaway full stack for the E2E journeys (make e2e)
+├── docs/testing.md             # What CI runs on each PR, the coverage gates, and how to run them locally
 ├── docs/manual-qa.md           # The few checks automation can't do (Auth0, OS prompts, real devices)
 │
 ├── backend/                    # Django Backend
