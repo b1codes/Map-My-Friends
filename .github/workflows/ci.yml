@@ -297,3 +297,33 @@ jobs:
       - name: Format Check
         run: terraform fmt -check -recursive
 
+  # -----------------------------------------------------------------
+  # SINGLE REQUIRED CHECK
+  # -----------------------------------------------------------------
+  # Passes only when every job above passed. Branch protection requires this
+  # one check, so adding or renaming a job doesn't mean editing the rules.
+  # The release workflow deploys only commits on main where this passed.
+  ci-passed:
+    name: CI Passed
+    if: ${{ always() }}
+    needs:
+      - lint-backend
+      - test-backend
+      - validate-frontend
+      - validate-widgetbook
+      - e2e
+      - lint-workflows
+      - validate-infra
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check every job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "::error::A required job did not pass ($result)."
+              exit 1
+            fi
+          done

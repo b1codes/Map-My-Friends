@@ -1,34 +1,65 @@
 name: Production Release Pipeline
 
+# Deploys only a commit on main that passed CI: this runs when the CI Pipeline
+# finishes there, and only if it succeeded (the CI Passed job covers every
+# check). It deploys that commit, not whatever main points at by then.
+# A manual run deploys the head of main as it is, for when CI itself is broken.
 on:
-  push:
+  workflow_run:
+    workflows: [ CI Pipeline ]
+    types: [ completed ]
     branches: [ main ]
   workflow_dispatch:
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-main
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
+env:
+  # The commit CI tested (or main's head on a manual run).
+  DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
 jobs:
+  # A failed or cancelled CI run, one for a pull request whose branch happens
+  # to be called main, or a manual run from another branch deploys nothing.
+  gate:
+    name: Check CI Passed
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    steps:
+      - name: Record the commit being deployed
+        run: echo "Deploying $DEPLOY_SHA" >> "$GITHUB_STEP_SUMMARY"
+
   # -----------------------------------------------------------------
   # BACKEND DEPLOYMENT (EC2)
   # -----------------------------------------------------------------
   deploy-backend:
     name: Deploy Django Backend to EC2
+    needs: gate
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
-
+      # Fast-forwards the server's main to the tested commit rather than
+      # pulling main's head, which may be a newer commit CI hasn't passed.
+      # If the server is already past it (a newer release went first),
+      # --ff-only leaves it there instead of going back.
       - name: Execute Deploy Command via SSH
         uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # ratchet:appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DEPLOY_SHA
           script: |
+            set -e
             cd /home/ubuntu/Map-My-Friends
-            git pull origin main
+            git fetch origin main
+            git merge --ff-only "$DEPLOY_SHA"
             chmod +x deploy.sh
             ./deploy.sh
 
@@ -37,6 +68,7 @@ jobs:
   # -----------------------------------------------------------------
   deploy-frontend:
     name: Deploy Flutter Frontend to S3 & CloudFront
+    needs: gate
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -44,6 +76,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
 
       - name: Set up Java
         uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # ratchet:actions/setup-java@v4
