@@ -155,13 +155,29 @@ jobs:
       - name: Analyze Code
         run: flutter analyze
 
+      # The goldens' shared harness is its own package, so the app's analyzer
+      # leaves it out (see analysis_options.yaml).
+      - name: Analyze Golden Harness
+        working-directory: frontend/golden_harness
+        run: |
+          flutter pub get
+          flutter analyze
+
       - name: Run Unit Tests
-        # Golden images only match the platform that generated them — text
-        # antialiasing differs between macOS and Linux, which shows up as a
-        # sub-4%% pixel diff with identical layout. They stay a local tool;
-        # run them with `flutter test --tags golden`.
+        # Includes the goldens: this runner is Linux x64, the platform they
+        # are recorded on (see frontend/golden_harness).
         # Random order, like the backend; the log prints the seed to rerun with.
-        run: flutter test --exclude-tags golden --coverage --test-randomize-ordering-seed random
+        run: flutter test --coverage --test-randomize-ordering-seed random
+
+      # A failed golden writes the expected, actual and diff images next to
+      # it, in failures/. They are what a reviewer needs to judge the change.
+      - name: Upload Golden Failures
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: golden-failures-frontend
+          path: frontend/test/**/failures/
+          if-no-files-found: ignore
 
       # Fails below the gate in tool/check_coverage.dart, or when a file in
       # lib/ has code that no test loads. Writes the summary to the job page.
@@ -211,9 +227,19 @@ jobs:
       - name: Analyze Code
         run: flutter analyze
 
-      # Opens every catalog entry and fails on anything it throws.
-      - name: Run Catalog Smoke Test
+      # The smoke test opens every catalog entry and fails on anything it
+      # throws; the goldens compare each one, in light and dark, with its
+      # recorded image.
+      - name: Run Catalog Smoke Test and Goldens
         run: flutter test
+
+      - name: Upload Golden Failures
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: golden-failures-widgetbook
+          path: frontend/widgetbook/test/**/failures/
+          if-no-files-found: ignore
 
   # -----------------------------------------------------------------
   # END-TO-END JOURNEYS

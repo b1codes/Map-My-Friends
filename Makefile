@@ -50,11 +50,12 @@ test-cov:
 	docker compose exec api coverage report
 
 # Frontend tests under coverage, in random order like CI, then the coverage
-# gate (frontend/tool/check_coverage.dart).
+# gate (frontend/tool/check_coverage.dart). The goldens skip themselves
+# anywhere but Linux x64; `make goldens` runs them.
 FLUTTER ?= fvm flutter
 DART ?= fvm dart
 test-frontend-cov:
-	cd frontend && $(FLUTTER) test --exclude-tags golden --coverage --test-randomize-ordering-seed random
+	cd frontend && $(FLUTTER) test --coverage --test-randomize-ordering-seed random
 	cd frontend && $(DART) run tool/check_coverage.dart
 
 # Static analysis, the same as CI. Ruff's version is read from
@@ -72,6 +73,7 @@ lint-backend:
 lint-frontend:
 	cd frontend && $(DART) format --set-exit-if-changed .
 	cd frontend && $(FLUTTER) analyze
+	cd frontend/golden_harness && $(FLUTTER) pub get >/dev/null && $(FLUTTER) analyze
 
 lint-workflows:
 	docker run --rm -v "$(CURDIR):/repo" -w /repo $(ACTIONLINT_IMAGE) -color
@@ -82,6 +84,19 @@ lint-workflows:
 check: lint test-cov test-frontend-cov
 
 .PHONY: test-cov test-frontend-cov lint lint-backend lint-frontend lint-workflows check
+
+# Golden tests, the app's and the Widgetbook catalog's, on Linux x64: the
+# platform they are recorded on, and the one CI runs. Natively on Linux x64,
+# in the pinned Flutter image (linux/amd64) anywhere else; see
+# scripts/goldens.sh. update-goldens re-records them; review the images
+# before committing.
+goldens:
+	scripts/goldens.sh
+
+update-goldens:
+	scripts/goldens.sh --update
+
+.PHONY: goldens update-goldens
 
 # E2E journeys (frontend/integration_test) in headless Chrome against a fresh
 # throwaway stack (docker-compose.e2e.yml), separate from the one `make up`
