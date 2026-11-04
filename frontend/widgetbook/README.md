@@ -24,6 +24,8 @@ Deep links work: `/#/?path=screens/people/peoplescreen/states` opens one entry d
 
 `test/use_cases_smoke_test.dart` opens every entry and fails on anything it throws, so a broken entry shows up in CI, not in review.
 
+`test/catalog_accessibility_test.dart` and `test/catalog_contrast_test.dart` check every entry's tap targets, labels, text at 200% and text contrast. A new entry is covered without any extra code. See [Accessibility](../../docs/testing.md#accessibility).
+
 ## How entries are built
 
 | Piece | Why |

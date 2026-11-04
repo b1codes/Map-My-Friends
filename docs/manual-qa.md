@@ -1,6 +1,6 @@
 # Manual QA checklist
 
-Automation covers almost everything: the backend and frontend unit suites, the [contract tests](../contracts/README.md), and the [E2E journeys](../frontend/integration_test/README.md). This list covers only what those can't reach, which is native OS prompts, hosted third-party pages, and how the app behaves on a real device. Go through it before a release, on at least one iOS device, one Android device and desktop Chrome, signed in against the production API.
+Automation covers almost everything: the backend and frontend unit suites, the [contract tests](../contracts/README.md), the [E2E journeys](../frontend/integration_test/README.md), and the [accessibility checks](testing.md#accessibility). This list covers only what those can't reach, which is native OS prompts, hosted third-party pages, and how the app behaves on a real device. Go through it before a release, on at least one iOS device, one Android device and desktop Chrome, signed in against the production API.
 
 If an item here becomes automatable, move it into a suite and delete it from this list.
 
@@ -45,8 +45,16 @@ The E2E stack serves a plain stub tile. Check that the real tile servers render:
 - [ ] **Localised standard map:** in German and French the map uses its localised tile server.
 - [ ] **Offline tiles (iOS/Android only; the web build doesn't cache):** tiles you've already viewed still show in airplane mode.
 
+## Screen readers and keyboard
+
+The catalog checks that every control has a name, every tap target is big enough, and text has enough contrast (see [Accessibility](testing.md#accessibility)). Whether the app makes sense when you can't see it takes a person.
+
+- [ ] **VoiceOver (iOS) and TalkBack (Android):** sign in, find a friend's pin on the map and open their sheet, add a person with a photo, log a contact, and plan, save and open a trip. Each control says what it does, and reading order follows the screen.
+- [ ] **Sheets and dialogs:** while a sheet or dialog is open, the screen reader stays inside it, and closing it returns you to where you were.
+- [ ] **Keyboard (web):** Tab through sign-in, register and the person form. Focus follows the layout, is always visible, and Enter submits.
+
 ## Feel on a real device
 
 - [ ] **Gestures:** panning, pinch-zooming and rotating the map are smooth on a mid-range Android phone, with no stutter when clusters split.
 - [ ] **Layout:** the bottom bar in portrait and the rail in landscape and on tablets don't overlap the notch, the home indicator or the keyboard.
-- [ ] **Text size:** the largest system text size still leaves every screen usable.
+- [ ] **Text size:** the largest system text size still leaves every screen usable. The catalog checks 200%. iOS's largest accessibility size is about 310%, so check that one by hand.

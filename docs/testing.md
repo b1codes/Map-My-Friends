@@ -11,7 +11,7 @@ What runs on every pull request, what each check enforces, and how to run the sa
 | Lint & Format Backend | Ruff format and lint on `backend/` | anything isn't formatted, or a rule fires | `make lint-backend` |
 | Test Backend | the Django suite on the Firestore emulator, in random order, under coverage | a test fails, or branch coverage is below the gate | `make test-cov` |
 | Lint, Format, & Test Frontend | dart format, `flutter analyze` (the app and the golden harness), the Flutter suite in random order under coverage, goldens included | a test fails, a golden differs, the analyzer reports anything (infos too), or line coverage is below the gate | `make lint-frontend`, `make test-frontend-cov`, `make goldens` |
-| Lint, Format, & Test Widgetbook | the component catalog is regenerated, formatted and analyzed, every entry opens, and every entry matches its light and dark golden | the committed catalog is stale, an entry throws, or a golden differs | `make goldens` for the goldens; see the job for the rest |
+| Lint, Format, & Test Widgetbook | the component catalog is regenerated, formatted and analyzed, every entry opens, every entry matches its light and dark golden, and every entry passes the [accessibility checks](#accessibility) | the committed catalog is stale, an entry throws, a golden differs, or an accessibility check finds a different number of problems than its known gaps record | `make goldens` for the goldens; see the job for the rest |
 | E2E Journeys | the real app in headless Chrome against a throwaway full stack | a journey fails | `make e2e` |
 | Lint Workflows | actionlint and shellcheck on every workflow | a workflow has an error | `make lint-workflows` |
 | Validate Terraform Configuration | `terraform fmt` | anything isn't formatted | `terraform fmt -check -recursive infra` |
@@ -25,7 +25,7 @@ The contract tests have no job of their own. They're part of the backend and fro
 | Suite | Measures | Gate | Measured (2026-11-03) | Where the gate lives |
 | --- | --- | --- | --- | --- |
 | Backend | branch coverage of `apps/` and `config/` | 98% | 99.23% | `fail_under` in `backend/pyproject.toml` |
-| Frontend | line coverage of `lib/` | 97% | 98.62% | `minimumLineCoverage` in `frontend/tool/check_coverage.dart` |
+| Frontend | line coverage of `lib/` | 97% | 98.76% | `minimumLineCoverage` in `frontend/tool/check_coverage.dart` |
 
 The gates sit a little under the measured totals. One uncovered line doesn't fail a PR, but an untested module, screen or endpoint does. Raise a gate when coverage rises, and don't lower one to get a PR through.
 
@@ -58,6 +58,31 @@ Running them:
 - When a golden fails, the expected, actual and diff images are written to `failures/` next to it. On CI they're uploaded as the `golden-failures-frontend` and `golden-failures-widgetbook` artifacts.
 - After an intended UI change, run `make update-goldens`, look at the changed images in the diff, and commit them with the change.
 - To give a new test goldens, call `setUpGoldens()` first in `main()`, write it with `goldenTest(...)` (pass `now:` if anything on screen shows a date), and compare with `expectGolden(...)`. Keep goldens in their own file: the harness loads real fonts for the whole file, which would change layout-based assertions in other tests.
+
+## Accessibility
+
+Every Widgetbook entry, and the entries cover every screen, is checked against the bar `lib/utils/a11y_constants.dart` sets, in the Widgetbook job on every PR:
+
+| Check | Fails when | Variants | File |
+| --- | --- | --- | --- |
+| Tap targets | a tappable node is smaller than 48x48 | light | `catalog_accessibility_test.dart` |
+| Labels | a tappable node has no label or tooltip, so a screen reader can only say "button" | light | `catalog_accessibility_test.dart` |
+| Large text | anything overflows with the system text size at 200% | light | `catalog_accessibility_test.dart` |
+| Text contrast | text is below WCAG AA: 4.5:1, or 3:1 for large text | light and dark, each with and without high contrast | `catalog_contrast_test.dart` |
+
+Two smaller checks sit in the app's own suite. `test/utils/app_theme_tokens_test.dart` checks every `MapSignal` ink (the colours that carry meaning as text) against both grounds. The screens and components that had unnamed controls check in their own tests that each control has a name, most with Flutter's `labeledTapTargetGuideline`.
+
+**Known gaps.** Problems the checks already know about are listed in `frontend/widgetbook/test/support/accessibility_gaps.dart`, as a count per entry with the task that fixes them. One entry is marked as a test-font artifact instead, with the reason it isn't a real problem. A check fails on any other count. So a new problem fails CI even on an entry that already has one, and a fix has to lower the count, which keeps the list honest. A new entry starts with no gaps.
+
+**How the checks see the app**:
+
+- Entries open the way the catalog shows them: the first frame, knobs at their defaults, motion reduced. A dialog behind "tap to open" isn't checked, and neither is a state only a knob reaches.
+- Layout checks run with the app's real fonts (`loadRealFonts()` from golden_harness), because the test font is much wider. Glyph sizes come from the font files, so the results are the same on macOS and on Linux x64.
+- Contrast runs with the test font. Its glyphs are solid boxes, so the check reads the exact text colour instead of antialiased edges blended with the glass behind. Text over glass is judged against whatever the glass is over, which is what a person sees.
+- flutter_test's contrast check finds a node's text by its label. A node labelled with words that also appear as visible text elsewhere can be measured against that other text. Name controls with words that aren't already on screen.
+- Icons aren't measured. WCAG asks 3:1 of them.
+
+Run them with `fvm flutter test test/catalog_accessibility_test.dart test/catalog_contrast_test.dart` in `frontend/widgetbook`, in about 20 seconds. Unlike goldens, they don't need Docker. What only a person can judge, like how a screen reader flows or where keyboard focus goes, is in the [manual QA checklist](manual-qa.md#screen-readers-and-keyboard).
 
 ## Random order
 
