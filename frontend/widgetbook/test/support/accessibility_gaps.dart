@@ -185,11 +185,6 @@ const contrastGaps = <String, KnownGap>{
   ),
   'components/shared/thermalbutton/tones-and-states (light, high contrast)':
       KnownGap(2, _lowContrast),
-  'screens/auth/forgotpasswordscreen/default (light)': KnownGap(2, _thisBranch),
-  'screens/auth/forgotpasswordscreen/default (light, high contrast)': KnownGap(
-    2,
-    _thisBranch,
-  ),
   'screens/auth/loginscreen/default (dark)': KnownGap(6, _lowContrast),
   'screens/auth/loginscreen/default (dark, high contrast)': KnownGap(
     6,
@@ -199,11 +194,6 @@ const contrastGaps = <String, KnownGap>{
   'screens/auth/loginscreen/default (light, high contrast)': KnownGap(
     6,
     _lowContrast,
-  ),
-  'screens/auth/registerscreen/default (light)': KnownGap(3, _thisBranch),
-  'screens/auth/registerscreen/default (light, high contrast)': KnownGap(
-    3,
-    _thisBranch,
   ),
   'screens/trips/tripdetailsscreen/default (dark)': KnownGap(4, _thisBranch),
   'screens/trips/tripdetailsscreen/default (dark, high contrast)': KnownGap(
