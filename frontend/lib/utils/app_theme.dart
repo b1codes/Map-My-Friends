@@ -103,7 +103,8 @@ class MapPalette {
   );
   static const MapSignal journeyPlanned = MapSignal(
     Color(0xFFEF6C00),
-    Color(0xFFEF6C00),
+    // The vivid orange was 2.7:1 on the light ground as text.
+    Color(0xFFB34700),
     Color(0xFFFFB74D),
   );
 }

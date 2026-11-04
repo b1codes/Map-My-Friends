@@ -32,7 +32,6 @@ void main() {
     // Inks known to fall short, with the task that fixes them. The test
     // fails if one of these passes, so the list can't go stale.
     const knownLow = <String, String>{
-      'journeyPlanned (light)': 'fixed on this branch',
       'due (light)': 'the low text contrast task',
       'journeyConfirmed (light)': 'the low text contrast task',
     };
