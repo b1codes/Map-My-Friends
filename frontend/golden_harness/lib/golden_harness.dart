@@ -60,7 +60,7 @@ void setUpGoldens() {
         'TZ=UTC, as `make goldens` does.',
       );
     }
-    await _loadFonts();
+    await loadRealFonts();
     final base = goldenFileComparator;
     if (base is LocalFileComparator) {
       goldenFileComparator = _HintingComparator(base.basedir);
@@ -159,7 +159,14 @@ Future<void> _preloadGoogleFonts() async {
   await GoogleFonts.pendingFonts();
 }
 
-Future<void> _loadFonts() async {
+/// Loads the app's real typefaces and icon fonts in place of the test font,
+/// for every test in this file.
+///
+/// [setUpGoldens] calls it on the reference platform. A test that checks
+/// layout rather than pixels (whether text at 200% still fits, say) can call
+/// it on any platform from `setUpAll`: glyph sizes come from the font files,
+/// so layout doesn't vary between platforms the way antialiasing does.
+Future<void> loadRealFonts() async {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   // google_fonts looks in the asset bundle first, and finds `fonts/` there:

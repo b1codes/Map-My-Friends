@@ -27,9 +27,7 @@ import 'package:golden_harness/golden_harness.dart';
 import 'package:map_my_friends_widgetbook/main.dart';
 import 'package:map_my_friends_widgetbook/main.directories.g.dart';
 import 'package:map_my_friends_widgetbook/support/fixtures.dart';
-import 'package:map_my_friends_widgetbook/support/media_addon.dart';
 import 'package:timezone/data/latest.dart' as tz;
-import 'package:widgetbook/widgetbook.dart';
 
 import 'support/catalog.dart';
 
@@ -41,28 +39,6 @@ const _window = Size(390, 844);
 const _pixelRatio = 1.0;
 
 const _themes = ['Light', 'Dark'];
-
-/// The route that opens [path] in preview mode, in [theme], with motion
-/// reduced. Group names come from the addons themselves, as the catalog
-/// reads them.
-String _routeTo(String path, String theme) {
-  final themeGroup = MaterialThemeAddon(
-    themes: [WidgetbookTheme(name: theme, data: ThemeData())],
-  ).groupName;
-  final mediaGroup = MediaPreferencesAddon().groupName;
-  final query = {
-    'path': path,
-    themeGroup: FieldCodec.encodeQueryGroup({'name': theme}),
-    mediaGroup: FieldCodec.encodeQueryGroup({
-      'reduceMotion': 'true',
-      'highContrast': 'false',
-    }),
-  };
-  final params = query.entries
-      .map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}')
-      .join('&');
-  return '/?$params&preview';
-}
 
 /// Where [path]'s golden in [theme] lives, relative to this file.
 String _goldenFor(String path, String theme) {
@@ -118,7 +94,7 @@ void main() {
         addTearDown(() => FlutterError.onError = previous);
 
         await tester.pumpWidget(
-          WidgetbookApp(initialRoute: _routeTo(path, theme)),
+          WidgetbookApp(initialRoute: routeTo(path, theme: theme)),
         );
         for (var i = 0; i < 5; i++) {
           await tester.pump(const Duration(milliseconds: 100));

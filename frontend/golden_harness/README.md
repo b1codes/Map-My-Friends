@@ -19,7 +19,8 @@ void main() {
 
 - `setUpGoldens()` loads the fonts and installs the comparator, once per file.
 - `goldenTest` tags the test `golden`, skips it anywhere but Linux x64, and with `now:` runs it with `clock.now()` pinned.
-- `expectGolden` waits for any font a style asked for to finish loading, then compares.
+- `expectGolden` decodes every image on screen first (so a golden never depends on whether an earlier test cached it), then compares.
+- `loadRealFonts()` loads just the fonts, on any platform, for a test that checks layout rather than pixels. The catalog's accessibility test uses it to check text at 200% (`setUpAll(loadRealFonts)`). Like `setUpGoldens`, it changes the font for every test in the file.
 
 ## Fonts
 
