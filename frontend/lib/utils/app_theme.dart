@@ -93,7 +93,8 @@ class MapPalette {
   /// would make the app's warmest colour mean two different things.
   static const MapSignal journeyConfirmed = MapSignal(
     Color(0xFF2E7D32),
-    Color(0xFF2E7D32),
+    // The vivid green was 2.9:1 as text on its own tinted status chip.
+    Color(0xFF1B5E20),
     Color(0xFF81C784),
   );
   static const MapSignal journeyCancelled = MapSignal(

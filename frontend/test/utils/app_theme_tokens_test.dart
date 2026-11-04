@@ -33,7 +33,6 @@ void main() {
     // fails if one of these passes, so the list can't go stale.
     const knownLow = <String, String>{
       'due (light)': 'the low text contrast task',
-      'journeyConfirmed (light)': 'the low text contrast task',
     };
 
     // Ink is the signal as text, so it has to read as text (WCAG AA, 4.5:1)
