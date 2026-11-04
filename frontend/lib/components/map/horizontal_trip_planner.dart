@@ -55,12 +55,12 @@ class HorizontalTripPlanner extends StatelessWidget {
                       if (stop.airport != null) {
                         name = stop.airport!.iataCode;
                         icon = Icons.flight;
-                        color = MapPalette.airport;
+                        color = MapPalette.airport.vivid;
                         onColor = Colors.white;
                       } else if (stop.station != null) {
                         name = stop.station!.name;
                         icon = Icons.train;
-                        color = MapPalette.majorStation;
+                        color = MapPalette.majorStation.vivid;
                         onColor = Colors.white;
                       } else if (stop.people.isNotEmpty) {
                         name = stop.people.first.firstName;

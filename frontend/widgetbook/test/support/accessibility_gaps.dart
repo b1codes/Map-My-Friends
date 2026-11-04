@@ -77,9 +77,9 @@ const largeTextGaps = <String, KnownGap>{
 
 /// Text below WCAG AA contrast: 4.5:1, or 3:1 for large text.
 const contrastGaps = <String, KnownGap>{
-  'components/map/airportbottomsheet/default (dark)': KnownGap(2, _lowContrast),
+  'components/map/airportbottomsheet/default (dark)': KnownGap(1, _lowContrast),
   'components/map/airportbottomsheet/default (dark, high contrast)': KnownGap(
-    2,
+    1,
     _lowContrast,
   ),
   'components/map/airportbottomsheet/default (light)': KnownGap(
@@ -90,9 +90,9 @@ const contrastGaps = <String, KnownGap>{
     1,
     _lowContrast,
   ),
-  'components/map/basebottomsheet/playground (dark)': KnownGap(2, _lowContrast),
+  'components/map/basebottomsheet/playground (dark)': KnownGap(1, _lowContrast),
   'components/map/basebottomsheet/playground (dark, high contrast)': KnownGap(
-    2,
+    1,
     _lowContrast,
   ),
   'components/map/basebottomsheet/playground (light)': KnownGap(
@@ -167,12 +167,6 @@ const contrastGaps = <String, KnownGap>{
     1,
     _lowContrast,
   ),
-  'components/shared/nearbyairportssection/states (dark)': KnownGap(
-    3,
-    _thisBranch,
-  ),
-  'components/shared/nearbyairportssection/states (dark, high contrast)':
-      KnownGap(3, _thisBranch),
   'components/shared/thermalbutton/tones-and-states (dark)': KnownGap(
     2,
     _lowContrast,

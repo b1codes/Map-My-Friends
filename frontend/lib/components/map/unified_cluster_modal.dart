@@ -196,10 +196,10 @@ class UnifiedClusterModal extends StatelessWidget {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: MapPalette.airport.withValues(alpha: 0.1),
+          color: MapPalette.airport.vivid.withValues(alpha: 0.1),
           shape: BoxShape.circle,
         ),
-        child: const Icon(Icons.flight, color: MapPalette.airport, size: 24),
+        child: Icon(Icons.flight, color: MapPalette.airport.vivid, size: 24),
       ),
       title: Text(a.name),
       subtitle: Text(
@@ -236,28 +236,28 @@ class UnifiedClusterModal extends StatelessWidget {
 
   Widget _buildStationTile(BuildContext context, Station s) {
     IconData iconData = Icons.train;
-    Color color = MapPalette.majorStation;
+    Color color = MapPalette.majorStation.vivid;
     String label = 'Station';
 
     switch (s.stationType) {
       case 'major_station':
         iconData = Icons.train;
-        color = MapPalette.majorStation;
+        color = MapPalette.majorStation.vivid;
         label = 'Major Station';
         break;
       case 'commuter_rail_station':
         iconData = Icons.directions_railway;
-        color = MapPalette.commuterRail;
+        color = MapPalette.commuterRail.vivid;
         label = 'Commuter Rail';
         break;
       case 'subway_station':
         iconData = Icons.subway;
-        color = MapPalette.subway;
+        color = MapPalette.subway.vivid;
         label = 'Subway Station';
         break;
       case 'regional_station':
         iconData = Icons.train;
-        color = MapPalette.regionalStation;
+        color = MapPalette.regionalStation.vivid;
         label = 'Regional Station';
         break;
       default:

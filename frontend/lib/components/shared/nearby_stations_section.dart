@@ -115,14 +115,14 @@ class _NearbyStationsSectionState extends State<NearbyStationsSection> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(
-                                0xFFE65100,
-                              ).withValues(alpha: 0.1),
+                              color: MapPalette.majorStation.vivid.withValues(
+                                alpha: 0.1,
+                              ),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.train,
-                              color: MapPalette.majorStation,
+                              color: MapPalette.majorStation.vivid,
                             ),
                           ),
                           const SizedBox(width: 16),

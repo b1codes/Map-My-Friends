@@ -8,6 +8,7 @@ import 'package:map_my_friends/bloc/trip/trip_state.dart';
 import 'package:map_my_friends/components/map/map_bottom_sheets.dart';
 import 'package:map_my_friends/models/airport.dart';
 import 'package:map_my_friends/models/station.dart';
+import 'package:map_my_friends/utils/app_theme.dart';
 
 class MockTripBloc extends Mock implements TripBloc {}
 
@@ -196,6 +197,35 @@ void main() {
       expect(find.text('Unknown City, Unknown Country'), findsOneWidget);
     });
 
+    // The vivid blue was 1.5:1 against the dark void as text.
+    for (final brightness in Brightness.values) {
+      testWidgets('the subtitle is text, so it takes the accent\'s ink in '
+          '${brightness.name} mode', (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: brightness == Brightness.dark
+                ? ThemeData.dark()
+                : ThemeData.light(),
+            home: const Scaffold(
+              body: BaseBottomSheet(
+                icon: Icons.flight,
+                accent: MapPalette.airport,
+                title: 'John F. Kennedy International Airport',
+                subtitle: 'JFK',
+                location: 'New York, USA',
+                label: 'International Airport',
+              ),
+            ),
+          ),
+        );
+
+        final subtitle = tester.widget<Text>(find.text('JFK'));
+        expect(subtitle.style?.color, MapPalette.airport.ink(brightness));
+        final icon = tester.widget<Icon>(find.byIcon(Icons.flight));
+        expect(icon.color, MapPalette.airport.vivid);
+      });
+    }
+
     testWidgets('a base sheet without an action has no Add to Trip', (
       tester,
     ) async {
@@ -203,7 +233,7 @@ void main() {
         tester,
         const BaseBottomSheet(
           icon: Icons.place,
-          color: Colors.red,
+          accent: MapPalette.regionalStation,
           title: 'Pinned place',
           location: 'Here',
           label: 'Note',

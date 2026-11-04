@@ -299,9 +299,9 @@ class _MapScreenState extends State<MapScreen> {
                                       label:
                                           'Airport: ${airport.name} (${airport.iataCode})',
                                       button: true,
-                                      child: const _MarkerIcon(
+                                      child: _MarkerIcon(
                                         icon: Icons.flight,
-                                        color: MapPalette.airport,
+                                        color: MapPalette.airport.vivid,
                                       ),
                                     ),
                                   ),
@@ -334,28 +334,28 @@ class _MapScreenState extends State<MapScreen> {
                                 })
                                 .map((station) {
                                   IconData iconData = Icons.train;
-                                  Color color = MapPalette.majorStation;
+                                  Color color = MapPalette.majorStation.vivid;
 
                                   switch (station.stationType) {
                                     case 'major_station':
                                       iconData = Icons.train;
-                                      color = MapPalette.majorStation;
+                                      color = MapPalette.majorStation.vivid;
                                       break;
                                     case 'commuter_rail_station':
                                       iconData = Icons.directions_railway;
-                                      color = MapPalette.commuterRail;
+                                      color = MapPalette.commuterRail.vivid;
                                       break;
                                     case 'subway_station':
                                       iconData = Icons.subway;
-                                      color = MapPalette.subway;
+                                      color = MapPalette.subway.vivid;
                                       break;
                                     case 'regional_station':
                                       iconData = Icons.train;
-                                      color = MapPalette.regionalStation;
+                                      color = MapPalette.regionalStation.vivid;
                                       break;
                                     default:
                                       iconData = Icons.train;
-                                      color = MapPalette.majorStation;
+                                      color = MapPalette.majorStation.vivid;
                                   }
 
                                   return Marker(
@@ -778,9 +778,10 @@ class _MapScreenState extends State<MapScreen> {
                                               color = scheme.secondary;
                                               onColor = scheme.onSecondary;
                                             } else if (isAirport) {
-                                              color = MapPalette.airport;
+                                              color = MapPalette.airport.vivid;
                                             } else if (isStation) {
-                                              color = MapPalette.majorStation;
+                                              color =
+                                                  MapPalette.majorStation.vivid;
                                             }
 
                                             return Marker(

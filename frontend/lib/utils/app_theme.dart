@@ -10,11 +10,35 @@ import 'a11y_constants.dart';
 class MapPalette {
   const MapPalette._();
 
-  static const Color airport = Color(0xFF1565C0);
-  static const Color majorStation = Color(0xFFE65100);
-  static const Color commuterRail = Color(0xFF00695C);
-  static const Color subway = Color(0xFF2E7D32);
-  static const Color regionalStation = Color(0xFF607D8B);
+  ///
+  /// Each is a [MapSignal]: a marker or an icon takes the vivid tone, and text
+  /// (an IATA code, a station's reference) takes the ink. The vivid blue was
+  /// 1.5:1 against the dark void as text.
+  static const MapSignal airport = MapSignal(
+    Color(0xFF1565C0),
+    Color(0xFF1565C0),
+    Color(0xFF90CAF9),
+  );
+  static const MapSignal majorStation = MapSignal(
+    Color(0xFFE65100),
+    Color(0xFFBF360C),
+    Color(0xFFFFB74D),
+  );
+  static const MapSignal commuterRail = MapSignal(
+    Color(0xFF00695C),
+    Color(0xFF00695C),
+    Color(0xFF80CBC4),
+  );
+  static const MapSignal subway = MapSignal(
+    Color(0xFF2E7D32),
+    Color(0xFF1B5E20),
+    Color(0xFF81C784),
+  );
+  static const MapSignal regionalStation = MapSignal(
+    Color(0xFF607D8B),
+    Color(0xFF455A64),
+    Color(0xFFB0BEC5),
+  );
 
   // Compass north arrow. Red is the universally-read north convention;
   // tokenized here as a deliberate Evening Palette exception, not a leak.

@@ -113,12 +113,14 @@ class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: MapPalette.airport.withValues(alpha: 0.1),
+                              color: MapPalette.airport.vivid.withValues(
+                                alpha: 0.1,
+                              ),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.flight,
-                              color: MapPalette.airport,
+                              color: MapPalette.airport.vivid,
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -135,7 +137,9 @@ class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
                                           .titleSmall
                                           ?.copyWith(
                                             fontWeight: FontWeight.bold,
-                                            color: MapPalette.airport,
+                                            color: MapPalette.airport.ink(
+                                              Theme.of(context).brightness,
+                                            ),
                                           ),
                                     ),
                                     const SizedBox(width: 8),
