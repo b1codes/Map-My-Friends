@@ -36,6 +36,7 @@ import 'package:map_my_friends/models/person.dart';
 import 'package:map_my_friends/models/station.dart';
 import 'package:map_my_friends/models/trip.dart';
 import 'package:map_my_friends/screens/map/map_screen.dart';
+import 'package:map_my_friends/utils/app_theme.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockLocationBloc extends MockBloc<LocationEvent, LocationState>
@@ -917,6 +918,24 @@ void main() {
         await pumpMap(tester, locale: c.$1);
 
         expect(tileUrl(tester), c.$2);
+      });
+    }
+
+    // Until tiles arrive, and offline, the map is its background. It was
+    // flutter_map's light grey, under white text in dark mode.
+    for (final c in <(ThemeMode, Brightness)>[
+      (ThemeMode.light, Brightness.light),
+      (ThemeMode.dark, Brightness.dark),
+    ]) {
+      testWidgets('before tiles load, a ${c.$1.name} map shows the '
+          '${c.$2.name} ground', (tester) async {
+        when(
+          () => settingsCubit.state,
+        ).thenReturn(MapSettingsState(themeMode: c.$1));
+        await pumpMap(tester);
+
+        final map = tester.widget<FlutterMap>(find.byType(FlutterMap));
+        expect(map.options.backgroundColor, MapField.ground(c.$2));
       });
     }
 

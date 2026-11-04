@@ -15,10 +15,15 @@ class KnownGap {
   final String task;
 }
 
-const _thisBranch = 'the accessibility subtask (ClickUp 86bcqv0gb)';
 const _smallTapTargets = 'the small tap targets task (to be filed)';
 const _lowContrast = 'the low text contrast task (to be filed)';
 const _largeText = 'the 200% text overflow task (to be filed)';
+
+/// Not a problem a person sees. With the test font's wider glyphs this
+/// demo's text re-flows over other text, and the check samples the two;
+/// with the real fonts (see the entry's golden) the heading is white on
+/// dark glass.
+const _testFontArtifact = 'no task: a test-font artifact, not a real problem';
 
 /// Tap targets smaller than 48x48 (A11yConstants.minTouchTargetSize).
 const tapTargetGaps = <String, KnownGap>{
@@ -86,12 +91,6 @@ const contrastGaps = <String, KnownGap>{
     1,
     _lowContrast,
   ),
-  'components/map/horizontaltripplanner/planning-a-trip (dark)': KnownGap(
-    1,
-    _thisBranch,
-  ),
-  'components/map/horizontaltripplanner/planning-a-trip (dark, high contrast)':
-      KnownGap(1, _thisBranch),
   'components/map/stationbottomsheet/default (dark)': KnownGap(1, _lowContrast),
   'components/map/stationbottomsheet/default (dark, high contrast)': KnownGap(
     1,
@@ -117,9 +116,9 @@ const contrastGaps = <String, KnownGap>{
   'components/shared/customtextformfield/validation-error (light, high contrast)':
       KnownGap(2, _lowContrast),
   'components/shared/glasscontainer/isolated-(over-other-glass) (dark)':
-      KnownGap(1, _thisBranch),
+      KnownGap(1, _testFontArtifact),
   'components/shared/glasscontainer/isolated-(over-other-glass) (dark, high contrast)':
-      KnownGap(1, _thisBranch),
+      KnownGap(1, _testFontArtifact),
   'components/shared/glassdialog/confirm-(tap-to-open) (dark)': KnownGap(
     1,
     _lowContrast,
@@ -172,10 +171,10 @@ const contrastGaps = <String, KnownGap>{
     6,
     _lowContrast,
   ),
-  'screens/trips/tripdetailsscreen/default (dark)': KnownGap(4, _thisBranch),
+  'screens/trips/tripdetailsscreen/default (dark)': KnownGap(1, _lowContrast),
   'screens/trips/tripdetailsscreen/default (dark, high contrast)': KnownGap(
-    4,
-    _thisBranch,
+    1,
+    _lowContrast,
   ),
   'screens/trips/tripdetailsscreen/default (light)': KnownGap(2, _lowContrast),
   'screens/trips/tripdetailsscreen/default (light, high contrast)': KnownGap(

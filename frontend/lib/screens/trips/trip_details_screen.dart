@@ -194,6 +194,12 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
             return FlutterMap(
               options: MapOptions(
+                // Shown until tiles load, and offline.
+                // flutter_map's default is light grey,
+                // under white text in dark mode.
+                backgroundColor: MapField.ground(
+                  isDark ? Brightness.dark : Brightness.light,
+                ),
                 initialCameraFit: bounds != null
                     ? CameraFit.bounds(
                         bounds: bounds,

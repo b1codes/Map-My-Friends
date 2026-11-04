@@ -395,6 +395,14 @@ class _MapScreenState extends State<MapScreen> {
                                     options: MapOptions(
                                       initialCenter: center,
                                       initialZoom: _kInitialZoom,
+                                      // Shown until tiles load, and offline.
+                                      // flutter_map's default is light grey,
+                                      // under white text in dark mode.
+                                      backgroundColor: MapField.ground(
+                                        _isDark(context, settingsState)
+                                            ? Brightness.dark
+                                            : Brightness.light,
+                                      ),
                                     ),
                                     children: [
                                       TileLayer(

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:map_my_friends/utils/app_theme.dart';
 
 /// A live map to set map chrome against.
 ///
@@ -53,6 +54,10 @@ class _MapBackdropState extends State<MapBackdrop> {
                 options: MapOptions(
                   initialCenter: widget.center,
                   initialZoom: widget.zoom,
+                  // As MapScreen: the ground until tiles arrive.
+                  backgroundColor: MapField.ground(
+                    dark ? Brightness.dark : Brightness.light,
+                  ),
                 ),
                 children: [
                   TileLayer(
