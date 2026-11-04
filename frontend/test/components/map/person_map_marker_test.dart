@@ -108,6 +108,42 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('on a layer, leaves the tap to the layer but still reads as a '
+      'button named for the friend', (tester) async {
+    final semantics = tester.ensureSemantics();
+    var layerTaps = 0;
+    await tester.pumpWidget(
+      BlocProvider<PeopleBloc>.value(
+        value: peopleBloc,
+        child: MaterialApp(
+          home: Scaffold(
+            body: Center(
+              // What MapScreen's cluster layer wraps around each marker.
+              child: GestureDetector(
+                onTap: () => layerTaps++,
+                child: PersonMapMarker.onLayer(person: _person()),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(
+      tester.getSemantics(find.byType(GestureDetector).first),
+      matchesSemantics(
+        label: 'Friend: Ada Lovelace\nAL',
+        isButton: true,
+        hasTapAction: true,
+      ),
+    );
+    await tester.tap(find.byType(PersonMapMarker));
+    await tester.pumpAndSettle();
+    expect(layerTaps, 1);
+    expect(find.text('View Details'), findsNothing);
+    semantics.dispose();
+  });
+
   testWidgets('a supplied onTap replaces the default dialog', (tester) async {
     var taps = 0;
     await pumpMarker(tester, _person(), onTap: () => taps++);

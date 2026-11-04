@@ -395,6 +395,14 @@ void main() {
 
         expect(find.byIcon(Icons.flight_takeoff), findsOneWidget);
         expect(find.text('Ref: LH123'), findsOneWidget);
+        // Each leg button is only an icon, so it's named for its transport.
+        final semantics = tester.ensureSemantics();
+        await tester.pump();
+        for (final mode in ['Flight', 'Train', 'Bus', 'Drive']) {
+          expect(find.bySemanticsLabel('$mode leg details'), findsOneWidget);
+        }
+        await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+        semantics.dispose();
         expect(find.byIcon(Icons.train), findsOneWidget);
         expect(find.byIcon(Icons.directions_bus), findsOneWidget);
         // s4 -> s5 has no leg yet; the last stop starts none.

@@ -485,8 +485,9 @@ class _PrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // No onTap: the button handles the tap. Passing it here too made a
+    // second, unlabelled tap target around the button for screen readers.
     return ThermalResponse(
-      onTap: onPressed,
       borderRadius: 14,
       child: ElevatedButton.icon(
         onPressed: onPressed,

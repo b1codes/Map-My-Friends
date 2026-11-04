@@ -49,6 +49,21 @@ void main() {
     expect(positioned.right, 16);
   });
 
+  testWidgets('is a button a screen reader can name', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await pumpButton(tester);
+
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Map settings')),
+      matchesSemantics(
+        label: 'Map settings',
+        isButton: true,
+        hasTapAction: true,
+      ),
+    );
+    semantics.dispose();
+  });
+
   testWidgets('opens the settings modal on tap', (tester) async {
     await pumpButton(tester);
     expect(find.byType(MapSettingsModal), findsNothing);

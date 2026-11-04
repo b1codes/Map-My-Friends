@@ -92,6 +92,19 @@ void main() {
   Finder primaryButton(String label) =>
       find.widgetWithText(ElevatedButton, label);
 
+  testWidgets('every control a screen reader reaches has a name', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    await openSheet(tester, _person(phone: '+15550100'));
+
+    // The primary button sat inside a second tap handler, an unnamed button
+    // around the named one.
+    expect(find.text('Call & log'), findsOneWidget);
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    semantics.dispose();
+  });
+
   testWidgets('names who the contact is with', (tester) async {
     await openSheet(tester, _person());
 

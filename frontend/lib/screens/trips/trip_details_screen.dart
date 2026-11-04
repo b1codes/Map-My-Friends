@@ -379,20 +379,12 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
   Widget _buildLegItem(BuildContext context, TripLeg leg) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
-    IconData transportIcon;
-    switch (leg.transportType) {
-      case 'FLIGHT':
-        transportIcon = Icons.flight_takeoff;
-        break;
-      case 'TRAIN':
-        transportIcon = Icons.train;
-        break;
-      case 'BUS':
-        transportIcon = Icons.directions_bus;
-        break;
-      default:
-        transportIcon = Icons.directions_car;
-    }
+    final (IconData transportIcon, String mode) = switch (leg.transportType) {
+      'FLIGHT' => (Icons.flight_takeoff, 'Flight'),
+      'TRAIN' => (Icons.train, 'Train'),
+      'BUS' => (Icons.directions_bus, 'Bus'),
+      _ => (Icons.directions_car, 'Drive'),
+    };
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
@@ -406,15 +398,23 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                 height: 20,
                 color: onSurface.withValues(alpha: 0.2),
               ),
-              InkWell(
-                onTap: () => _showLegDetails(context, leg),
-                child: GlassContainer(
-                  padding: const EdgeInsets.all(8),
-                  borderRadius: 20, // pill: half the 40px timeline dot
-                  child: Icon(
-                    transportIcon,
-                    color: onSurface.withValues(alpha: 0.7),
-                    size: 20,
+              // The button is only an icon, so it needs a name of its own.
+              // A node of its own, too: the booking reference beside it is
+              // text to read, not part of the button's name.
+              Semantics(
+                container: true,
+                button: true,
+                label: '$mode leg details',
+                child: InkWell(
+                  onTap: () => _showLegDetails(context, leg),
+                  child: GlassContainer(
+                    padding: const EdgeInsets.all(8),
+                    borderRadius: 20, // pill: half the 40px timeline dot
+                    child: Icon(
+                      transportIcon,
+                      color: onSurface.withValues(alpha: 0.7),
+                      size: 20,
+                    ),
                   ),
                 ),
               ),

@@ -187,6 +187,17 @@ void main() {
           as UpdatePerson;
 
   group('adding', () {
+    testWidgets('every control a screen reader reaches has a name', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      await pumpForm(tester);
+
+      expect(find.bySemanticsLabel('Add photo'), findsOneWidget);
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      semantics.dispose();
+    });
+
     testWidgets('starts empty with sensible defaults', (tester) async {
       await pumpForm(tester);
 

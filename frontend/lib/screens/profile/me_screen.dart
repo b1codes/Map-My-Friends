@@ -294,41 +294,46 @@ class _MeScreenState extends State<MeScreen> {
                                                 width: 2,
                                               ),
                                             ),
-                                            child: InkWell(
-                                              onTap:
-                                                  profileState
-                                                      is ProfileUpdating
-                                                  ? null
-                                                  : _showImageSourceDialog,
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                    MapGlass.radiusMd,
-                                                  ),
-                                              child: Padding(
-                                                padding: const EdgeInsets.all(
-                                                  8.0,
-                                                ),
-                                                child:
+                                            child: Semantics(
+                                              button: true,
+                                              label: 'Change profile picture',
+                                              child: InkWell(
+                                                onTap:
                                                     profileState
                                                         is ProfileUpdating
-                                                    ? SizedBox(
-                                                        height: 20,
-                                                        width: 20,
-                                                        child: ChromaticPulse(
-                                                          colors:
-                                                              PulseIndicator.paletteOf(
-                                                                context,
-                                                              ),
-                                                          borderRadius: 10.0,
+                                                    ? null
+                                                    : _showImageSourceDialog,
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                      MapGlass.radiusMd,
+                                                    ),
+                                                child: Padding(
+                                                  padding: const EdgeInsets.all(
+                                                    8.0,
+                                                  ),
+                                                  child:
+                                                      profileState
+                                                          is ProfileUpdating
+                                                      ? SizedBox(
+                                                          height: 20,
+                                                          width: 20,
+                                                          child: ChromaticPulse(
+                                                            colors:
+                                                                PulseIndicator.paletteOf(
+                                                                  context,
+                                                                ),
+                                                            borderRadius: 10.0,
+                                                          ),
+                                                        )
+                                                      : Icon(
+                                                          Icons.camera_alt,
+                                                          size: 20,
+                                                          color:
+                                                              Theme.of(context)
+                                                                  .colorScheme
+                                                                  .onPrimary,
                                                         ),
-                                                      )
-                                                    : Icon(
-                                                        Icons.camera_alt,
-                                                        size: 20,
-                                                        color: Theme.of(
-                                                          context,
-                                                        ).colorScheme.onPrimary,
-                                                      ),
+                                                ),
                                               ),
                                             ),
                                           ),

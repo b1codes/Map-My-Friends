@@ -33,31 +33,14 @@ const tapTargetGaps = <String, KnownGap>{
   ),
   'components/pulse/logcontactsheet/inline': KnownGap(3, _smallTapTargets),
   'components/pulse/pulsecalendar/interactive': KnownGap(4, _smallTapTargets),
-  'screens/map/mapscreen/default': KnownGap(4, _smallTapTargets),
+  'screens/map/mapscreen/default': KnownGap(3, _smallTapTargets),
   'screens/profile/mescreen/states': KnownGap(1, _smallTapTargets),
-  'screens/shell/mainscreen/navigation-chrome': KnownGap(4, _smallTapTargets),
-  'screens/trips/tripdetailsscreen/default': KnownGap(1, _smallTapTargets),
+  'screens/shell/mainscreen/navigation-chrome': KnownGap(3, _smallTapTargets),
+  'screens/trips/tripdetailsscreen/default': KnownGap(3, _smallTapTargets),
 };
 
 /// Tappable nodes a screen reader has no name for.
-const labelGaps = <String, KnownGap>{
-  'components/map/horizontaltripplanner/planning-a-trip': KnownGap(
-    1,
-    _thisBranch,
-  ),
-  'components/map/mapcontrols/over-the-map': KnownGap(1, _thisBranch),
-  'components/map/mapsettingsbutton/over-the-map-(tap-to-open)': KnownGap(
-    2,
-    _thisBranch,
-  ),
-  'components/pulse/logcontactsheet/inline': KnownGap(1, _thisBranch),
-  'screens/map/mapscreen/default': KnownGap(2, _thisBranch),
-  'screens/people/addeditpersonscreen/add': KnownGap(1, _thisBranch),
-  'screens/people/addeditpersonscreen/edit': KnownGap(1, _thisBranch),
-  'screens/profile/mescreen/states': KnownGap(1, _thisBranch),
-  'screens/shell/mainscreen/navigation-chrome': KnownGap(2, _thisBranch),
-  'screens/trips/tripdetailsscreen/default': KnownGap(1, _thisBranch),
-};
+const labelGaps = <String, KnownGap>{};
 
 /// Layout overflows with the system text size at 200%.
 const largeTextGaps = <String, KnownGap>{

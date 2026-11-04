@@ -366,12 +366,49 @@ void main() {
       expect(find.bySemanticsLabel('Friend: Ann Lee'), findsOneWidget);
     });
 
+    testWidgets('every pin and control a screen reader reaches has a name', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      when(() => peopleBloc.state).thenReturn(
+        // About 5 km from you: on screen at the opening zoom, and too far
+        // apart to cluster.
+        PeopleLoaded([_person('1', 'Ann', 'Lee', lat: 51.52, lon: -0.05)]),
+      );
+      when(
+        () => locationBloc.state,
+      ).thenReturn(LocationLoaded(position: _position(51.5, -0.12)));
+      await pumpMap(tester);
+
+      // The cluster layer wraps each pin in a tap handler of its own. When the
+      // pin handled taps too, a screen reader found the layer's first: a
+      // button with no name.
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Friend: Ann Lee')),
+        matchesSemantics(
+          label: 'Friend: Ann Lee',
+          isButton: true,
+          hasTapAction: true,
+        ),
+      );
+      expect(find.bySemanticsLabel('Your location'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(RegExp('^Map of your friends')),
+        findsOneWidget,
+      );
+      semantics.dispose();
+    });
+
     testWidgets(
       'tapping a person opens their sheet, and Add as New Stop starts a trip',
       (tester) async {
         final ann = _person('1', 'Ann', 'Lee');
         when(() => peopleBloc.state).thenReturn(PeopleLoaded([ann]));
         await pumpMap(tester);
+        // The cluster layer handles marker taps, and ignores them while its
+        // opening animation runs, as it does for airports and stations.
+        await tester.pump(const Duration(seconds: 1));
 
         await tester.tap(find.bySemanticsLabel('Friend: Ann Lee'));
         await _settle(tester);

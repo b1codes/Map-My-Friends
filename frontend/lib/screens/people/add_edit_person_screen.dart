@@ -308,61 +308,68 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
   }
 
   Widget _buildProfileImagePicker() {
+    final hasPhoto = _selectedImageBytes != null || _existingImageUrl != null;
     return Center(
-      child: GestureDetector(
-        onTap: _showImagePickerOptions,
-        child: Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: MapGlass.inlayFillStrong(Theme.of(context).brightness),
-                  width: 4,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: CircleAvatar(
-                radius: 64,
-                backgroundColor: MapGlass.inlayFillStrong(
-                  Theme.of(context).brightness,
-                ),
-                backgroundImage: _selectedImageBytes != null
-                    ? MemoryImage(_selectedImageBytes!)
-                    : (_existingImageUrl != null
-                              ? NetworkImage(_existingImageUrl!)
-                              : null)
-                          as ImageProvider?,
-                child:
-                    (_selectedImageBytes == null && _existingImageUrl == null)
-                    ? Icon(
-                        Icons.person,
-                        size: 64,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      )
-                    : null,
-              ),
-            ),
-            Positioned(
-              bottom: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(8),
+      child: Semantics(
+        button: true,
+        label: hasPhoto ? 'Change photo' : 'Add photo',
+        child: GestureDetector(
+          onTap: _showImagePickerOptions,
+          child: Stack(
+            children: [
+              Container(
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  shape: BoxShape.circle,
                   border: Border.all(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    width: 2,
+                    color: MapGlass.inlayFillStrong(
+                      Theme.of(context).brightness,
+                    ),
+                    width: 4,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: CircleAvatar(
+                  radius: 64,
+                  backgroundColor: MapGlass.inlayFillStrong(
+                    Theme.of(context).brightness,
+                  ),
+                  backgroundImage: _selectedImageBytes != null
+                      ? MemoryImage(_selectedImageBytes!)
+                      : (_existingImageUrl != null
+                                ? NetworkImage(_existingImageUrl!)
+                                : null)
+                            as ImageProvider?,
+                  child:
+                      (_selectedImageBytes == null && _existingImageUrl == null)
+                      ? Icon(
+                          Icons.person,
+                          size: 64,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        )
+                      : null,
+                ),
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt,
+                    size: 20,
+                    color: Colors.white,
                   ),
                 ),
-                child: const Icon(
-                  Icons.camera_alt,
-                  size: 20,
-                  color: Colors.white,
-                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -220,6 +220,17 @@ void main() {
           as UpdateProfile;
 
   group('MeScreen loading', () {
+    testWidgets('every control a screen reader reaches has a name', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      await pumpMe(tester);
+
+      expect(find.bySemanticsLabel('Change profile picture'), findsOneWidget);
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      semantics.dispose();
+    });
+
     testWidgets('asks for the profile on mount', (tester) async {
       await pumpMe(tester);
 
