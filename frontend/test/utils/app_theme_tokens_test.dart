@@ -32,7 +32,7 @@ void main() {
     // Inks known to fall short, with the task that fixes them. The test
     // fails if one of these passes, so the list can't go stale.
     const knownLow = <String, String>{
-      'due (light)': 'the low text contrast task',
+      'due (light)': 'the low text contrast task (ClickUp 86bcyn599)',
     };
 
     // Ink is the signal as text, so it has to read as text (WCAG AA, 4.5:1)

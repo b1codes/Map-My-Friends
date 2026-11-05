@@ -15,9 +15,9 @@ class KnownGap {
   final String task;
 }
 
-const _smallTapTargets = 'the small tap targets task (to be filed)';
-const _lowContrast = 'the low text contrast task (to be filed)';
-const _largeText = 'the 200% text overflow task (to be filed)';
+const _smallTapTargets = 'the small tap targets task (ClickUp 86bcyn58d)';
+const _lowContrast = 'the low text contrast task (ClickUp 86bcyn599)';
+const _largeText = 'the 200% text overflow task (ClickUp 86bcyn5a6)';
 
 /// Not a problem a person sees. With the test font's wider glyphs this
 /// demo's text re-flows over other text, and the check samples the two;
