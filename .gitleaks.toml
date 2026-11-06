@@ -49,3 +49,14 @@ condition = "AND"
 paths = ['''^backend/(?:apps/[^/]+/tests_[^/]+|tests/.+)\.py$''']
 regexTarget = "secret"
 regexes = ['''^Tr1cky-Horse-Battery$''']
+
+# The example password-reset token in the ZAP scan's request for the confirm
+# route: a made-up value in Django's token shape (its hash part counts
+# 0123456789abcdef twice). It resets nothing; the scan only probes the route.
+[[allowlists]]
+description = "Example reset token in the ZAP extra operations"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^\.zap/extra-operations\.json$''']
+regexTarget = "secret"
+regexes = ['''^cyx3pa-0123456789abcdef0123456789abcdef$''']
