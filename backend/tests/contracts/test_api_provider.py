@@ -13,12 +13,14 @@ half), against the Firestore emulator, and the response must:
 
 from __future__ import annotations
 
+import io
 import json
 from unittest import expectedFailure
 from unittest.mock import patch
 from urllib.parse import urlencode
 
 from django.core.files.uploadedfile import SimpleUploadedFile
+from PIL import Image
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import AccessToken
 
@@ -35,11 +37,17 @@ from .support import (
     unconsumed_fields,
 )
 
-# A 1x1 transparent PNG, so uploads go through Pillow-readable bytes.
-PNG = bytes.fromhex(
-    "89504e470d0a1a0a0000000d4948445200000001000000010806000000"
-    "1f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082"
-)
+
+def _png():
+    # Uploads are decoded and re-encoded (apps/common/storage.py), so this has
+    # to be a whole, valid image; a hand-written one was truncated.
+    buffer = io.BytesIO()
+    Image.new("RGBA", (1, 1), (0, 0, 0, 0)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+# A 1x1 transparent PNG, like the app's cropped upload.
+PNG = _png()
 
 
 # Gaps between what the Flutter client expects and what the API does, found

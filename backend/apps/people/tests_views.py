@@ -6,6 +6,7 @@ state, validation, geocoding and uploads. Geocoding is the only thing mocked
 because it is a Nominatim network call.
 """
 
+import io
 import shutil
 import tempfile
 from unittest.mock import patch
@@ -15,6 +16,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
+from PIL import Image
 from rest_framework.test import APITestCase
 
 from apps.common import firestore as fs
@@ -537,8 +539,10 @@ class PersonProfileImageTests(PersonTestCase):
         self.client.force_authenticate(user=self.user)
 
     @staticmethod
-    def image(name="avatar.png"):
-        return SimpleUploadedFile(name, b"\x89PNG\r\n\x1a\n", content_type="image/png")
+    def image(name="avatar.png", fmt="PNG"):
+        buffer = io.BytesIO()
+        Image.new("RGB", (2, 2), color="red").save(buffer, format=fmt)
+        return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
 
     def test_multipart_create_stores_the_image(self, _geocode):
         response = self.client.post(
@@ -566,14 +570,14 @@ class PersonProfileImageTests(PersonTestCase):
 
         response = self.client.patch(
             f"/api/people/{created.data['id']}/",
-            {"profile_image": self.image("Portrait.JPG")},
+            {"profile_image": self.image("Portrait.JPG", fmt="JPEG")},
             format="multipart",
         )
 
         self.assertEqual(response.status_code, 200)
         second = stored(created.data["id"]).to_dict()["profile_image"]
         self.assertNotEqual(first, second)
-        # Extensions are normalised to lower case.
+        # The extension is the image's real format, in lower case.
         self.assertTrue(second.endswith(".jpg"))
         self.assertTrue(response.data["properties"]["profile_image"].endswith(second))
 
