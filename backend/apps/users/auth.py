@@ -119,6 +119,14 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
 
         try:
             user = User.objects.get(username=username)
+            # Accounts this backend creates have no password. One that has
+            # a password came from local sign-up, which lets anyone pick any
+            # free username, including the one this sub maps to: it isn't
+            # this login's account, whoever registered it.
+            if user.has_usable_password():
+                raise exceptions.AuthenticationFailed(
+                    _("This sign-in's username belongs to another account.")
+                )
         except User.DoesNotExist:
             # Create a new user automatically
             email = payload.get("email")
@@ -150,18 +158,16 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
             if not email:
                 email = f"{username}@temporary.auth0.com"
 
-            # Check if user with this email already exists to prevent duplicate emails
-            # Only associate if email is verified in Auth0 to prevent spoofing
-            email_verified = payload.get("email_verified", False)
-            existing_user = User.objects.filter(email=email).first()
-            if existing_user and email_verified:
-                user = existing_user
-            else:
-                user = User.objects.create_user(
-                    username=username,
-                    email=email,
-                    first_name=first_name,
-                    last_name=last_name,
-                )
+            # Always a new account, never one found by email: local sign-up
+            # doesn't verify addresses, so an existing account with this
+            # email may be an attacker's, registered first to be linked into.
+            # Joining an Auth0 login to a local account needs proof the
+            # person controls both (ClickUp 86bcz9azj).
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+            )
 
         return (user, token)

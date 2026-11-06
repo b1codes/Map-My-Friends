@@ -313,8 +313,12 @@ class Auth0VerificationTests(TestCase):
         self.assertIn("Auth0 userinfo lookup failed", logs.output[0])
         self.assertEqual(user.email, "auth0_abc123@temporary.auth0.com")
 
-    def test_verified_email_links_to_existing_account(self):
-        existing = User.objects.create_user(
+    def test_verified_email_does_not_join_a_password_account(self):
+        # Local sign-up never verifies the address, so a password account
+        # with ada@example.com may be an attacker's, registered before Ada
+        # ever signed in. Linking her verified Auth0 login into it would hand
+        # everything she adds to whoever knows that password.
+        squatter = User.objects.create_user(
             username="ada", email="ada@example.com", password="pw12345!"
         )
 
@@ -322,8 +326,17 @@ class Auth0VerificationTests(TestCase):
             auth0_token(email="ada@example.com", email_verified=True)
         )
 
-        self.assertEqual(user.pk, existing.pk)
-        self.assertFalse(User.objects.filter(username="auth0_abc123").exists())
+        self.assertNotEqual(user.pk, squatter.pk)
+        self.assertEqual(user.username, "auth0_abc123")
+        self.assertFalse(user.has_usable_password())
+
+    def test_a_password_account_holding_the_sub_username_is_refused(self):
+        # Local sign-up can pick any free username, including the one an
+        # Auth0 sub maps to. Signing that sub in must not resolve to it.
+        User.objects.create_user(username="auth0_abc123", password="pw12345!")
+
+        with self.assertRaisesMessage(exceptions.AuthenticationFailed, "username"):
+            self.authenticate(auth0_token(email="ada@example.com"))
 
     def test_unverified_email_does_not_take_over_existing_account(self):
         # Anyone can claim an address at an IdP; without verification the
