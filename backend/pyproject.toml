@@ -98,9 +98,9 @@ omit = [
 
 [tool.coverage.report]
 # The CI gate (`coverage report` exits 1 below it). Set a little under the
-# measured total (99.14% branch, 2026-11-03) so a stray line doesn't fail a PR,
+# measured total (99.86% branch, 2026-11-05) so a stray line doesn't fail a PR,
 # while an untested module or endpoint does. Raise it as coverage rises.
-fail_under = 98
+fail_under = 99
 precision = 2
 show_missing = true
 skip_covered = true

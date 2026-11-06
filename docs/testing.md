@@ -22,10 +22,10 @@ The contract tests have no job of their own. They're part of the backend and fro
 
 ## Coverage gates
 
-| Suite | Measures | Gate | Measured (2026-11-03) | Where the gate lives |
+| Suite | Measures | Gate | Measured | Where the gate lives |
 | --- | --- | --- | --- | --- |
-| Backend | branch coverage of `apps/` and `config/` | 98% | 99.23% | `fail_under` in `backend/pyproject.toml` |
-| Frontend | line coverage of `lib/` | 97% | 98.76% | `minimumLineCoverage` in `frontend/tool/check_coverage.dart` |
+| Backend | branch coverage of `apps/` and `config/` | 99% | 99.86% (2026-11-05) | `fail_under` in `backend/pyproject.toml` |
+| Frontend | line coverage of `lib/` | 97% | 98.76% (2026-11-03) | `minimumLineCoverage` in `frontend/tool/check_coverage.dart` |
 
 The gates sit a little under the measured totals. One uncovered line doesn't fail a PR, but an untested module, screen or endpoint does. Raise a gate when coverage rises, and don't lower one to get a PR through.
 
