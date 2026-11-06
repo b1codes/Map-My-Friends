@@ -98,28 +98,16 @@ class PasswordResetRequestView(generics.GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        email = serializer.validated_data["email"]
-        try:
-            user = User.objects.get(email=email)
-            token = default_token_generator.make_token(user)
-            # In production, send an actual email with the reset link
-            # For now, we'll just return the token (development only)
-            return Response(
-                {
-                    "message": "Password reset email sent.",
-                    "token": token,  # Remove this in production!
-                    "user_id": user.pk,  # Remove this in production!
-                },
-                status=status.HTTP_200_OK,
-            )
-        except User.DoesNotExist:
-            # Don't reveal whether the email exists
-            return Response(
-                {
-                    "message": "Password reset email sent.",
-                },
-                status=status.HTTP_200_OK,
-            )
+        # The token and user_id are what PasswordResetConfirmView takes, so
+        # they may only ever reach the address's inbox, never this response:
+        # returning them let anyone who knew an email reset that account's
+        # password. No email is sent yet, so a reset can't be completed; the
+        # response is the same for every address so it doesn't reveal which
+        # ones have accounts.
+        return Response(
+            {"message": "Password reset email sent."},
+            status=status.HTTP_200_OK,
+        )
 
 
 class PasswordResetConfirmView(generics.GenericAPIView):
