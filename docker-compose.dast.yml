@@ -14,8 +14,8 @@
 #   - gunicorn's access log on, so scripts/dast.sh can count what the API
 #     answered (many 429s would mean the scan hit a throttle)
 #
-# The one deliberate difference from production is the throttle rates; see
-# docker/dast/dast_settings.py.
+# The one deliberate difference from production is the throttle rates, raised
+# for the E2E stack too; see docker/test-stack-settings/unthrottled_settings.py.
 services:
   api:
     image: map-my-friends-backend:dast
@@ -23,8 +23,9 @@ services:
       sh -c "python manage.py collectstatic --noinput >/dev/null &&
              python manage.py migrate --noinput &&
              gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --access-logfile -"
+    # Only the settings overlay; the code is the image's.
     volumes: !override
-      - ./docker/dast:/dast:ro
+      - ./docker/test-stack-settings:/test-stack-settings:ro
     ports: !override
       - "${DAST_API_PORT:-8200}:8000"
     environment:
@@ -37,8 +38,6 @@ services:
       - ALLOWED_HOSTS=api,localhost,127.0.0.1
       - CORS_ALLOWED_ORIGINS=http://localhost:3000
       - DJANGO_SQLITE_PATH=/tmp/dast.sqlite3
-      - PYTHONPATH=/dast
-      - DJANGO_SETTINGS_MODULE=dast_settings
 
   stubs:
     # The API reaches the stubs on the compose network; nothing on the host

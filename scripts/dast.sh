@@ -153,7 +153,7 @@ grep -oE '" [1-5][0-9]{2} ' "$OUT/api.log" | sort | uniq -c | sort -rn || true
 # --- 6. Gate --------------------------------------------------------------
 # A 5xx is an unhandled exception: input the API should have rejected with a
 # 4xx. ZAP only rates it Low, but it fails the scan here. The tracebacks are
-# in build/dast/api.log (docker/dast/dast_settings.py logs them).
+# in build/dast/api.log (config/settings.py logs them).
 result=0
 server_errors="$(grep -E '" 5[0-9]{2} ' "$OUT/api.log" | grep -oE '"(GET|POST|PUT|PATCH|DELETE) [^ ?]+' |
   sed -E 's#/[A-Za-z0-9]{20}/#/{id}/#g' | sort | uniq -c | sort -rn || true)"
