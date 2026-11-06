@@ -1,0 +1,127 @@
+{
+  "description": "Load the signed-in user's trips with their stops and legs inline. After a reload the planner draws and routes stops from people_detail and airport_detail/station_detail.",
+  "consumer": "ApiService.getTrips",
+  "provider_state": "user_with_trip",
+  "request": {
+    "method": "GET",
+    "path": "trips/",
+    "auth": "user"
+  },
+  "response": {
+    "status": 200,
+    "schema": "TripList",
+    "expect": {
+      "/0/stops/0/people_detail/0/id": "Pp5ltxR4W9tpvZTZUlY7",
+      "/0/stops/1/airport_detail/id": 2364
+    },
+    "example": [
+      {
+        "id": "CPczK4heHksu4O9ODudG",
+        "name": "Milwaukee weekend",
+        "date": "2026-11-14",
+        "start_date": "2026-11-14",
+        "end_date": "2026-11-16",
+        "status": "DRAFT",
+        "user": "ada",
+        "stops": [
+          {
+            "id": "B0HgfWm6ArmpJaNJdqGN",
+            "trip": "CPczK4heHksu4O9ODudG",
+            "sequence_order": 0,
+            "location": {
+              "type": "Point",
+              "coordinates": [
+                -87.9065,
+                43.0389
+              ]
+            },
+            "people": [
+              "Pp5ltxR4W9tpvZTZUlY7"
+            ],
+            "airport": null,
+            "station": null,
+            "snapshot_address": "",
+            "snapshot_metadata": {},
+            "people_detail": [
+              {
+                "id": "Pp5ltxR4W9tpvZTZUlY7",
+                "tag": "FRIEND",
+                "first_name": "Grace",
+                "last_name": "Hopper",
+                "city": "Milwaukee",
+                "state": "WI",
+                "country": "USA",
+                "street": "500 N Harbor Dr",
+                "birthday": "1906-12-09",
+                "phone_number": "+14145550100",
+                "latitude": 43.0389,
+                "longitude": -87.9065,
+                "profile_image": "http://localhost:8000/media/profile_images/8be56fb6eda94a508d371f2caf933428.png",
+                "timezone": "America/Chicago",
+                "pin_color": "#2196F3",
+                "pin_style": "circle",
+                "pin_icon_type": "emoji",
+                "pin_emoji": "🚢"
+              }
+            ],
+            "airport_detail": null,
+            "station_detail": null
+          },
+          {
+            "id": "Pxxx4iCAa0bd1A6mYVzL",
+            "trip": "CPczK4heHksu4O9ODudG",
+            "sequence_order": 1,
+            "location": {
+              "type": "Point",
+              "coordinates": [
+                -87.752403,
+                41.785999
+              ]
+            },
+            "people": [],
+            "airport": 2364,
+            "station": null,
+            "snapshot_address": "",
+            "snapshot_metadata": {},
+            "people_detail": [],
+            "airport_detail": {
+              "id": 2364,
+              "type": "Feature",
+              "geometry": {
+                "type": "Point",
+                "coordinates": [
+                  -87.752403,
+                  41.785999
+                ]
+              },
+              "properties": {
+                "name": "Chicago Midway International Airport",
+                "iata_code": "MDW",
+                "icao_code": "KMDW",
+                "airport_type": "large_airport",
+                "city": "Chicago",
+                "country": "US",
+                "continent": "NA",
+                "distance_km": null
+              }
+            },
+            "station_detail": null
+          }
+        ],
+        "legs": [
+          {
+            "id": "TzgYzOtSeqrdtWScrbVF",
+            "trip": "CPczK4heHksu4O9ODudG",
+            "departure_stop": "B0HgfWm6ArmpJaNJdqGN",
+            "arrival_stop": "Pxxx4iCAa0bd1A6mYVzL",
+            "departure_time": null,
+            "arrival_time": null,
+            "transport_type": "CAR",
+            "booking_reference": "",
+            "ticket_data": {}
+          }
+        ]
+      }
+    ]
+  }
+}

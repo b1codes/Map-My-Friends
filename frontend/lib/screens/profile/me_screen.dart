@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
@@ -26,7 +27,11 @@ import '../../components/shared/glass_surfaces.dart';
 import '../../components/shared/glass_header.dart';
 
 class MeScreen extends StatefulWidget {
-  const MeScreen({super.key});
+  /// Injectable picker. Production leaves this null and gets the platform
+  /// [ImagePicker]; tests pass a fake, since the real one is a native plugin.
+  final ImagePicker? imagePicker;
+
+  const MeScreen({super.key, this.imagePicker});
 
   @override
   State<MeScreen> createState() => _MeScreenState();
@@ -42,7 +47,7 @@ class _MeScreenState extends State<MeScreen> {
   final _lastNameController = TextEditingController();
   final _phoneNumberController = TextEditingController();
   final _birthDateController = TextEditingController();
-  final _imagePicker = ImagePicker();
+  late final ImagePicker _imagePicker = widget.imagePicker ?? ImagePicker();
   Uint8List?
   _localImageBytes; // For showing local image immediately after picking
 
@@ -118,7 +123,9 @@ class _MeScreenState extends State<MeScreen> {
   }
 
   void _showColorPicker() {
-    Color pickerColor = Color(int.parse(_pinColor.replaceFirst('#', '0xFF')));
+    final Color pickerColor = Color(
+      int.parse(_pinColor.replaceFirst('#', '0xFF')),
+    );
     GlassDialog.panel(
       context,
       title: 'Pick a Pin Color',
@@ -217,7 +224,7 @@ class _MeScreenState extends State<MeScreen> {
                 label: 'Settings',
                 onPressed: () => Navigator.push(
                   context,
-                  MaterialPageRoute(
+                  MaterialPageRoute<void>(
                     builder: (context) => const SettingsScreen(),
                   ),
                 ),
@@ -287,41 +294,46 @@ class _MeScreenState extends State<MeScreen> {
                                                 width: 2,
                                               ),
                                             ),
-                                            child: InkWell(
-                                              onTap:
-                                                  profileState
-                                                      is ProfileUpdating
-                                                  ? null
-                                                  : _showImageSourceDialog,
-                                              borderRadius:
-                                                  BorderRadius.circular(
-                                                    MapGlass.radiusMd,
-                                                  ),
-                                              child: Padding(
-                                                padding: const EdgeInsets.all(
-                                                  8.0,
-                                                ),
-                                                child:
+                                            child: Semantics(
+                                              button: true,
+                                              label: 'Change profile picture',
+                                              child: InkWell(
+                                                onTap:
                                                     profileState
                                                         is ProfileUpdating
-                                                    ? SizedBox(
-                                                        height: 20,
-                                                        width: 20,
-                                                        child: ChromaticPulse(
-                                                          colors:
-                                                              PulseIndicator.paletteOf(
-                                                                context,
-                                                              ),
-                                                          borderRadius: 10.0,
+                                                    ? null
+                                                    : _showImageSourceDialog,
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                      MapGlass.radiusMd,
+                                                    ),
+                                                child: Padding(
+                                                  padding: const EdgeInsets.all(
+                                                    8.0,
+                                                  ),
+                                                  child:
+                                                      profileState
+                                                          is ProfileUpdating
+                                                      ? SizedBox(
+                                                          height: 20,
+                                                          width: 20,
+                                                          child: ChromaticPulse(
+                                                            colors:
+                                                                PulseIndicator.paletteOf(
+                                                                  context,
+                                                                ),
+                                                            borderRadius: 10.0,
+                                                          ),
+                                                        )
+                                                      : Icon(
+                                                          Icons.camera_alt,
+                                                          size: 20,
+                                                          color:
+                                                              Theme.of(context)
+                                                                  .colorScheme
+                                                                  .onPrimary,
                                                         ),
-                                                      )
-                                                    : Icon(
-                                                        Icons.camera_alt,
-                                                        size: 20,
-                                                        color: Theme.of(
-                                                          context,
-                                                        ).colorScheme.onPrimary,
-                                                      ),
+                                                ),
                                               ),
                                             ),
                                           ),
@@ -387,9 +399,9 @@ class _MeScreenState extends State<MeScreen> {
                                             DateTime.tryParse(
                                               _birthDateController.text,
                                             ) ??
-                                            DateTime.now(),
+                                            clock.now(),
                                         firstDate: DateTime(1900),
-                                        lastDate: DateTime.now(),
+                                        lastDate: clock.now(),
                                       );
                                       if (date != null) {
                                         _birthDateController.text =

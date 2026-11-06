@@ -1,0 +1,49 @@
+{
+  "description": "Save profile edits. Only the fields the user changed are sent.",
+  "consumer": "AuthService.updateProfile -> ProfileBloc",
+  "provider_state": "registered_user",
+  "request": {
+    "method": "PATCH",
+    "path": "user/profile/",
+    "auth": "user",
+    "json": {
+      "first_name": "Ada",
+      "city": "London",
+      "country": "UK",
+      "birth_date": "1815-12-10",
+      "pin_color": "#9C27B0",
+      "pin_style": "diamond",
+      "pin_icon_type": "emoji",
+      "pin_emoji": "🧮",
+      "distance_unit": "imperial"
+    }
+  },
+  "response": {
+    "status": 200,
+    "schema": "Profile",
+    "expect": {
+      "/city": "London",
+      "/birth_date": "1815-12-10",
+      "/pin_emoji": "🧮",
+      "/distance_unit": "imperial"
+    },
+    "example": {
+      "username": "ada",
+      "email": "ada@example.com",
+      "profile_image": null,
+      "city": "London",
+      "state": "",
+      "country": "UK",
+      "street": "",
+      "birth_date": "1815-12-10",
+      "phone_number": "",
+      "pin_color": "#9C27B0",
+      "pin_style": "diamond",
+      "pin_icon_type": "emoji",
+      "pin_emoji": "🧮",
+      "distance_unit": "imperial",
+      "first_name": "Ada",
+      "last_name": "Lovelace"
+    }
+  }
+}

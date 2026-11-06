@@ -1,6 +1,3 @@
-@Tags(['golden'])
-library;
-
 // The design system's visual contract, in one frame.
 //
 // Every material in the app appears here over the surface it is meant to float
@@ -8,12 +5,11 @@ library;
 // chromatic pulse, and the type scale. A regression in any of them shows up as
 // a pixel diff here before it reaches a screen.
 //
-// Golden images only match the platform that generated them, so these are
-// tagged for CI to skip (`flutter test --exclude-tags golden`) and are kept as
-// the local check on what the material actually looks like.
+// Rendered with the real typefaces, on Linux x64 only: see golden_harness.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golden_harness/golden_harness.dart';
 import 'package:map_my_friends/components/shared/ambient_field.dart';
 import 'package:map_my_friends/components/shared/chromatic_pulse.dart';
 import 'package:map_my_friends/components/shared/glass_container.dart';
@@ -21,14 +17,9 @@ import 'package:map_my_friends/components/shared/glass_inlay.dart';
 import 'package:map_my_friends/components/shared/thermal_response.dart';
 import 'package:map_my_friends/utils/app_theme.dart';
 
-/// The app's palette and scale with the platform's default typeface, so the
-/// specimen renders offline instead of waiting on GoogleFonts.
-ThemeData specimenTheme(Brightness brightness) {
-  final base = brightness == Brightness.dark
-      ? AppTheme.darkTheme
-      : AppTheme.lightTheme;
-  return base.copyWith(textTheme: Typography.material2021().black.apply());
-}
+/// The app's theme, palette, scale and typefaces.
+ThemeData specimenTheme(Brightness brightness) =>
+    brightness == Brightness.dark ? AppTheme.darkTheme : AppTheme.lightTheme;
 
 Widget _label(BuildContext context, String text) {
   return Text(
@@ -215,23 +206,12 @@ Widget specimen({required Brightness brightness}) {
 }
 
 void main() {
-  setUpAll(() {
-    // Render offline: the real theme, a local typeface. See
-    // AppTheme.textThemeBuilder for why this seam exists.
-    AppTheme.textThemeBuilder = (color) => Typography.material2021().black
-        .apply(bodyColor: color, displayColor: color);
-    AppTheme.resetThemeCache();
-  });
-
-  tearDownAll(() {
-    AppTheme.textThemeBuilder = AppTheme.buildBrandTextTheme;
-    AppTheme.resetThemeCache();
-  });
+  setUpGoldens();
 
   for (final brightness in Brightness.values) {
     final name = brightness == Brightness.dark ? 'dark' : 'light';
 
-    testWidgets('material specimen — phone $name', (tester) async {
+    goldenTest('material specimen — phone $name', (tester) async {
       tester.view.physicalSize = const Size(390 * 3, 844 * 3);
       tester.view.devicePixelRatio = 3.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -240,19 +220,14 @@ void main() {
       await tester.pumpWidget(specimen(brightness: brightness));
       await tester.pump(const Duration(milliseconds: 400));
 
-      // AppTheme builds its scale through GoogleFonts, which kicks off a font
-      // fetch the moment the TextStyle is created. Offline that surfaces as a
-      // test exception; the specimen renders in the fallback face and every
-      // material it exists to check is unaffected.
-      tester.takeException();
-
-      await expectLater(
+      await expectGolden(
+        tester,
         find.byType(MaterialApp),
-        matchesGoldenFile('goldens/specimen_phone_$name.png'),
+        'goldens/specimen_phone_$name.png',
       );
     });
 
-    testWidgets('material specimen — desktop $name', (tester) async {
+    goldenTest('material specimen — desktop $name', (tester) async {
       tester.view.physicalSize = const Size(1280 * 2, 900 * 2);
       tester.view.devicePixelRatio = 2.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -261,15 +236,10 @@ void main() {
       await tester.pumpWidget(specimen(brightness: brightness));
       await tester.pump(const Duration(milliseconds: 400));
 
-      // AppTheme builds its scale through GoogleFonts, which kicks off a font
-      // fetch the moment the TextStyle is created. Offline that surfaces as a
-      // test exception; the specimen renders in the fallback face and every
-      // material it exists to check is unaffected.
-      tester.takeException();
-
-      await expectLater(
+      await expectGolden(
+        tester,
         find.byType(MaterialApp),
-        matchesGoldenFile('goldens/specimen_desktop_$name.png'),
+        'goldens/specimen_desktop_$name.png',
       );
     });
   }

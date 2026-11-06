@@ -26,7 +26,7 @@ class _ImageEditorModalState extends State<ImageEditorModal> {
 
   Future<void> _saveImage() async {
     try {
-      RenderRepaintBoundary? boundary =
+      final RenderRepaintBoundary? boundary =
           _repaintBoundaryKey.currentContext?.findRenderObject()
               as RenderRepaintBoundary?;
 
@@ -34,11 +34,11 @@ class _ImageEditorModalState extends State<ImageEditorModal> {
 
       // Capture the image from the boundary
       // We might want to capture at a higher pixel ratio for better quality
-      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData = await image.toByteData(
+      final ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      final ByteData? byteData = await image.toByteData(
         format: ui.ImageByteFormat.png,
       );
-      Uint8List? pngBytes = byteData?.buffer.asUint8List();
+      final Uint8List? pngBytes = byteData?.buffer.asUint8List();
 
       if (pngBytes != null && mounted) {
         Navigator.pop(context, pngBytes);

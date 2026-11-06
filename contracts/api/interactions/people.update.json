@@ -1,0 +1,114 @@
+{
+  "description": "Save edits to a person. The client sends every field, as multipart form data.",
+  "consumer": "ApiService.updatePerson",
+  "provider_state": "user_with_person",
+  "request": {
+    "method": "PATCH",
+    "path": "people/Pp5ltxR4W9tpvZTZUlY7/",
+    "auth": "user",
+    "multipart": {
+      "fields": {
+        "first_name": "Grace",
+        "last_name": "Hopper",
+        "tag": "FAMILY",
+        "city": "Milwaukee",
+        "state": "WI",
+        "country": "USA",
+        "pin_color": "#2196F3",
+        "pin_style": "circle",
+        "pin_icon_type": "emoji",
+        "street": "500 N Harbor Dr",
+        "birthday": "1906-12-09T00:00:00.000",
+        "phone_number": "+14145550100",
+        "pin_emoji": "🚢",
+        "preferred_airport": "2364",
+        "preferred_station": "1753",
+        "contact_cadence_days": "14"
+      },
+      "files": {}
+    }
+  },
+  "response": {
+    "status": 200,
+    "schema": "PersonFeature",
+    "expect": {
+      "/id": "Pp5ltxR4W9tpvZTZUlY7",
+      "/properties/tag": "FAMILY"
+    },
+    "example": {
+      "id": "Pp5ltxR4W9tpvZTZUlY7",
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -87.9065,
+          43.0389
+        ]
+      },
+      "properties": {
+        "owner": "ada",
+        "tag": "FAMILY",
+        "first_name": "Grace",
+        "last_name": "Hopper",
+        "city": "Milwaukee",
+        "state": "WI",
+        "country": "USA",
+        "street": "500 N Harbor Dr",
+        "birthday": "1906-12-09",
+        "phone_number": "+14145550100",
+        "profile_image": "http://localhost:8000/media/profile_images/8be56fb6eda94a508d371f2caf933428.png",
+        "timezone": "America/Chicago",
+        "pin_color": "#2196F3",
+        "pin_style": "circle",
+        "pin_icon_type": "emoji",
+        "pin_emoji": "🚢",
+        "contact_cadence_days": 14,
+        "preferred_airport": 2364,
+        "preferred_station": 1753,
+        "preferred_airport_detail": {
+          "id": 2364,
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              -87.752403,
+              41.785999
+            ]
+          },
+          "properties": {
+            "name": "Chicago Midway International Airport",
+            "iata_code": "MDW",
+            "icao_code": "KMDW",
+            "airport_type": "large_airport",
+            "city": "Chicago",
+            "country": "US",
+            "continent": "NA",
+            "distance_km": null
+          }
+        },
+        "preferred_station_detail": {
+          "id": 1753,
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              -87.9247172,
+              42.9405817
+            ]
+          },
+          "properties": {
+            "name": "Milwaukee Airport",
+            "osm_id": 7030069356,
+            "station_type": "major_station",
+            "uic_ref": "",
+            "city": "Milwaukee",
+            "country": "USA",
+            "distance_km": null
+          }
+        },
+        "last_contacted_at": null,
+        "last_contact_channel": null
+      }
+    }
+  }
+}

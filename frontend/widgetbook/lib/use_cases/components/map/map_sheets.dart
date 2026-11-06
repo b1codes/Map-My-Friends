@@ -77,9 +77,22 @@ Widget baseBottomSheetPlayground(BuildContext context) {
     label: 'Type label',
     initialValue: 'Major Airport',
   );
-  final color = context.knobs.color(
+  final accent = context.knobs.object.dropdown<MapSignal>(
     label: 'Accent',
-    initialValue: MapPalette.airport,
+    options: const [
+      MapPalette.airport,
+      MapPalette.majorStation,
+      MapPalette.commuterRail,
+      MapPalette.subway,
+      MapPalette.regionalStation,
+    ],
+    labelBuilder: (signal) => switch (signal) {
+      MapPalette.airport => 'Airport',
+      MapPalette.majorStation => 'Major station',
+      MapPalette.commuterRail => 'Commuter rail',
+      MapPalette.subway => 'Subway',
+      _ => 'Regional station',
+    },
   );
   final canAdd = context.knobs.boolean(
     label: 'Add to trip',
@@ -89,7 +102,7 @@ Widget baseBottomSheetPlayground(BuildContext context) {
   return _sheet(
     BaseBottomSheet(
       icon: Icons.flight,
-      color: color,
+      accent: accent,
       title: title,
       subtitle: subtitle,
       location: location,

@@ -34,7 +34,7 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
         if len(auth_header) == 1:
             msg = _("Invalid Authorization header. No credentials provided.")
             raise exceptions.AuthenticationFailed(msg)
-        elif len(auth_header) > 2:
+        if len(auth_header) > 2:
             msg = _(
                 "Invalid Authorization header. Credentials string should not contain spaces."
             )
@@ -55,10 +55,7 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
         if (settings.DEBUG or TESTING) and token.startswith("mock_auth0_jwt_token_"):
             parts = token.split("_")
             # Format: mock_auth0_jwt_token_{username}_{timestamp}
-            if len(parts) >= 5:
-                username = parts[4]
-            else:
-                username = "mock_auth0_user"
+            username = parts[4] if len(parts) >= 5 else "mock_auth0_user"
 
             email = f"{username}@example.com"
             user, _created = User.objects.get_or_create(
@@ -100,14 +97,18 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
                 audience=auth0_audience,
                 issuer=expected_issuer,
             )
-        except jwt.ExpiredSignatureError:
-            raise exceptions.AuthenticationFailed(_("Token has expired."))
+        except jwt.ExpiredSignatureError as e:
+            raise exceptions.AuthenticationFailed(_("Token has expired.")) from e
         except jwt.InvalidTokenError as e:
             raise exceptions.AuthenticationFailed(
                 _("Invalid token signature or claims: ") + str(e)
-            )
-        except Exception as e:  # noqa: BLE001 - deliberate catch-all so auth never leaks an internal error
-            raise exceptions.AuthenticationFailed(_("Authentication failed: ") + str(e))
+            ) from e
+        except (
+            Exception
+        ) as e:  # deliberate catch-all so auth never leaks an internal error
+            raise exceptions.AuthenticationFailed(
+                _("Authentication failed: ") + str(e)
+            ) from e
 
         sub = payload.get("sub")
         if not sub:
@@ -118,6 +119,14 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
 
         try:
             user = User.objects.get(username=username)
+            # Accounts this backend creates have no password. One that has
+            # a password came from local sign-up, which lets anyone pick any
+            # free username, including the one this sub maps to: it isn't
+            # this login's account, whoever registered it.
+            if user.has_usable_password():
+                raise exceptions.AuthenticationFailed(
+                    _("This sign-in's username belongs to another account.")
+                )
         except User.DoesNotExist:
             # Create a new user automatically
             email = payload.get("email")
@@ -149,18 +158,16 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
             if not email:
                 email = f"{username}@temporary.auth0.com"
 
-            # Check if user with this email already exists to prevent duplicate emails
-            # Only associate if email is verified in Auth0 to prevent spoofing
-            email_verified = payload.get("email_verified", False)
-            existing_user = User.objects.filter(email=email).first()
-            if existing_user and email_verified:
-                user = existing_user
-            else:
-                user = User.objects.create_user(
-                    username=username,
-                    email=email,
-                    first_name=first_name,
-                    last_name=last_name,
-                )
+            # Always a new account, never one found by email: local sign-up
+            # doesn't verify addresses, so an existing account with this
+            # email may be an attacker's, registered first to be linked into.
+            # Joining an Auth0 login to a local account needs proof the
+            # person controls both (ClickUp 86bcz9azj).
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+            )
 
         return (user, token)

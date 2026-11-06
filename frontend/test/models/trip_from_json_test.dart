@@ -121,9 +121,10 @@ void main() {
     test('round-trips a stop back to the wire shape', () {
       final trip = Trip.fromJson(json);
       final wire = trip.stops.first.toJson();
-      expect(wire['location']['type'], 'Point');
+      final location = wire['location'] as Map<String, dynamic>;
+      expect(location['type'], 'Point');
       expect(
-        (wire['location']['coordinates'] as List).cast<double>(),
+        (location['coordinates'] as List).cast<double>(),
         orderedEquals(<double>[-87.6298, 41.8781]),
       );
     });

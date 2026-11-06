@@ -1,0 +1,84 @@
+{
+  "description": "The stations nearest a point, closest first. StationBloc asks for 3 (StationService); the person form asks for the default 5 (ApiService) and gets the same shape.",
+  "consumer": "StationService.getNearestStations, ApiService.getNearestStations",
+  "provider_state": "registered_user",
+  "request": {
+    "method": "GET",
+    "path": "stations/nearest/",
+    "query": {
+      "lat": "43.0389",
+      "lon": "-87.9065",
+      "count": "3"
+    },
+    "auth": "user"
+  },
+  "response": {
+    "status": 200,
+    "schema": "StationFeatureCollection",
+    "example": {
+      "type": "FeatureCollection",
+      "features": [
+        {
+          "id": 1643,
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              -87.9173923,
+              43.0343496
+            ]
+          },
+          "properties": {
+            "name": "Milwaukee",
+            "osm_id": 2367479990,
+            "station_type": "major_station",
+            "uic_ref": "",
+            "city": "Milwaukee",
+            "country": "USA",
+            "distance_km": 1.0
+          }
+        },
+        {
+          "id": 1753,
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              -87.9247172,
+              42.9405817
+            ]
+          },
+          "properties": {
+            "name": "Milwaukee Airport",
+            "osm_id": 7030069356,
+            "station_type": "major_station",
+            "uic_ref": "",
+            "city": "Milwaukee",
+            "country": "USA",
+            "distance_km": 11.0
+          }
+        },
+        {
+          "id": 1638,
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              -87.9062037,
+              42.7182996
+            ]
+          },
+          "properties": {
+            "name": "Sturtevant",
+            "osm_id": 1539909342,
+            "station_type": "major_station",
+            "uic_ref": "",
+            "city": "Sturtevant",
+            "country": "USA",
+            "distance_km": 35.6
+          }
+        }
+      ]
+    }
+  }
+}

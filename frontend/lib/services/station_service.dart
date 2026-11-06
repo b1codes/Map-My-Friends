@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import '../models/station.dart';
 import 'api_config.dart';
@@ -7,7 +8,7 @@ import 'auth_service.dart';
 
 class StationService {
   late final Dio _dio;
-  final AuthService _authService = AuthService();
+  final AuthService _authService;
 
   // Singleton pattern
   static final StationService _instance = StationService._internal();
@@ -16,14 +17,25 @@ class StationService {
     return _instance;
   }
 
-  StationService._internal() {
-    _dio = Dio(
-      BaseOptions(
-        baseUrl: ApiConfig.baseUrl,
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 3),
-      ),
-    );
+  /// A non-singleton instance for tests: [dio] carries a fake HTTP adapter,
+  /// and the auth interceptor is attached to it exactly as in production.
+  @visibleForTesting
+  factory StationService.forTesting({
+    required Dio dio,
+    required AuthService authService,
+  }) => StationService._internal(dio: dio, authService: authService);
+
+  StationService._internal({Dio? dio, AuthService? authService})
+    : _authService = authService ?? AuthService() {
+    _dio =
+        dio ??
+        Dio(
+          BaseOptions(
+            baseUrl: ApiConfig.baseUrl,
+            connectTimeout: const Duration(seconds: 5),
+            receiveTimeout: const Duration(seconds: 3),
+          ),
+        );
 
     // Add auth interceptor
     _dio.interceptors.add(
@@ -42,8 +54,10 @@ class StationService {
   /// Load all stations from the bundled JSON asset (for map layer).
   Future<List<Station>> loadStationsFromAsset() async {
     final jsonString = await rootBundle.loadString('assets/data/stations.json');
-    final List<dynamic> jsonList = json.decode(jsonString);
-    return jsonList.map((json) => Station.fromJson(json)).toList();
+    final jsonList = json.decode(jsonString) as List<dynamic>;
+    return jsonList
+        .map((json) => Station.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
   /// Fetch the nearest stations from the backend API.
@@ -53,7 +67,7 @@ class StationService {
     int count = 3,
   }) async {
     try {
-      final response = await _dio.get(
+      final response = await _dio.get<dynamic>(
         'stations/nearest/',
         queryParameters: {'lat': lat, 'lon': lon, 'count': count},
       );
@@ -62,9 +76,13 @@ class StationService {
         if (data is Map<String, dynamic> &&
             data['type'] == 'FeatureCollection') {
           final features = data['features'] as List;
-          return features.map((json) => Station.fromGeoJson(json)).toList();
+          return features
+              .map((json) => Station.fromGeoJson(json as Map<String, dynamic>))
+              .toList();
         } else if (data is List) {
-          return data.map((json) => Station.fromGeoJson(json)).toList();
+          return data
+              .map((json) => Station.fromGeoJson(json as Map<String, dynamic>))
+              .toList();
         }
         throw Exception('Unexpected response format');
       } else {

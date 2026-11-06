@@ -84,6 +84,8 @@ class TripRepository:
         return fs.collection(TRIPS)
 
     def _owned_ref(self, trip_id: str, owner_key: str):
+        if not fs.is_valid_doc_id(trip_id):
+            return None
         ref = self._collection().document(trip_id)
         doc = ref.get()
         if not doc.exists or (doc.to_dict() or {}).get("owner_key") != owner_key:
@@ -340,7 +342,7 @@ class TripRepository:
         self, trip_id: str, leg_id: str, owner_key: str, data: dict
     ) -> TripLegRecord | None:
         trip_ref = self._owned_ref(trip_id, owner_key)
-        if trip_ref is None:
+        if trip_ref is None or not fs.is_valid_doc_id(leg_id):
             return None
         leg_ref = trip_ref.collection(LEGS).document(leg_id)
         if not leg_ref.get().exists:

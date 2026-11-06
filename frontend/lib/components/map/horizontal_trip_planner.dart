@@ -1,9 +1,11 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import '../../bloc/trip/trip_bloc.dart';
 import '../../bloc/trip/trip_event.dart';
 import '../../bloc/trip/trip_state.dart';
+import '../../models/person.dart';
 import '../../models/trip.dart';
 import '../../utils/app_theme.dart';
 import '../shared/glass_container.dart';
@@ -53,12 +55,12 @@ class HorizontalTripPlanner extends StatelessWidget {
                       if (stop.airport != null) {
                         name = stop.airport!.iataCode;
                         icon = Icons.flight;
-                        color = MapPalette.airport;
+                        color = MapPalette.airport.vivid;
                         onColor = Colors.white;
                       } else if (stop.station != null) {
                         name = stop.station!.name;
                         icon = Icons.train;
-                        color = MapPalette.majorStation;
+                        color = MapPalette.majorStation.vivid;
                         onColor = Colors.white;
                       } else if (stop.people.isNotEmpty) {
                         name = stop.people.first.firstName;
@@ -166,7 +168,7 @@ class HorizontalTripPlanner extends StatelessWidget {
                                             : null,
                                         child: p.profileImageUrl == null
                                             ? Text(
-                                                p.firstName[0],
+                                                _initialOf(p),
                                                 style: const TextStyle(
                                                   fontSize: 8,
                                                 ),
@@ -192,7 +194,7 @@ class HorizontalTripPlanner extends StatelessWidget {
                   height: 140,
                   child: _ActionGroup(
                     onSave: () {
-                      final now = DateTime.now();
+                      final now = clock.now();
                       final dateStr = DateFormat('yyyy-MM-dd').format(now);
                       context.read<TripBloc>().add(
                         SaveTrip(
@@ -262,4 +264,12 @@ class _ActionGroup extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The avatar letter for [p]: their first initial, else their last, else
+/// nothing. Names come from the server, so either may be empty.
+String _initialOf(Person p) {
+  if (p.firstName.isNotEmpty) return p.firstName[0];
+  if (p.lastName.isNotEmpty) return p.lastName[0];
+  return '';
 }

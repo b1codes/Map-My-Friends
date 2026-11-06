@@ -6,7 +6,12 @@ from rest_framework.response import Response
 from apps.common.ownership import owner_key_for
 
 from .repositories import DuplicateSequenceOrder, TripRepository
-from .serializers import TripLegSerializer, TripSerializer, TripStopSerializer
+from .serializers import (
+    TripLegSerializer,
+    TripSerializer,
+    TripStopSerializer,
+    stop_context,
+)
 from .services import OSRMService, RoutingError, TransportLookupService
 
 
@@ -17,15 +22,22 @@ class TripViewSet(viewsets.ViewSet):
     def repository(self):
         return TripRepository()
 
+    @staticmethod
+    def _represent(request, trips, many=False):
+        stops = [stop for trip in (trips if many else [trips]) for stop in trip.stops]
+        return TripSerializer(
+            trips, many=many, context=stop_context(request, stops)
+        ).data
+
     def list(self, request):
         trips = self.repository.list_for_owner(owner_key_for(request))
-        return Response(TripSerializer(trips, many=True).data)
+        return Response(self._represent(request, trips, many=True))
 
     def retrieve(self, request, pk=None):
         trip = self.repository.get_for_owner(pk, owner_key_for(request))
         if trip is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(TripSerializer(trip).data)
+        return Response(self._represent(request, trip))
 
     @staticmethod
     def _split_payload(validated):
@@ -49,7 +61,7 @@ class TripViewSet(viewsets.ViewSet):
         if stops:
             self.repository.replace_stops(trip.id, owner_key, stops)
             trip = self.repository.get_for_owner(trip.id, owner_key)
-        return Response(TripSerializer(trip).data, status=status.HTTP_201_CREATED)
+        return Response(self._represent(request, trip), status=status.HTTP_201_CREATED)
 
     def update(self, request, pk=None):
         return self._write_update(request, pk, partial=False)
@@ -86,7 +98,7 @@ class TripViewSet(viewsets.ViewSet):
                     self.repository.update_leg(pk, leg_id, owner_key, leg_payload)
 
         trip = self.repository.get_for_owner(pk, owner_key)
-        return Response(TripSerializer(trip).data)
+        return Response(self._represent(request, trip))
 
     def destroy(self, request, pk=None):
         if not self.repository.delete(pk, owner_key_for(request)):
@@ -97,9 +109,10 @@ class TripViewSet(viewsets.ViewSet):
     def stops(self, request, pk=None):
         owner_key = owner_key_for(request)
         if request.method == "GET":
+            stops = self.repository.list_stops(pk, owner_key)
             return Response(
                 TripStopSerializer(
-                    self.repository.list_stops(pk, owner_key), many=True
+                    stops, many=True, context=stop_context(request, stops)
                 ).data
             )
 
@@ -115,7 +128,10 @@ class TripViewSet(viewsets.ViewSet):
             )
         if stop is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(TripStopSerializer(stop).data, status=status.HTTP_201_CREATED)
+        return Response(
+            TripStopSerializer(stop, context=stop_context(request, [stop])).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=False, methods=["post"])
     def calculate_route(self, request):
@@ -189,10 +205,15 @@ class TripLegViewSet(viewsets.ViewSet):
 
         serializer = TripLegSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        # `id` addresses the leg; the doc id is the id, so it is never written.
         payload = {
             k: (v.isoformat() if hasattr(v, "isoformat") else v)
             for k, v in serializer.validated_data.items()
+            if k != "id"
         }
+        # Firestore rejects an empty update, so a no-op PATCH returns the leg.
+        if not payload:
+            return Response(TripLegSerializer(leg).data)
         updated = self.repository.update_leg(leg.trip_id, pk, owner_key, payload)
         return Response(TripLegSerializer(updated).data)
 
@@ -207,6 +228,11 @@ class TripLegViewSet(viewsets.ViewSet):
         if not identifier:
             return Response(
                 {"error": "Missing identifier"}, status=status.HTTP_400_BAD_REQUEST
+            )
+        if not isinstance(identifier, str):
+            return Response(
+                {"error": "Identifier must be a string"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         data = {}

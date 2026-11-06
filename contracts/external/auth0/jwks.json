@@ -1,0 +1,43 @@
+{
+  "description": "The tenant's public signing keys.",
+  "consumer": "Auth0JSONWebTokenAuthentication (backend), via PyJWKClient",
+  "provider": "Auth0 tenant",
+  "live": true,
+  "request": {
+    "method": "GET",
+    "url": "https://b1codes.us.auth0.com/.well-known/jwks.json",
+    "auth": "none"
+  },
+  "response": {
+    "status": 200,
+    "schema": "jwks.schema.json",
+    "example": {
+      "keys": [
+        {
+          "kty": "RSA",
+          "use": "sig",
+          "n": "wABzgOTHMnoeoD3TQepmFfwuzQ-DtnZJLdQBQIdP6auciAMaiBSXnkB3JGh5PibLTaxK-EuXNjNc9uVKK2LJf98Un41GaPcp4oTG6Eg_lBVcKgC6qs17UQuEUTu5nQGtWIufo7K1YUTCsl4t9pT1D8o9opkNsnO9KGXAB-Qso_P94vCy7q-XE14hhnVZkrpgn6rowPFHE9EqsFR1a5xEgMCeKMLCeQwGleGF4b5nU3eLKM_tOJkM8iVulh-LeVQ6p--T_GuW6dRFeyfhi4N0pu8Qb_iUzgQwtWtU9mbPq3WjG5RhnCAHjub7rrLhXF-_up93K6e1nOmzmPQjFCJFUw",
+          "e": "AQAB",
+          "kid": "eIhJuvb4PQI9mfpDr9b5S",
+          "x5t": "xBSkg3oOM9fPGzSAnrno2F-kXNg",
+          "x5c": [
+            "MIIDAzCCAeugAwIBAgIJEYy27maJMJ75MA0GCSqGSIb3DQEBCwUAMB8xHTAbBgNVBAMTFGIxY29kZXMudXMuYXV0aDAuY29tMB4XDTI2MDUzMDIxMTk0N1oXDTQwMDIwNjIxMTk0N1owHzEdMBsGA1UEAxMUYjFjb2Rlcy51cy5hdXRoMC5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDAAHOA5Mcyeh6gPdNB6mYV/C7ND4O2dkkt1AFAh0/pq5yIAxqIFJeeQHckaHk+JstNrEr4S5c2M1z25UorYsl/3xSfjUZo9ynihMboSD+UFVwqALqqzXtRC4RRO7mdAa1Yi5+jsrVhRMKyXi32lPUPyj2imQ2yc70oZcAH5Cyj8/3i8LLur5cTXiGGdVmSumCfqujA8UcT0SqwVHVrnESAwJ4owsJ5DAaV4YXhvmdTd4soz+04mQzyJW6WH4t5VDqn75P8a5bp1EV7J+GLg3Sm7xBv+JTOBDC1a1T2Zs+rdaMblGGcIAeO5vuusuFcX7+6n3crp7Wc6bOY9CMUIkVTAgMBAAGjQjBAMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFALcRQ8TMYPkbQCuuel7Z84wQPJkMA4GA1UdDwEB/wQEAwIChDANBgkqhkiG9w0BAQsFAAOCAQEAUGTS6sK6C7kOWcRH/653bMj69vat9VXMbCW1yIsvtNujzrspL7Uq2Z3mcxW97ykVL03wA+kGqBDW2ge13QOiP7vCQzLWGEgX0Xk9pxEl246Gf8jCF6w6MeG6MtakmkiC/8AlCiVKs1tWLI7vEtY6GofdjeBk9MtAVCYF8tkHJwY6ywSbfCF3T8USXNSzXdRmdkWaVRKqnXmdHhi3L/aIB5c8CZ9BQTdSnbtwj36hO8ei8OJrTKJz10rbSAxqMk+1rb4mmdR0U33QBxJLEepRpfeKAt1VhQets4sS0lcOQaB4Xh/Gla6VzNN7or2qAnGZxpPwtw9q6SJl5RnQoWchYw=="
+          ],
+          "alg": "RS256"
+        },
+        {
+          "kty": "RSA",
+          "use": "sig",
+          "n": "sVf_lkmK4VaVavUwT7_QdizM3E0YG7RAd9cLUUbseIv9WtBGRegV4A80dyNBr8ttoPsdYF3YMcGm3v8r08PI9FjK6XI9NLxosPiPcHvRKg02yoWktONSqXJjyG7-oPYt2MGUnjd1pIYTAxa5XI_4OayzoPPi8ziDdHIO_c0Ka8XTKNcqdivxdCW2h3iZU2ka3BRAb5wl8cm0d5XR6u0FQAJLhrOOCKzd1oz9MU9q81F4alcBfySC62zWQmBrsaZWWhOCX0AgahmvUU05kQOBIF7bANk-dFlOJIl6F34waNx1Q02CPczmgNqvrvAiYsJF7KnDaltNRWRgVEQSP8Of_Q",
+          "e": "AQAB",
+          "kid": "DMGp-yGXrxwn9_hx4OzvZ",
+          "x5t": "me8U5R5ZeDkUUEm7V0n9g5pFDmU",
+          "x5c": [
+            "MIIDAzCCAeugAwIBAgIJdfQ4vTFpYH75MA0GCSqGSIb3DQEBCwUAMB8xHTAbBgNVBAMTFGIxY29kZXMudXMuYXV0aDAuY29tMB4XDTI2MDUzMDIxMTk0N1oXDTQwMDIwNjIxMTk0N1owHzEdMBsGA1UEAxMUYjFjb2Rlcy51cy5hdXRoMC5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCxV/+WSYrhVpVq9TBPv9B2LMzcTRgbtEB31wtRRux4i/1a0EZF6BXgDzR3I0Gvy22g+x1gXdgxwabe/yvTw8j0WMrpcj00vGiw+I9we9EqDTbKhaS041KpcmPIbv6g9i3YwZSeN3WkhhMDFrlcj/g5rLOg8+LzOIN0cg79zQprxdMo1yp2K/F0JbaHeJlTaRrcFEBvnCXxybR3ldHq7QVAAkuGs44IrN3WjP0xT2rzUXhqVwF/JILrbNZCYGuxplZaE4JfQCBqGa9RTTmRA4EgXtsA2T50WU4kiXoXfjBo3HVDTYI9zOaA2q+u8CJiwkXsqcNqW01FZGBURBI/w5/9AgMBAAGjQjBAMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFL3P3lsajhtU+PTStcH0x8C3/Vp9MA4GA1UdDwEB/wQEAwIChDANBgkqhkiG9w0BAQsFAAOCAQEAEPiM8YJyldR1QpM7h25gxRg8g8KMBgPuwa5700lwaYqLLhqF24d9kFPa3v9y4GxiQQCWz8KLToWdpV39BSqXBiMXC0vreotpGbL/OX9Bop68ZVri5A5imkPUj89L+uSppa0wbzi+KtDeJzlc3sTQowxbrosvWDTS1aFJQCTFbv6zs4hcTAsnf6bbcL9S5lLWqBZ1hl3lxb2kabT6xxXXDaxyajfElNrWQCXqQqchE0Lkj8GvLFfi+VA1Eg3LzCJ0LFCY7Vgfq4jG1MlExc3oGM8uckA8HkTbbJU7MQ5WDh1kWgHM9JdfpaAj15xIMvt4QnbtXtku7uEnSfaNWVr1Xw=="
+          ],
+          "alg": "RS256"
+        }
+      ]
+    }
+  }
+}

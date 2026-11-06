@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/contact_log.dart';
@@ -43,7 +44,7 @@ class PulseCalendar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final localizations = MaterialLocalizations.of(context);
-    final today = DateUtils.dateOnly(now ?? DateTime.now());
+    final today = DateUtils.dateOnly(now ?? clock.now());
 
     final year = displayedMonth.year;
     final month = displayedMonth.month;

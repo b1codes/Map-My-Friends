@@ -1,0 +1,4 @@
+tags:
+  # Pixel comparisons against committed images. They skip themselves
+  # anywhere but Linux x64; see golden_harness and docs/testing.md.
+  golden:

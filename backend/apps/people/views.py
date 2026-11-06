@@ -1,7 +1,10 @@
-from rest_framework import status, viewsets
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework import serializers, status, viewsets
+from rest_framework.exceptions import APIException
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.settings import api_settings
 from rest_framework.throttling import UserRateThrottle
 
 from apps.common.ownership import owner_key_for
@@ -9,7 +12,14 @@ from apps.common.storage import save_upload
 
 from .repositories import ContactLogRepository, PersonRepository
 from .serializers import ContactLogSerializer, PersonSerializer
-from .services import geocode_address
+from .services import GeocodingUnavailable, geocode_address
+
+
+class GeocoderUnavailable(APIException):
+    """503 for a geocoder outage, shaped like the Firestore-outage response in
+    apps.common.exception_handlers ({"error": ...})."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
 
 
 class PersonViewSet(viewsets.ViewSet):
@@ -102,12 +112,22 @@ class PersonViewSet(viewsets.ViewSet):
         }
 
     def _apply_geocoding(self, payload):
-        lat, lng, timezone = geocode_address(
-            payload.get("city", ""),
-            payload.get("state", ""),
-            payload.get("country", ""),
-            payload.get("street"),
-        )
+        # geocode_address raises Django's ValidationError, which DRF does not
+        # translate, so it would otherwise surface as a 500.
+        try:
+            lat, lng, timezone = geocode_address(
+                payload.get("city", ""),
+                payload.get("state", ""),
+                payload.get("country", ""),
+                payload.get("street"),
+            )
+        except GeocodingUnavailable as exc:
+            raise GeocoderUnavailable({"error": exc.messages[0]}) from exc
+        except DjangoValidationError as exc:
+            # The address spans several fields, so the error is not tied to one.
+            raise serializers.ValidationError(
+                {api_settings.NON_FIELD_ERRORS_KEY: exc.messages}
+            ) from exc
         payload["lat"] = lat
         payload["lng"] = lng
         payload["timezone"] = timezone
@@ -133,8 +153,10 @@ class ContactLogViewSet(viewsets.ViewSet):
         return ContactLogRepository()
 
     def list(self, request):
+        # A blank ?person= means no filter, per the usual DRF filter convention.
         logs = self.repository.list_for_owner(
-            owner_key_for(request), person_id=request.query_params.get("person")
+            owner_key_for(request),
+            person_id=request.query_params.get("person") or None,
         )
         return Response(ContactLogSerializer(logs, many=True).data)
 

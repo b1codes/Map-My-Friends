@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'profile_event.dart';
 import 'profile_state.dart';
@@ -22,26 +23,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
 
     try {
       final profile = await _authService.getProfile();
-      emit(
-        ProfileLoaded(
-          username: profile['username'],
-          email: profile['email'],
-          firstName: profile['first_name'],
-          lastName: profile['last_name'],
-          profileImageUrl: _processImageUrl(profile['profile_image']),
-          city: profile['city'],
-          state: profile['state'],
-          country: profile['country'],
-          street: profile['street'],
-          birthDate: profile['birth_date'],
-          phoneNumber: profile['phone_number'],
-          pinColor: profile['pin_color'],
-          pinStyle: profile['pin_style'],
-          pinIconType: profile['pin_icon_type'],
-          pinEmoji: profile['pin_emoji'],
-          distanceUnit: profile['distance_unit'],
-        ),
-      );
+      emit(_loaded(profile));
     } catch (e) {
       emit(ProfileError(message: e.toString().replaceFirst('Exception: ', '')));
     }
@@ -70,26 +52,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         pinEmoji: event.pinEmoji,
         distanceUnit: event.distanceUnit,
       );
-      emit(
-        ProfileLoaded(
-          username: profile['username'],
-          email: profile['email'],
-          firstName: profile['first_name'],
-          lastName: profile['last_name'],
-          profileImageUrl: _processImageUrl(profile['profile_image']),
-          city: profile['city'],
-          state: profile['state'],
-          country: profile['country'],
-          street: profile['street'],
-          birthDate: profile['birth_date'],
-          phoneNumber: profile['phone_number'],
-          pinColor: profile['pin_color'],
-          pinStyle: profile['pin_style'],
-          pinIconType: profile['pin_icon_type'],
-          pinEmoji: profile['pin_emoji'],
-          distanceUnit: profile['distance_unit'],
-        ),
-      );
+      emit(_loaded(profile));
     } catch (e) {
       if (currentState is ProfileLoaded) {
         emit(currentState);
@@ -110,26 +73,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         event.imageBytes,
         event.imageName,
       );
-      emit(
-        ProfileLoaded(
-          username: profile['username'],
-          email: profile['email'],
-          firstName: profile['first_name'],
-          lastName: profile['last_name'],
-          profileImageUrl: _processImageUrl(profile['profile_image']),
-          city: profile['city'],
-          state: profile['state'],
-          country: profile['country'],
-          street: profile['street'],
-          birthDate: profile['birth_date'],
-          phoneNumber: profile['phone_number'],
-          pinColor: profile['pin_color'],
-          pinStyle: profile['pin_style'],
-          pinIconType: profile['pin_icon_type'],
-          pinEmoji: profile['pin_emoji'],
-          distanceUnit: profile['distance_unit'],
-        ),
-      );
+      emit(_loaded(profile));
     } catch (e) {
       if (currentState is ProfileLoaded) {
         emit(currentState);
@@ -138,10 +82,31 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     }
   }
 
+  /// Builds the loaded state from a profile response. A field of the wrong
+  /// type throws, which the caller reports as a [ProfileError].
+  ProfileLoaded _loaded(Map<String, dynamic> profile) => ProfileLoaded(
+    username: profile['username'] as String?,
+    email: profile['email'] as String?,
+    firstName: profile['first_name'] as String?,
+    lastName: profile['last_name'] as String?,
+    profileImageUrl: _processImageUrl(profile['profile_image'] as String?),
+    city: profile['city'] as String?,
+    state: profile['state'] as String?,
+    country: profile['country'] as String?,
+    street: profile['street'] as String?,
+    birthDate: profile['birth_date'] as String?,
+    phoneNumber: profile['phone_number'] as String?,
+    pinColor: profile['pin_color'] as String?,
+    pinStyle: profile['pin_style'] as String?,
+    pinIconType: profile['pin_icon_type'] as String?,
+    pinEmoji: profile['pin_emoji'] as String?,
+    distanceUnit: profile['distance_unit'] as String?,
+  );
+
   String? _processImageUrl(String? url) {
     if (url == null) return null;
     // Add timestamp to force cache refresh
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final timestamp = clock.now().millisecondsSinceEpoch;
     if (url.contains('?')) {
       return '$url&t=$timestamp';
     }

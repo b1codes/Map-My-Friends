@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import '../models/contact_log.dart';
 import '../models/person.dart';
@@ -78,7 +79,7 @@ class ContactRecency {
       );
     }
 
-    final today = now ?? DateTime.now();
+    final today = now ?? clock.now();
     final todayDate = DateTime(today.year, today.month, today.day);
     final lastDate = DateTime(
       lastContactedAt.year,

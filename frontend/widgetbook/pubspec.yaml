@@ -35,6 +35,9 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # Real fonts, the reference platform and the comparator for goldens.
+  golden_harness:
+    path: ../golden_harness
   flutter_lints: ^6.0.0
   # Versions are held by the committed pubspec.lock: CI regenerates the
   # catalog tree and fails if the output differs from what is committed.

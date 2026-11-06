@@ -4,7 +4,9 @@ from rest_framework import generics, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.common.ownership import owner_key_for
 
@@ -13,8 +15,13 @@ from .serializers import (
     PasswordResetRequestSerializer,
     RegisterSerializer,
     UserProfileSerializer,
+    validate_password_for,
 )
-from .throttles import BurstAnonRateThrottle, SustainedAnonRateThrottle
+from .throttles import (
+    BurstAnonRateThrottle,
+    LoginBurstRateThrottle,
+    SustainedAnonRateThrottle,
+)
 
 
 class UserProfileView(APIView):
@@ -98,28 +105,16 @@ class PasswordResetRequestView(generics.GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        email = serializer.validated_data["email"]
-        try:
-            user = User.objects.get(email=email)
-            token = default_token_generator.make_token(user)
-            # In production, send an actual email with the reset link
-            # For now, we'll just return the token (development only)
-            return Response(
-                {
-                    "message": "Password reset email sent.",
-                    "token": token,  # Remove this in production!
-                    "user_id": user.pk,  # Remove this in production!
-                },
-                status=status.HTTP_200_OK,
-            )
-        except User.DoesNotExist:
-            # Don't reveal whether the email exists
-            return Response(
-                {
-                    "message": "Password reset email sent.",
-                },
-                status=status.HTTP_200_OK,
-            )
+        # The token and user_id are what PasswordResetConfirmView takes, so
+        # they may only ever reach the address's inbox, never this response:
+        # returning them let anyone who knew an email reset that account's
+        # password. No email is sent yet, so a reset can't be completed; the
+        # response is the same for every address so it doesn't reveal which
+        # ones have accounts.
+        return Response(
+            {"message": "Password reset email sent."},
+            status=status.HTTP_200_OK,
+        )
 
 
 class PasswordResetConfirmView(generics.GenericAPIView):
@@ -140,18 +135,31 @@ class PasswordResetConfirmView(generics.GenericAPIView):
         try:
             user = User.objects.get(pk=user_id)
             if default_token_generator.check_token(user, token):
+                validate_password_for(password, user)
                 user.set_password(password)
                 user.save()
                 return Response(
                     {"message": "Password has been reset successfully."},
                     status=status.HTTP_200_OK,
                 )
-            else:
-                return Response(
-                    {"error": "Invalid or expired token."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-        except User.DoesNotExist:
+            return Response(
+                {"error": "Invalid or expired token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except (User.DoesNotExist, ValueError, TypeError):
+            # ValueError/TypeError: user_id is not coercible to a primary key
+            # (e.g. "abc" or a list), which is a bad request, not a server error.
             return Response(
                 {"error": "Invalid request."}, status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class LoginView(TokenObtainPairView):
+    """Exchange a username and password for tokens.
+
+    Limited to 10 attempts a minute per client IP on top of the default 100 a
+    day, so a password can't be guessed back to back. The view ignores the
+    Authorization header, so every caller counts as anonymous here.
+    """
+
+    throttle_classes = [LoginBurstRateThrottle, AnonRateThrottle]

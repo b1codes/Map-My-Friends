@@ -1,0 +1,62 @@
+# gitleaks configuration (make scan-secrets, and the Secret Scan CI job).
+#
+# gitleaks' default rules, plus one for Django keys, minus a few test
+# fixtures. Each allowlist below is limited to the files and the exact values
+# it was written for, so a real token in the same file still fails.
+#
+# Never allowlist a real credential to get a PR through. Rotate it first (it is
+# in the git history, so treat it as public), then allowlist that one finding
+# by fingerprint in .gitleaksignore with a comment saying it was rotated.
+# Triage steps: docs/testing.md, Security scans.
+
+[extend]
+useDefault = true
+
+# A Django SECRET_KEY written into a settings file, an env file or a compose
+# file. The defaults don't look for these, and a leaked one lets anyone sign
+# the API's JWTs. Django's own "django-insecure-" development keys are
+# allowed: settings.py refuses to run with its development key once DEBUG
+# is off, so that one is public by design.
+[[rules]]
+id = "django-secret-key"
+description = "Django SECRET_KEY"
+regex = '''(?i)\b(?:DJANGO_)?SECRET_KEY["']?\s*[:=]\s*["']?([^"'\s$]{32,})'''
+secretGroup = 1
+keywords = ["secret_key"]
+  [[rules.allowlists]]
+  regexTarget = "secret"
+  regexes = ['''^django-insecure-''']
+
+# The contracts' SimpleJWT tokens: unsigned placeholders whose signature is
+# literally "refresh-signature" and the like, and whose payload is only
+# {"token_type": ...}. They can't authenticate anywhere.
+[[allowlists]]
+description = "Placeholder JWTs in the API contracts"
+targetRules = ["jwt"]
+condition = "AND"
+paths = ['''^contracts/api/''']
+regexTarget = "secret"
+regexes = [
+  '''^eyJhbGciOiJIUzI1NiJ9\.eyJ0b2tlbl90eXBlIjoi(?:cmVmcmVzaCJ9|YWNjZXNzIn0)\.(?:refresh-signature|access-signature|rotated-access|rotated-refresh)$''',
+]
+
+# The password the backend's user tests sign up with. It only exists in the
+# test database each run creates.
+[[allowlists]]
+description = "Test user password in the backend tests"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^backend/(?:apps/[^/]+/tests_[^/]+|tests/.+)\.py$''']
+regexTarget = "secret"
+regexes = ['''^Tr1cky-Horse-Battery$''']
+
+# The example password-reset token in the ZAP scan's request for the confirm
+# route: a made-up value in Django's token shape (its hash part counts
+# 0123456789abcdef twice). It resets nothing; the scan only probes the route.
+[[allowlists]]
+description = "Example reset token in the ZAP extra operations"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^\.zap/extra-operations\.json$''']
+regexTarget = "secret"
+regexes = ['''^cyx3pa-0123456789abcdef0123456789abcdef$''']

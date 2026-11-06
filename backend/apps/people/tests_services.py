@@ -1,9 +1,9 @@
 from unittest.mock import MagicMock, patch
 
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
-from apps.people.services import geocode_address
+from apps.people.services import GeocodingUnavailable, geocode_address
 
 
 class GeocodeAddressTests(SimpleTestCase):
@@ -87,3 +87,37 @@ class GeocodeAddressTests(SimpleTestCase):
 
         query = mock_nominatim.return_value.geocode.call_args[0][0]
         self.assertEqual(query["street"], "123 Main St")
+
+    @patch("apps.people.services.time.sleep")
+    @patch("apps.people.services.TimezoneFinder")
+    @patch("apps.people.services.Nominatim")
+    def test_outage_is_distinguishable_from_no_match(
+        self, mock_nominatim, mock_tf, mock_sleep
+    ):
+        from geopy.exc import GeocoderServiceError
+
+        mock_nominatim.return_value.geocode.side_effect = GeocoderServiceError()
+        with self.assertRaises(GeocodingUnavailable):
+            geocode_address("Somewhere", "ST", "CC")
+
+        mock_nominatim.return_value.geocode.side_effect = None
+        mock_nominatim.return_value.geocode.return_value = None
+        with self.assertRaises(ValidationError) as caught:
+            geocode_address("Nowhereville", "ZZ", "XX")
+        self.assertNotIsInstance(caught.exception, GeocodingUnavailable)
+
+    @override_settings(NOMINATIM_DOMAIN="stubs:8090", NOMINATIM_SCHEME="http")
+    @patch("apps.people.services.TimezoneFinder")
+    @patch("apps.people.services.Nominatim")
+    def test_geocoder_host_comes_from_settings(self, mock_nominatim, mock_tf):
+        mock_nominatim.return_value.geocode.return_value = MagicMock(
+            latitude=41.8781, longitude=-87.6298
+        )
+
+        geocode_address("Chicago", "IL", "USA")
+
+        mock_nominatim.assert_called_once_with(
+            user_agent="map_my_friends_global_connect",
+            domain="stubs:8090",
+            scheme="http",
+        )

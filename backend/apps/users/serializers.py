@@ -1,6 +1,20 @@
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+
+
+def validate_password_for(password, user):
+    """Django's password validators, run against `user`, as a DRF error.
+
+    Passing the user matters: UserAttributeSimilarityValidator compares the
+    password with the username, email and names, and with no user it passes
+    everything. Used as a bare field validator, that's what happened.
+    """
+    try:
+        validate_password(password, user=user)
+    except DjangoValidationError as e:
+        raise serializers.ValidationError({"password": list(e.messages)}) from e
 
 
 class UserProfileSerializer(serializers.Serializer):
@@ -66,9 +80,8 @@ class UserProfileSerializer(serializers.Serializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(required=True)
-    password = serializers.CharField(
-        write_only=True, required=True, validators=[validate_password]
-    )
+    # Checked against the new user's details in validate().
+    password = serializers.CharField(write_only=True, required=True)
     password_confirm = serializers.CharField(write_only=True, required=True)
     first_name = serializers.CharField(required=False, allow_blank=True)
     last_name = serializers.CharField(required=False, allow_blank=True)
@@ -103,19 +116,27 @@ class RegisterSerializer(serializers.ModelSerializer):
                 {"email": "A user with this email already exists."}
             )
 
+        validate_password_for(
+            attrs["password"],
+            User(
+                username=attrs["username"],
+                email=attrs["email"],
+                first_name=attrs.get("first_name", ""),
+                last_name=attrs.get("last_name", ""),
+            ),
+        )
         return attrs
 
     def create(self, validated_data):
         validated_data.pop("password_confirm")
         validated_data.pop("first_name_hp", None)
-        user = User.objects.create_user(
+        return User.objects.create_user(
             username=validated_data["username"],
             email=validated_data["email"],
             password=validated_data["password"],
             first_name=validated_data.get("first_name", ""),
             last_name=validated_data.get("last_name", ""),
         )
-        return user
 
 
 class PasswordResetRequestSerializer(serializers.Serializer):
@@ -124,9 +145,9 @@ class PasswordResetRequestSerializer(serializers.Serializer):
 
 class PasswordResetConfirmSerializer(serializers.Serializer):
     token = serializers.CharField(required=True)
-    password = serializers.CharField(
-        write_only=True, required=True, validators=[validate_password]
-    )
+    # Checked against the account in PasswordResetConfirmView, the first point
+    # that knows which user it is.
+    password = serializers.CharField(write_only=True, required=True)
     password_confirm = serializers.CharField(write_only=True, required=True)
 
     def validate(self, attrs):

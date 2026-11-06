@@ -8,21 +8,83 @@ filesystem and Cloud Storage — no code branches on environment.
 
 from __future__ import annotations
 
+import io
 import uuid
-from pathlib import Path
 
+from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
+from PIL import Image, ImageOps, UnidentifiedImageError
+from rest_framework import serializers
+
+# The app uploads a cropped PNG of at most 1024x1024 (add_edit_person_screen
+# and the profile screen); these leave room for a phone photo sent directly.
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+MAX_IMAGE_SIDE = 4096
+
+# Pillow format -> stored extension. Only formats a browser shows as a plain
+# picture: no SVG (it runs scripts), and nothing exotic for Pillow to parse.
+IMAGE_FORMATS = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp"}
+
+
+def _invalid(message: str) -> serializers.ValidationError:
+    return serializers.ValidationError({"profile_image": [message]})
+
+
+def clean_image(uploaded_file) -> tuple[bytes, str]:
+    """Check an upload is a real image and re-encode it.
+
+    Returns the new bytes and the extension to store them under. The upload's
+    own name and content type are the client's to choose, so neither decides
+    anything: the format Pillow finds does. Re-encoding keeps only the pixels,
+    which drops anything appended after the image (an HTML/image polyglot)
+    and the metadata, including the GPS position a phone photo was taken at.
+    Raises a 400-shaped ValidationError for anything else.
+    """
+    if uploaded_file.size > MAX_IMAGE_BYTES:
+        raise _invalid(f"Images must be under {MAX_IMAGE_BYTES // (1024 * 1024)} MB.")
+
+    data = uploaded_file.read()
+    try:
+        with Image.open(io.BytesIO(data)) as probe:
+            fmt = probe.format
+            width, height = probe.size
+        if fmt not in IMAGE_FORMATS:
+            raise _invalid("Upload a PNG, JPEG or WebP image.")
+        # Checked before decoding: a small, highly compressed file can
+        # decode to gigabytes.
+        if max(width, height) > MAX_IMAGE_SIDE:
+            raise _invalid(
+                f"Images must be at most {MAX_IMAGE_SIDE} pixels on each side."
+            )
+        with Image.open(io.BytesIO(data)) as image:
+            image.load()
+            # Applies the EXIF orientation to the pixels, since the tag that
+            # records it is about to be dropped with the rest.
+            upright = ImageOps.exif_transpose(image)
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError) as e:
+        # Pillow reports a truncated or corrupt file as OSError (or, for some
+        # decoders, SyntaxError/ValueError).
+        raise _invalid("Upload a PNG, JPEG or WebP image.") from e
+
+    if fmt == "JPEG" and upright.mode not in ("RGB", "L"):
+        upright = upright.convert("RGB")
+    out = io.BytesIO()
+    save_args = {"quality": 90} if fmt in ("JPEG", "WEBP") else {}
+    upright.save(out, format=fmt, **save_args)
+    return out.getvalue(), IMAGE_FORMATS[fmt]
 
 
 def save_upload(uploaded_file, prefix: str) -> str:
-    """Persist an uploaded file under `prefix/`, returning its storage name.
+    """Validate an uploaded image and persist it under `prefix/`.
 
-    A UUID stem prevents collisions between users uploading identically named
-    files, mirroring what Django's upload_to + suffixing used to provide.
+    Returns the storage name. The stem is a UUID, so identically named uploads
+    don't collide and the client's filename never reaches storage, and the
+    extension is the image's real format, which is what decides the content
+    type /media/ serves it with.
     """
-    suffix = Path(uploaded_file.name).suffix.lower()
-    name = f"{prefix}/{uuid.uuid4().hex}{suffix}"
-    return default_storage.save(name, uploaded_file)
+    content, extension = clean_image(uploaded_file)
+    name = f"{prefix}/{uuid.uuid4().hex}{extension}"
+    return default_storage.save(name, ContentFile(content))
 
 
 def upload_url(name: str | None, request=None) -> str | None:

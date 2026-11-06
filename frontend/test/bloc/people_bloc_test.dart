@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:map_my_friends/bloc/people/people_bloc.dart';
 import 'package:map_my_friends/models/person.dart';
@@ -169,6 +172,132 @@ void main() {
         seed: () => PeopleLoaded(testPeople),
         act: (bloc) => bloc.add(const DeletePerson('1')),
         expect: () => [const PeopleError('Exception: Failed to delete')],
+      );
+    });
+
+    group('before the list has loaded', () {
+      blocTest<PeopleBloc, PeopleState>(
+        'AddPerson reports an error instead of calling the API',
+        build: () => peopleBloc,
+        act: (bloc) => bloc.add(AddPerson(testPerson)),
+        expect: () => [
+          const PeopleError('Cannot add person before loading list'),
+        ],
+        verify: (_) => verifyNever(() => apiService.addPerson(any())),
+      );
+
+      blocTest<PeopleBloc, PeopleState>(
+        'UpdatePerson is ignored',
+        build: () => peopleBloc,
+        seed: () => PeopleLoading(),
+        act: (bloc) => bloc.add(UpdatePerson(testPerson)),
+        expect: () => <PeopleState>[],
+        verify: (_) => verifyNever(() => apiService.updatePerson(any())),
+      );
+
+      blocTest<PeopleBloc, PeopleState>(
+        'DeletePerson is ignored',
+        build: () => peopleBloc,
+        seed: () => const PeopleError('earlier failure'),
+        act: (bloc) => bloc.add(const DeletePerson('1')),
+        expect: () => <PeopleState>[],
+        verify: (_) => verifyNever(() => apiService.deletePerson(any())),
+      );
+    });
+
+    group('image uploads', () {
+      final bytes = Uint8List.fromList([1, 2, 3]);
+      final file = XFile('/tmp/avatar.png');
+
+      blocTest<PeopleBloc, PeopleState>(
+        'AddPerson forwards the picked image and its bytes',
+        build: () {
+          when(
+            () => apiService.addPerson(
+              any(),
+              profileImage: any(named: 'profileImage'),
+              imageBytes: any(named: 'imageBytes'),
+            ),
+          ).thenAnswer((_) async => testPerson);
+          return peopleBloc;
+        },
+        seed: () => const PeopleLoaded([]),
+        act: (bloc) => bloc.add(
+          AddPerson(testPerson, profileImage: file, imageBytes: bytes),
+        ),
+        expect: () => [
+          PeopleLoaded([testPerson]),
+        ],
+        verify: (_) => verify(
+          () => apiService.addPerson(
+            testPerson,
+            profileImage: file,
+            imageBytes: bytes,
+          ),
+        ).called(1),
+      );
+
+      blocTest<PeopleBloc, PeopleState>(
+        'UpdatePerson forwards the image bytes',
+        build: () {
+          when(
+            () => apiService.updatePerson(
+              any(),
+              profileImage: any(named: 'profileImage'),
+              imageBytes: any(named: 'imageBytes'),
+            ),
+          ).thenAnswer((_) async => testPerson);
+          return peopleBloc;
+        },
+        seed: () => PeopleLoaded([testPerson]),
+        act: (bloc) => bloc.add(UpdatePerson(testPerson, imageBytes: bytes)),
+        verify: (_) => verify(
+          () => apiService.updatePerson(
+            testPerson,
+            profileImage: null,
+            imageBytes: bytes,
+          ),
+        ).called(1),
+      );
+    });
+
+    blocTest<PeopleBloc, PeopleState>(
+      'UpdatePerson replaces only the matching person, keeping order',
+      build: () {
+        when(() => apiService.updatePerson(any())).thenAnswer(
+          (_) async => testPerson.copyWith(id: '2', firstName: 'Updated'),
+        );
+        return peopleBloc;
+      },
+      seed: () => PeopleLoaded([
+        testPerson,
+        testPerson.copyWith(id: '2'),
+        testPerson.copyWith(id: '3'),
+      ]),
+      act: (bloc) => bloc.add(UpdatePerson(testPerson.copyWith(id: '2'))),
+      expect: () => [
+        isA<PeopleLoaded>()
+            .having((s) => s.people.map((p) => p.id), 'ids', ['1', '2', '3'])
+            .having((s) => s.people.map((p) => p.firstName), 'names', [
+              'John',
+              'Updated',
+              'John',
+            ]),
+      ],
+    );
+
+    test('events and states have value equality', () {
+      expect(AddPerson(testPerson), AddPerson(testPerson));
+      expect(UpdatePerson(testPerson), UpdatePerson(testPerson));
+      expect(const DeletePerson('1'), isNot(const DeletePerson('2')));
+      expect(LoadPeople(), LoadPeople());
+      expect(
+        const PeopleOperationSuccess('Saved'),
+        const PeopleOperationSuccess('Saved'),
+      );
+      expect(
+        const PeopleOperationSuccess('Saved'),
+        isNot(const PeopleOperationSuccess('Deleted')),
       );
     });
   });

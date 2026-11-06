@@ -35,6 +35,11 @@ class AmbientScaffold extends StatelessWidget {
   /// The pre-auth flow uses this. It runs before there is a signed-in person
   /// whose preference we could honour, and it reads as the product's title
   /// sequence: the void, once, before the room lights come up.
+  ///
+  /// It pins the theme for the widgets below this one, not for anything the
+  /// caller already read while building [body] or [header]: `Theme.of` in
+  /// the caller's build method still sees the user's theme. A pinned screen
+  /// that styles text from the theme builds its body under a [Builder].
   final Brightness? appearance;
 
   const AmbientScaffold({

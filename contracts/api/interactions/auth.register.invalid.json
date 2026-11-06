@@ -1,0 +1,21 @@
+{
+  "description": "Register with a taken username. The client turns each field's error list into a 'field: message' line.",
+  "consumer": "AuthService.register",
+  "provider_state": "registered_user",
+  "request": {
+    "method": "POST",
+    "path": "user/auth/register/",
+    "auth": "none",
+    "json": {
+      "username": "ada",
+      "email": "another-ada@example.com",
+      "password": "Analytical-Engine-1843",
+      "password_confirm": "Analytical-Engine-1843"
+    }
+  },
+  "response": {
+    "status": 400,
+    "schema": "FieldErrors",
+    "example": { "username": ["A user with that username already exists."] }
+  }
+}

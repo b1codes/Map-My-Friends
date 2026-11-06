@@ -7,6 +7,8 @@ rather than Firestore itself.
 
 from __future__ import annotations
 
+from django.core.cache import cache
+
 from apps.common import firestore as fs
 
 
@@ -46,4 +48,19 @@ class FirestoreTestMixin:
     def setUp(self):
         for name in self.collections_to_purge:
             purge_collection(name)
+        super().setUp()
+
+
+class ThrottleIsolationMixin:
+    """Clears throttle history around each test.
+
+    DRF keeps throttle counters in the process-wide cache, and the anonymous
+    buckets are small (anon_burst is 10/minute), so without this the outcome of
+    a test would depend on how many requests earlier tests, in any app,
+    happened to make.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
         super().setUp()

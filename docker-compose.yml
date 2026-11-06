@@ -12,6 +12,9 @@ services:
       - ./backend:/app # Syncs your local backend folder to the container
       - /app/.venv # Anonymous volume to hide host's .venv from container
       - media_data:/app/media # Persist uploaded media files
+      # Shared API/third-party contracts, read by backend/tests/contracts.
+      # Mounted beside /app so ../contracts resolves the same as on the host.
+      - ./contracts:/contracts:ro
     ports:
       - "8000:8000"
     depends_on:

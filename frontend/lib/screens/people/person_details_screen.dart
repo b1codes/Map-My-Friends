@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -61,7 +62,7 @@ class PersonDetailsScreen extends StatelessWidget {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
+                    MaterialPageRoute<void>(
                       builder: (context) => AddEditPersonScreen(person: person),
                     ),
                   );
@@ -156,7 +157,7 @@ class PersonDetailsScreen extends StatelessWidget {
     if (person.timezone != null && person.timezone!.isNotEmpty) {
       try {
         final location = tz.getLocation(person.timezone!);
-        final now = tz.TZDateTime.now(location);
+        final now = tz.TZDateTime.from(clock.now(), location);
         timeString = DateFormat.jm().format(now);
       } catch (_) {}
     }

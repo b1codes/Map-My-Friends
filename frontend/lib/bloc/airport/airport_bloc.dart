@@ -4,9 +4,11 @@ import 'airport_event.dart';
 import 'airport_state.dart';
 
 class AirportBloc extends Bloc<AirportEvent, AirportState> {
-  final AirportService _airportService = AirportService();
+  final AirportService _airportService;
 
-  AirportBloc() : super(AirportInitial()) {
+  AirportBloc({AirportService? airportService})
+    : _airportService = airportService ?? AirportService(),
+      super(AirportInitial()) {
     on<LoadMapAirports>(_onLoadMapAirports);
     on<LoadNearestAirports>(_onLoadNearestAirports);
   }

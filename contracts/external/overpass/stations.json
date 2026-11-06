@@ -1,0 +1,103 @@
+{
+  "description": "One state's stations and halts, as fetch_stations requests them (it loops over every US state; Rhode Island is the smallest). Whitespace in the query is not significant.",
+  "consumer": "manage.py fetch_stations (backend)",
+  "provider": "Overpass API (overpass-api.de)",
+  "live": true,
+  "request": {
+    "method": "POST",
+    "url": "https://overpass-api.de/api/interpreter",
+    "headers": {
+      "User-Agent": "map-my-friends/1.0 (station dataset fetch; +https://github.com/b1codes)",
+      "Accept": "application/json"
+    },
+    "form": {
+      "data": "[out:json][timeout:180]; area[\"ISO3166-2\"=\"US-RI\"][admin_level=4]->.a; ( node[\"railway\"=\"station\"](area.a); node[\"railway\"=\"halt\"](area.a); ); out body;"
+    },
+    "auth": "none"
+  },
+  "response": {
+    "status": 200,
+    "schema": "stations.schema.json",
+    "example": {
+      "version": 0.6,
+      "generator": "Overpass API 0.7.62.11 87bfad18",
+      "osm3s": {
+        "timestamp_osm_base": "2026-10-26T15:05:21Z",
+        "timestamp_areas_base": "2026-10-26T09:41:45Z",
+        "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+      },
+      "elements": [
+        {
+          "type": "node",
+          "id": 3280065972,
+          "lat": 41.8292289,
+          "lon": -71.4132485,
+          "tags": {
+            "addr:housenumber": "100",
+            "addr:state": "RI",
+            "addr:street": "Gaspee Street",
+            "iata": "ZRV",
+            "name": "Providence",
+            "network": "Amtrak;MBTA",
+            "operator": "Amtrak",
+            "public_transport": "station",
+            "railway": "station",
+            "railway:position": "mi:185.1",
+            "railway:ref": "PVD",
+            "train": "yes",
+            "wheelchair": "yes",
+            "wikidata": "Q7252482",
+            "wikipedia": "en:Providence station"
+          }
+        },
+        {
+          "type": "node",
+          "id": 4586126150,
+          "lat": 41.4840267,
+          "lon": -71.5606624,
+          "tags": {
+            "addr:state": "RI",
+            "name": "Kingston",
+            "network": "Amtrak",
+            "network:wikidata": "Q23239",
+            "operator": "Amtrak",
+            "platforms": "2",
+            "public_transport": "station",
+            "railway": "station",
+            "railway:position": "mi:158.1",
+            "railway:ref": "KIN",
+            "start_date": "1875-06",
+            "train": "yes",
+            "wikidata": "Q6413589",
+            "wikipedia": "en:Kingston station (Rhode Island)"
+          }
+        },
+        {
+          "type": "node",
+          "id": 5889932762,
+          "lat": 41.7275555,
+          "lon": -71.4420942,
+          "tags": {
+            "name": "T. F. Green Airport",
+            "network": "MBTA",
+            "network:wikidata": "Q171985",
+            "operator": "Massachusetts Bay Transportation Authority",
+            "public_transport": "station",
+            "railway": "station",
+            "train": "yes",
+            "wikidata": "Q7668233"
+          }
+        },
+        {
+          "type": "node",
+          "id": 9900000001,
+          "lat": 41.7,
+          "lon": -71.5,
+          "tags": {
+            "railway": "halt"
+          }
+        }
+      ]
+    }
+  }
+}

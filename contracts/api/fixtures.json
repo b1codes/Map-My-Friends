@@ -1,0 +1,32 @@
+{
+  "description": "The shared world every API interaction is written against. The provider side builds it for real (backend/tests/contracts/states.py); the consumer side (frontend/test/contracts/) uses the same values as inputs. Ids are illustrative: before replaying a request, the provider swaps each placeholder for the real value it created under that role.",
+  "user": {
+    "username": "ada",
+    "password": "Analytical-Engine-1843",
+    "email": "ada@example.com",
+    "first_name": "Ada",
+    "last_name": "Lovelace"
+  },
+  "geocoder": {
+    "description": "What the provider's stubbed geocoder answers for any address. Nominatim itself is not under contract here.",
+    "lat": 43.0389,
+    "lng": -87.9065,
+    "timezone": "America/Chicago"
+  },
+  "placeholders": {
+    "Pp5ltxR4W9tpvZTZUlY7": "person",
+    "MdSXYBzGfdyHp1R17jee": "contact_log",
+    "CPczK4heHksu4O9ODudG": "trip",
+    "B0HgfWm6ArmpJaNJdqGN": "trip.stop.0",
+    "Pxxx4iCAa0bd1A6mYVzL": "trip.stop.1",
+    "TzgYzOtSeqrdtWScrbVF": "trip.leg.0",
+    "eyJhbGciOiJIUzI1NiJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCJ9.refresh-signature": "refresh_token"
+  },
+  "provider_states": {
+    "anonymous": "No account exists yet.",
+    "registered_user": "The user exists and can sign in.",
+    "user_with_person": "registered_user, plus Grace Hopper in Milwaukee with preferred airport 2364 (MDW) and station 1753.",
+    "user_with_contacted_person": "user_with_person, plus one CALL logged with her on 2026-10-20.",
+    "user_with_trip": "user_with_person, plus a DRAFT trip with two stops (Grace, then MDW) and the leg between them."
+  }
+}

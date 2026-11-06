@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../models/trip.dart';
 import '../../components/shared/glass_container.dart';
 import '../../utils/app_theme.dart';
+import '../../services/api_config.dart';
 import '../../services/routing_service.dart';
 import '../../bloc/map/map_settings_cubit.dart';
 import '../../utils/window_size.dart';
@@ -14,7 +15,11 @@ import '../../components/shared/glass_surfaces.dart';
 class TripDetailsScreen extends StatefulWidget {
   final Trip trip;
 
-  const TripDetailsScreen({super.key, required this.trip});
+  /// Draws the route line. Defaults to a fresh [RoutingService]; tests pass a
+  /// fake.
+  final RoutingService? routingService;
+
+  const TripDetailsScreen({super.key, required this.trip, this.routingService});
 
   @override
   State<TripDetailsScreen> createState() => _TripDetailsScreenState();
@@ -22,7 +27,8 @@ class TripDetailsScreen extends StatefulWidget {
 
 class _TripDetailsScreenState extends State<TripDetailsScreen> {
   late Future<List<LatLng>> _routeFuture;
-  final RoutingService _routingService = RoutingService();
+  late final RoutingService _routingService =
+      widget.routingService ?? RoutingService();
 
   @override
   void initState() {
@@ -163,7 +169,9 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                 : settingsState.themeMode == ThemeMode.dark;
 
             String tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-            if (settingsState.mapType == MapType.satellite) {
+            if (ApiConfig.tileUrlOverride.isNotEmpty) {
+              tileUrl = ApiConfig.tileUrlOverride;
+            } else if (settingsState.mapType == MapType.satellite) {
               tileUrl =
                   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
             } else if (settingsState.mapType == MapType.minimal) {
@@ -186,6 +194,12 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
 
             return FlutterMap(
               options: MapOptions(
+                // Shown until tiles load, and offline.
+                // flutter_map's default is light grey,
+                // under white text in dark mode.
+                backgroundColor: MapField.ground(
+                  isDark ? Brightness.dark : Brightness.light,
+                ),
                 initialCameraFit: bounds != null
                     ? CameraFit.bounds(
                         bounds: bounds,
@@ -371,20 +385,12 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
   Widget _buildLegItem(BuildContext context, TripLeg leg) {
     final theme = Theme.of(context);
     final onSurface = theme.colorScheme.onSurface;
-    IconData transportIcon;
-    switch (leg.transportType) {
-      case 'FLIGHT':
-        transportIcon = Icons.flight_takeoff;
-        break;
-      case 'TRAIN':
-        transportIcon = Icons.train;
-        break;
-      case 'BUS':
-        transportIcon = Icons.directions_bus;
-        break;
-      default:
-        transportIcon = Icons.directions_car;
-    }
+    final (IconData transportIcon, String mode) = switch (leg.transportType) {
+      'FLIGHT' => (Icons.flight_takeoff, 'Flight'),
+      'TRAIN' => (Icons.train, 'Train'),
+      'BUS' => (Icons.directions_bus, 'Bus'),
+      _ => (Icons.directions_car, 'Drive'),
+    };
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
@@ -398,15 +404,23 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
                 height: 20,
                 color: onSurface.withValues(alpha: 0.2),
               ),
-              InkWell(
-                onTap: () => _showLegDetails(context, leg),
-                child: GlassContainer(
-                  padding: const EdgeInsets.all(8),
-                  borderRadius: 20, // pill: half the 40px timeline dot
-                  child: Icon(
-                    transportIcon,
-                    color: onSurface.withValues(alpha: 0.7),
-                    size: 20,
+              // The button is only an icon, so it needs a name of its own.
+              // A node of its own, too: the booking reference beside it is
+              // text to read, not part of the button's name.
+              Semantics(
+                container: true,
+                button: true,
+                label: '$mode leg details',
+                child: InkWell(
+                  onTap: () => _showLegDetails(context, leg),
+                  child: GlassContainer(
+                    padding: const EdgeInsets.all(8),
+                    borderRadius: 20, // pill: half the 40px timeline dot
+                    child: Icon(
+                      transportIcon,
+                      color: onSurface.withValues(alpha: 0.7),
+                      size: 20,
+                    ),
                   ),
                 ),
               ),
@@ -432,7 +446,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
   }
 
   void _showLegDetails(BuildContext context, TripLeg leg) {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -447,7 +461,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
     final onSurface = theme.colorScheme.onSurface;
 
     String name = '';
-    String address = stop.snapshotAddress ?? '';
+    final String address = stop.snapshotAddress ?? '';
 
     if (stop.snapshotMetadata != null) {
       final peopleData = stop.snapshotMetadata!['people'];
@@ -460,7 +474,7 @@ class _TripDetailsScreenState extends State<TripDetailsScreen> {
           name = peopleData.toString();
         }
       } else if (stop.snapshotMetadata!['hub'] != null) {
-        name = stop.snapshotMetadata!['hub']['name'];
+        name = (stop.snapshotMetadata!['hub'] as Map)['name'] as String;
       }
     }
 

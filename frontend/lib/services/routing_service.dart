@@ -1,16 +1,28 @@
 import 'dart:developer' as developer;
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:latlong2/latlong.dart';
 import '../models/trip.dart';
-import 'api_service.dart';
+import 'api_config.dart';
 
 class RoutingService {
-  final ApiService _apiService;
+  /// A plain Dio, deliberately not `ApiService.dio`: OSRM is a public
+  /// third-party host, and the API client's interceptor would attach the
+  /// signed-in user's bearer token (and retry 401s through a token refresh).
+  final Dio _dio;
 
-  RoutingService({ApiService? apiService})
-    : _apiService = apiService ?? ApiService();
+  RoutingService({Dio? dio})
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              connectTimeout: const Duration(seconds: 5),
+              receiveTimeout: const Duration(seconds: 10),
+            ),
+          );
 
-  Dio get _dio => _apiService.dio;
+  @visibleForTesting
+  Dio get dio => _dio;
 
   /// Fetches a hybrid route based on stop types.
   /// - Friend -> Friend: Driving route via OSRM.
@@ -19,7 +31,7 @@ class RoutingService {
   Future<List<LatLng>> getRoute(List<TripStop> stops) async {
     if (stops.length < 2) return [];
 
-    List<LatLng> fullPath = [];
+    final List<LatLng> fullPath = [];
 
     for (int i = 0; i < stops.length - 1; i++) {
       final start = stops[i];
@@ -65,18 +77,22 @@ class RoutingService {
       final coordinates =
           '${start.longitude},${start.latitude};${end.longitude},${end.latitude}';
       final url =
-          'https://router.project-osrm.org/route/v1/driving/$coordinates?overview=full&geometries=geojson';
+          '${ApiConfig.osrmBaseUrl}/$coordinates?overview=full&geometries=geojson';
 
-      final response = await _dio.get(url);
+      final response = await _dio.get<dynamic>(url);
 
       if (response.statusCode == 200) {
-        final data = response.data;
-        if (data['routes'] != null && data['routes'].isNotEmpty) {
-          final List<dynamic> coords =
-              data['routes'][0]['geometry']['coordinates'];
-          return coords
-              .map((c) => LatLng(c[1].toDouble(), c[0].toDouble()))
-              .toList();
+        final routes = (response.data as Map)['routes'] as List?;
+        if (routes != null && routes.isNotEmpty) {
+          final geometry = (routes[0] as Map)['geometry'] as Map;
+          final coords = geometry['coordinates'] as List;
+          return coords.map((c) {
+            final point = c as List;
+            return LatLng(
+              (point[1] as num).toDouble(),
+              (point[0] as num).toDouble(),
+            );
+          }).toList();
         }
       }
     } catch (e) {

@@ -565,6 +565,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.2.0"
+  golden_harness:
+    dependency: "direct dev"
+    description:
+      path: "../golden_harness"
+      relative: true
+    source: path
+    version: "1.0.0"
   google_fonts:
     dependency: transitive
     description:

@@ -76,30 +76,46 @@ class MapSettingsCubit extends Cubit<MapSettingsState> {
 
   void _loadSettings() {
     final showControls = prefs.getBool('map_show_controls') ?? true;
-    final mapTypeIndex = prefs.getInt('map_type') ?? MapType.standard.index;
-    final themeModeIndex =
-        prefs.getInt('map_theme_mode') ?? ThemeMode.system.index;
     final showAirports = prefs.getBool('map_show_airports') ?? false;
     final showStations = prefs.getBool('map_show_stations') ?? false;
-    final airportFilterIndex =
-        prefs.getInt('map_airport_filter') ?? AirportFilter.all.index;
-    final stationFilterIndex =
-        prefs.getInt('map_station_filter') ?? StationFilter.all.index;
-    final distanceUnitIndex =
-        prefs.getInt('map_distance_unit') ?? DistanceUnit.metric.index;
 
     emit(
       state.copyWith(
         showControls: showControls,
-        mapType: MapType.values[mapTypeIndex],
-        themeMode: ThemeMode.values[themeModeIndex],
+        mapType: _savedEnum('map_type', MapType.values, MapType.standard),
+        themeMode: _savedEnum(
+          'map_theme_mode',
+          ThemeMode.values,
+          ThemeMode.system,
+        ),
         showAirports: showAirports,
         showStations: showStations,
-        airportFilter: AirportFilter.values[airportFilterIndex],
-        stationFilter: StationFilter.values[stationFilterIndex],
-        distanceUnit: DistanceUnit.values[distanceUnitIndex],
+        airportFilter: _savedEnum(
+          'map_airport_filter',
+          AirportFilter.values,
+          AirportFilter.all,
+        ),
+        stationFilter: _savedEnum(
+          'map_station_filter',
+          StationFilter.values,
+          StationFilter.all,
+        ),
+        distanceUnit: _savedEnum(
+          'map_distance_unit',
+          DistanceUnit.values,
+          DistanceUnit.metric,
+        ),
       ),
     );
+  }
+
+  /// The enum value saved under [key] by index, or [fallback] when nothing
+  /// is saved or the index doesn't exist in this build (e.g. it was written
+  /// by a version whose enum had more cases).
+  T _savedEnum<T extends Enum>(String key, List<T> values, T fallback) {
+    final index = prefs.getInt(key);
+    if (index == null || index < 0 || index >= values.length) return fallback;
+    return values[index];
   }
 
   void toggleControls() {

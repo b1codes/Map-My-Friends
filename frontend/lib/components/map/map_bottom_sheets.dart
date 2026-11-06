@@ -19,7 +19,7 @@ class AirportBottomSheet extends StatelessWidget {
         : 'Regional Airport';
     return BaseBottomSheet(
       icon: Icons.flight,
-      color: MapPalette.airport,
+      accent: MapPalette.airport,
       title: airport.name,
       subtitle: airport.iataCode,
       location: '${airport.city}, ${airport.country}',
@@ -39,28 +39,28 @@ class StationBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     IconData iconData = Icons.train;
-    Color color = MapPalette.majorStation;
+    MapSignal accent = MapPalette.majorStation;
     String label = 'Station';
 
     switch (station.stationType) {
       case 'major_station':
         iconData = Icons.train;
-        color = MapPalette.majorStation;
+        accent = MapPalette.majorStation;
         label = 'Major Station';
         break;
       case 'commuter_rail_station':
         iconData = Icons.directions_railway;
-        color = MapPalette.commuterRail;
+        accent = MapPalette.commuterRail;
         label = 'Commuter Rail';
         break;
       case 'subway_station':
         iconData = Icons.subway;
-        color = MapPalette.subway;
+        accent = MapPalette.subway;
         label = 'Subway Station';
         break;
       case 'regional_station':
         iconData = Icons.train;
-        color = MapPalette.regionalStation;
+        accent = MapPalette.regionalStation;
         label = 'Regional Station';
         break;
       default:
@@ -69,7 +69,7 @@ class StationBottomSheet extends StatelessWidget {
 
     return BaseBottomSheet(
       icon: iconData,
-      color: color,
+      accent: accent,
       title: station.name,
       subtitle: station.uicRef != null && station.uicRef!.isNotEmpty
           ? 'Ref: ${station.uicRef}'
@@ -88,7 +88,10 @@ class StationBottomSheet extends StatelessWidget {
 
 class BaseBottomSheet extends StatelessWidget {
   final IconData icon;
-  final Color color;
+
+  /// The category's colour: [MapSignal.vivid] for the icon, and
+  /// [MapSignal.ink] for the subtitle, which is text.
+  final MapSignal accent;
   final String title;
   final String? subtitle;
   final String location;
@@ -98,7 +101,7 @@ class BaseBottomSheet extends StatelessWidget {
   const BaseBottomSheet({
     super.key,
     required this.icon,
-    required this.color,
+    required this.accent,
     required this.title,
     this.subtitle,
     required this.location,
@@ -122,7 +125,7 @@ class BaseBottomSheet extends StatelessWidget {
             edge: false,
             borderRadius: MapGlass.radiusPill,
             padding: const EdgeInsets.all(12),
-            child: Icon(icon, color: color, size: 32),
+            child: Icon(icon, color: accent.vivid, size: 32),
           ),
           const SizedBox(height: 12),
           Text(
@@ -134,7 +137,9 @@ class BaseBottomSheet extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               subtitle!,
-              style: theme.textTheme.headlineSmall?.copyWith(color: color),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: accent.ink(theme.brightness),
+              ),
             ),
           ],
           const SizedBox(height: MapSpacing.xs),

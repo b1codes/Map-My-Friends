@@ -22,7 +22,7 @@ class MapSettingsButton extends StatelessWidget {
         child: ThermalResponse(
           borderRadius: MapGlass.radiusLg,
           onTap: () {
-            showModalBottomSheet(
+            showModalBottomSheet<void>(
               context: context,
               backgroundColor: Colors.transparent,
               builder: (_) {
@@ -34,10 +34,14 @@ class MapSettingsButton extends StatelessWidget {
               },
             );
           },
-          child: Icon(
-            Icons.settings,
-            color: Theme.of(context).colorScheme.primary,
-            size: 24, // Consistent with IconButton default size
+          child: Semantics(
+            button: true,
+            label: 'Map settings',
+            child: Icon(
+              Icons.settings,
+              color: Theme.of(context).colorScheme.primary,
+              size: 24, // Consistent with IconButton default size
+            ),
           ),
         ),
       ),

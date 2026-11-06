@@ -9,6 +9,7 @@ production.
 from __future__ import annotations
 
 import os
+import re
 import threading
 
 import firebase_admin
@@ -64,3 +65,21 @@ def get_client():
 def collection(name: str):
     """Shorthand for get_client().collection(name)."""
     return get_client().collection(name)
+
+
+def is_valid_doc_id(doc_id) -> bool:
+    """Whether doc_id can name a document directly in a collection.
+
+    Ids reach the repositories from URLs, request bodies and query strings.
+    Firestore rejects an empty id, "." / "..", and reserved __names__ outright
+    (a 500 if it reached the client), and a "/" would address a different,
+    deeper path. Such ids can never name a real record, so callers treat them
+    as not found.
+    """
+    return (
+        isinstance(doc_id, str)
+        and bool(doc_id)
+        and "/" not in doc_id
+        and doc_id not in {".", ".."}
+        and re.fullmatch(r"__.*__", doc_id) is None
+    )
