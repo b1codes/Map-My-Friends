@@ -13,6 +13,7 @@ from .serializers import (
     PasswordResetRequestSerializer,
     RegisterSerializer,
     UserProfileSerializer,
+    validate_password_for,
 )
 from .throttles import BurstAnonRateThrottle, SustainedAnonRateThrottle
 
@@ -128,6 +129,7 @@ class PasswordResetConfirmView(generics.GenericAPIView):
         try:
             user = User.objects.get(pk=user_id)
             if default_token_generator.check_token(user, token):
+                validate_password_for(password, user)
                 user.set_password(password)
                 user.save()
                 return Response(

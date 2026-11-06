@@ -253,6 +253,38 @@ class RegisterTests(ThrottleIsolationMixin, APITestCase):
         self.assertIn("password", response.data)
         self.assertFalse(User.objects.filter(username="newuser").exists())
 
+    def test_password_like_the_username_or_email_is_rejected(self):
+        # UserAttributeSimilarityValidator is configured, but it only works
+        # when it's given the user; as a bare field validator it had nothing
+        # to compare against and passed everything.
+        cases = {
+            "username": self.payload(
+                username="kestrelwatcher",
+                password="kestrelwatcher",
+                password_confirm="kestrelwatcher",
+            ),
+            "email": self.payload(
+                username="second",
+                email="marmalade.sky@example.com",
+                password="marmalade.sky",
+                password_confirm="marmalade.sky",
+            ),
+            "name": self.payload(
+                username="third",
+                email="third@example.com",
+                first_name="Bartholomew",
+                password="Bartholomew1",
+                password_confirm="Bartholomew1",
+            ),
+        }
+        for attribute, payload in cases.items():
+            with self.subTest(attribute=attribute):
+                response = self.client.post(REGISTER_URL, payload, format="json")
+
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("password", response.data)
+                self.assertEqual(User.objects.count(), 0)
+
     def test_duplicate_email_is_rejected(self):
         User.objects.create_user(username="existing", email="new@example.com")
 
@@ -511,6 +543,14 @@ class PasswordResetTests(ThrottleIsolationMixin, APITestCase):
 
     def test_weak_new_password_is_rejected(self):
         response = self.confirm(password="password", password_confirm="password")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("password", response.data)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password(STRONG_PASSWORD))
+
+    def test_new_password_like_the_username_is_rejected(self):
+        response = self.confirm(password="owner-a-1", password_confirm="owner-a-1")
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("password", response.data)
