@@ -96,8 +96,11 @@ class SecurityBehaviorTests(ThrottleIsolationMixin, APITestCase):
 
     def test_registration_throttling(self):
         """Test that multiple registration attempts trigger throttling."""
-        # Note: In a real test environment, we might need to ensure the cache is used
-        # for throttling to work across requests.
+        # anon_burst allows 10 a minute, so the 11th attempt is the first 429.
+        # ThrottleIsolationMixin clears the cache-backed counters first, so
+        # earlier tests can't have spent any of the budget. Exact-limit and
+        # window behavior is covered in tests/test_throttling.py.
+        hit_429_at = None
         for i in range(15):
             payload = {
                 "username": f"throttleuser{i}",
@@ -107,13 +110,11 @@ class SecurityBehaviorTests(ThrottleIsolationMixin, APITestCase):
             }
             response = self.client.post(self.register_url, payload)
             if response.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+                hit_429_at = i + 1
                 break
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        # Note: Throttling might be disabled in some test environments.
-        # If it doesn't hit, we'll log it but not necessarily fail the whole suite
-        # if the environment is known to disable it.
-        # For this task, we want to verify it works in a realistic setup.
-        # self.assertTrue(hit_429, "Throttling did not kick in after 15 attempts")
+        self.assertEqual(hit_429_at, 11, "Throttling did not kick in at attempt 11")
 
 
 class PasswordResetDisclosureTests(APITestCase):
