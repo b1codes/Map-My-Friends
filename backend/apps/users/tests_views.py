@@ -387,15 +387,13 @@ class PasswordResetTests(ThrottleIsolationMixin, APITestCase):
         data.update(overrides)
         return self.client.post(RESET_CONFIRM_URL, data, format="json")
 
-    def test_request_for_known_email_issues_usable_token(self):
+    def test_request_for_known_email_returns_only_the_generic_message(self):
+        # The token and user_id belong in the owner's inbox: returning them
+        # here let anyone who knew the address reset the password.
         response = self.client.post(RESET_URL, {"email": "a@example.com"})
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["message"], "Password reset email sent.")
-        self.assertEqual(response.data["user_id"], self.user.pk)
-        self.assertTrue(
-            default_token_generator.check_token(self.user, response.data["token"])
-        )
+        self.assertEqual(response.data, {"message": "Password reset email sent."})
 
     def test_request_for_unknown_email_does_not_reveal_absence(self):
         response = self.client.post(RESET_URL, {"email": "nobody@example.com"})
@@ -419,10 +417,9 @@ class PasswordResetTests(ThrottleIsolationMixin, APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("email", response.data)
 
-    def test_full_reset_flow_changes_password(self):
-        issued = self.client.post(RESET_URL, {"email": "a@example.com"}).data
-
-        response = self.confirm(user_id=issued["user_id"], token=issued["token"])
+    def test_confirm_with_a_valid_token_changes_password(self):
+        # The token as the reset email will carry it (no email is sent yet).
+        response = self.confirm()
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(

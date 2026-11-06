@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -113,6 +114,61 @@ class SecurityBehaviorTests(ThrottleIsolationMixin, APITestCase):
         # if the environment is known to disable it.
         # For this task, we want to verify it works in a realistic setup.
         # self.assertTrue(hit_429, "Throttling did not kick in after 15 attempts")
+
+
+class PasswordResetDisclosureTests(APITestCase):
+    """The reset request must not hand out what only the inbox owner may have.
+
+    It used to return the reset token and user_id to anyone who knew an
+    address, and /confirm/ takes exactly those two: a full account takeover
+    from an email alone.
+    """
+
+    def setUp(self):
+        # The reset endpoints are throttled, and DRF's counters live in the
+        # process-wide cache, so earlier tests could leave this one at a 429.
+        cache.clear()
+        self.reset_url = reverse("password_reset")
+        self.confirm_url = reverse("password_reset_confirm")
+        self.user = User.objects.create_user(
+            username="victim", email="victim@example.com", password="Original!234"
+        )
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_reset_request_does_not_return_the_token_or_user_id(self):
+        response = self.client.post(self.reset_url, {"email": "victim@example.com"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn("token", response.data)
+        self.assertNotIn("user_id", response.data)
+
+    def test_reset_response_is_the_same_whether_or_not_the_email_has_an_account(
+        self,
+    ):
+        known = self.client.post(self.reset_url, {"email": "victim@example.com"})
+        unknown = self.client.post(self.reset_url, {"email": "nobody@example.com"})
+
+        self.assertEqual(known.status_code, unknown.status_code)
+        self.assertEqual(known.data, unknown.data)
+
+    def test_reset_request_alone_cannot_change_the_password(self):
+        """The attack end to end: request, then confirm with what came back."""
+        response = self.client.post(self.reset_url, {"email": "victim@example.com"})
+        self.client.post(
+            self.confirm_url,
+            {
+                "token": response.data.get("token", ""),
+                "user_id": response.data.get("user_id", ""),
+                "password": "Attacker!9876",
+                "password_confirm": "Attacker!9876",
+            },
+        )
+
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("Original!234"))
+        self.assertFalse(self.user.check_password("Attacker!9876"))
 
 
 class APIPermissionTests(FirestoreTestMixin, APITestCase):
