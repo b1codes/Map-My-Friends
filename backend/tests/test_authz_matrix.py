@@ -696,6 +696,7 @@ class FormatSuffixTests(MatrixBase):
     # Bug: PersonViewSet, ContactLogViewSet, TripViewSet and TripLegViewSet
     # actions don't accept the `format` kwarg the router passes for .json
     # URLs, so every suffixed request past the permission check is a 500.
+    # Filed as ClickUp 86bcz9b5y.
     @unittest.expectedFailure
     def test_suffixed_routes_answer_like_unsuffixed_ones(self):
         for name, pk, statuses in self.suffixed_cases():
@@ -724,6 +725,7 @@ class ReservedIdTests(MatrixBase):
     # Bug: TripRepository._owned_ref passes the id straight to Firestore
     # without the _is_valid_id check PersonRepository has, so the emulator's
     # "invalid id" error escapes as a 500.
+    # Filed as ClickUp 86bcz9b5y.
     @unittest.expectedFailure
     def test_trips_treat_reserved_ids_as_not_found(self):
         for name in ("trip-detail", "trip-stops"):
