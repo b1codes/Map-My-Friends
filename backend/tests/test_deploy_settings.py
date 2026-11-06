@@ -223,3 +223,20 @@ class ThrottleClientIdentityTests(SimpleTestCase):
         self.assertEqual(
             load_settings(DJANGO_DEBUG="True").REST_FRAMEWORK["NUM_PROXIES"], 0
         )
+
+
+class ErrorLoggingTests(SimpleTestCase):
+    def test_production_logs_unhandled_errors(self):
+        # Django's default logging sends a 500's traceback to the console only
+        # when DEBUG is on, and otherwise to mail_admins, with ADMINS empty:
+        # in production a 500 left no trace anywhere.
+        loaded = load_settings(**PRODUCTION_ENV)
+
+        logger = loaded.LOGGING["loggers"]["django.request"]
+        self.assertEqual(logger["level"], "ERROR")
+        for name in logger["handlers"]:
+            handler = loaded.LOGGING["handlers"][name]
+            self.assertEqual(handler["class"], "logging.StreamHandler")
+            # No require_debug_true filter, which is what silences Django's own.
+            self.assertNotIn("filters", handler)
+        self.assertTrue(logger["handlers"])

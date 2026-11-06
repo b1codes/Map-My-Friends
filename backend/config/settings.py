@@ -256,6 +256,17 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = True
 
 
+# Logging. Django's defaults print a request's traceback only while DEBUG is
+# on, and otherwise mail it to ADMINS, which is empty, so a production 500 was
+# logged nowhere. Errors go to stderr, which gunicorn and Docker collect.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"django.request": {"handlers": ["console"], "level": "ERROR"}},
+}
+
+
 # Auth0 Configuration
 AUTH0_DOMAIN = os.environ.get("AUTH0_DOMAIN", "b1codes.us.auth0.com")
 AUTH0_AUDIENCE = os.environ.get("AUTH0_AUDIENCE", "https://api.mapmyfriends.com/")
