@@ -11,7 +11,6 @@ Layout:
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, fields
 from datetime import UTC, datetime
 
@@ -73,20 +72,7 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def _is_valid_id(doc_id: str) -> bool:
-    """Whether doc_id can name a document directly in a collection.
-
-    Ids reach the repositories from request bodies and query strings. Firestore
-    rejects an empty id, "." / "..", and reserved __names__ outright (a 500 if
-    it reached the client), and a "/" would address a different, deeper path.
-    Such ids can never name a real record, so they are treated as not found.
-    """
-    return (
-        bool(doc_id)
-        and "/" not in doc_id
-        and doc_id not in {".", ".."}
-        and re.fullmatch(r"__.*__", doc_id) is None
-    )
+_is_valid_id = fs.is_valid_doc_id
 
 
 class PersonRepository:

@@ -722,16 +722,16 @@ class ReservedIdTests(MatrixBase):
                 response = self.client.get(reverse(name, args=["__x__"]))
                 self.assertEqual(response.status_code, 404)
 
-    # Bug: TripRepository._owned_ref passes the id straight to Firestore
-    # without the _is_valid_id check PersonRepository has, so the emulator's
-    # "invalid id" error escapes as a 500.
-    # Filed as ClickUp 86bcz9b5y.
-    @unittest.expectedFailure
+    # Reserved ids used to reach Firestore and come back as a 500. They now
+    # answer like any trip the caller doesn't own: detail is a 404, and stops
+    # an empty list (see the matrix's note on other users' stops).
     def test_trips_treat_reserved_ids_as_not_found(self):
-        for name in ("trip-detail", "trip-stops"):
-            with self.subTest(route=name):
-                response = self.client.get(reverse(name, args=["__x__"]))
-                self.assertEqual(response.status_code, 404)
+        detail = self.client.get(reverse("trip-detail", args=["__x__"]))
+        self.assertEqual(detail.status_code, 404)
+
+        stops = self.client.get(reverse("trip-stops", args=["__x__"]))
+        self.assertEqual(stops.status_code, 200)
+        self.assertEqual(stops.data, [])
 
 
 class DatasetVisibilityTests(MatrixBase):

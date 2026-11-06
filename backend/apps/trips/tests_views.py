@@ -426,6 +426,34 @@ class TripUpdateTests(TripViewTestCase):
         self.assertEqual(len(response.data["legs"]), 1)
         self.assertEqual(response.data["legs"][0]["booking_reference"], "")
 
+    def test_patch_legs_with_ids_firestore_rejects_are_ignored(self):
+        # Found by the DAST scan: a leg id from the body went straight into a
+        # Firestore path, so "a/b" (a deeper path), reserved __names__ or a
+        # non-string raised and the PATCH was a 500. None can name a leg.
+        created = self.create_trip_with_stops(CHICAGO, LONDON)
+        leg_id = created["legs"][0]["id"]
+
+        for bad_id in ("a/b", "__x__", "..", ".", 7):
+            with self.subTest(bad_id=bad_id):
+                response = self.client.patch(
+                    f"{TRIPS_URL}{created['id']}/",
+                    {"legs": [{"id": bad_id, "booking_reference": "X"}]},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data["legs"][0]["booking_reference"], "")
+        # Not ids at all: the serializer refuses them.
+        for bad_id in (["x"], {"id": leg_id}):
+            with self.subTest(bad_id=bad_id):
+                response = self.client.patch(
+                    f"{TRIPS_URL}{created['id']}/",
+                    {"legs": [{"id": bad_id}]},
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, 400)
+
     def test_patch_legs_with_unknown_id_is_ignored(self):
         created = self.create_trip_with_stops(CHICAGO, LONDON)
 
