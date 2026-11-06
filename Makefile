@@ -108,8 +108,6 @@ e2e:
 # these same targets.
 #
 # scan-deps: every lockfile against the OSV database (scripts/scan-deps.sh).
-# The frontend lockfiles aren't committed: run `fvm flutter pub get` in
-# frontend/ and frontend/golden_harness first.
 scan-deps:
 	scripts/scan-deps.sh
 

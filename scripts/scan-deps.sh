@@ -8,11 +8,6 @@
 # without editing this script, and one whose lockfile is missing fails, so
 # nothing is skipped quietly.
 #
-# frontend/pubspec.lock and frontend/golden_harness/pubspec.lock are not
-# committed (.gitignore), so run `flutter pub get` in each first; CI does.
-# That scans what pub resolves today, which is what CI and the release build
-# would install.
-#
 # Fails on any known vulnerability not ignored in .osv-scanner.toml. Each
 # ignore there has a reason and an expiry date. OSV_FORMAT=json gives the
 # full machine-readable report.

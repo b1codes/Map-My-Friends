@@ -24,19 +24,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
 
-      # The frontend lockfiles aren't committed; see the job in ci.yml.
-      - name: Set up Flutter
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # ratchet:subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-          flutter-version-file: ${{ github.workspace }}/.fvmrc
-          cache: true
-
-      - name: Resolve Frontend Lockfiles
-        run: |
-          (cd frontend && flutter pub get)
-          (cd frontend/golden_harness && flutter pub get)
-
       - name: Run OSV-Scanner
         run: make scan-deps
 
