@@ -14,6 +14,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from django.utils.translation import gettext_lazy as _
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -23,16 +24,23 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-^qp=8@08yp#dg3*bbuyw7y*-l(hiuqx@pf9m_e#@!)91hf3^nq",
+# Off unless the environment turns it on: the dev, test and E2E stacks set
+# DJANGO_DEBUG=True, and a server that forgot to set anything gets production
+# behaviour. DEBUG on serves debug pages and media, and accepts the mock Auth0
+# tokens that sign in as any user (apps/users/auth.py).
+DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
+
+# Signs sessions, password-reset tokens and the SimpleJWT access and refresh
+# tokens. This default is public, so with it anyone could mint a token for any
+# user; production refuses to start without its own key.
+_DEVELOPMENT_SECRET_KEY = (
+    "django-insecure-^qp=8@08yp#dg3*bbuyw7y*-l(hiuqx@pf9m_e#@!)91hf3^nq"
 )
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
-
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", _DEVELOPMENT_SECRET_KEY)
+if not DEBUG and SECRET_KEY == _DEVELOPMENT_SECRET_KEY:
+    raise ImproperlyConfigured(
+        "Set DJANGO_SECRET_KEY: DEBUG is off and the development key is public."
+    )
 
 
 # Application definition
@@ -193,6 +201,12 @@ REST_FRAMEWORK = {
         "anon_sustained": "50/day",
     },
     "EXCEPTION_HANDLER": "apps.common.exception_handlers.firestore_exception_handler",
+    # How many proxies sit in front of Django: 1 behind nginx in production,
+    # 0 when clients connect directly (dev). Throttles identify an anonymous
+    # client by the address the outermost proxy saw. Left unset, DRF used the
+    # whole X-Forwarded-For header, which the client writes, so a new value
+    # per request escaped every anonymous limit.
+    "NUM_PROXIES": int(os.environ.get("DJANGO_NUM_PROXIES", "0")),
 }
 
 # Simple JWT Configuration
@@ -208,7 +222,10 @@ if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOW_CREDENTIALS = True
 else:
-    CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    # Unset means no cross-origin access, not an origin of "".
+    CORS_ALLOWED_ORIGINS = [
+        origin for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if origin
+    ]
     CORS_ALLOW_CREDENTIALS = True
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0").split(",")
@@ -219,10 +236,14 @@ CSRF_TRUSTED_ORIGINS = os.getenv(
 
 # Security Headers
 if not DEBUG:
-    SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
     SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "False").lower() == "true"
+    # nginx terminates TLS and always sets X-Forwarded-Proto
+    # (nginx.conf.example), so it's the proxy's word, not the client's. Without
+    # it, is_secure() is always False behind the proxy and SECURE_SSL_REDIRECT
+    # redirects forever.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000  # 1 year
