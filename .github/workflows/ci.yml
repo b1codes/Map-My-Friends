@@ -91,6 +91,14 @@ jobs:
         run: |
           docker compose exec -T api coverage report
 
+      # The ZAP scan (nightly, security.yml) attacks the routes its OpenAPI
+      # document lists. This fails when a route is added or removed without
+      # the contracts or .zap/extra-operations.json following, so a new
+      # endpoint can't silently go unscanned. Here because it needs Django,
+      # and this job already has the API running.
+      - name: Check the DAST Scan Covers Every Route
+        run: make check-dast-routes
+
       - name: Publish Coverage Report
         if: ${{ !cancelled() && hashFiles('backend/.coverage') != '' }}
         run: |
@@ -305,6 +313,61 @@ jobs:
         run: make lint-workflows
 
   # -----------------------------------------------------------------
+  # SECURITY SCANS
+  # -----------------------------------------------------------------
+  # Every lockfile against the OSV vulnerability database. Fails on any known
+  # vulnerability that .osv-scanner.toml doesn't ignore. The same scan runs
+  # nightly (security.yml), since new advisories appear without code changes.
+  scan-deps:
+    name: Dependency Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      # frontend/pubspec.lock and golden_harness's aren't committed, so they
+      # are resolved here exactly as the other jobs and the release build
+      # resolve them.
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # ratchet:subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version-file: ${{ github.workspace }}/.fvmrc
+          cache: true
+
+      - name: Resolve Frontend Lockfiles
+        run: |
+          (cd frontend && flutter pub get)
+          (cd frontend/golden_harness && flutter pub get)
+
+      - name: Run OSV-Scanner
+        run: make scan-deps
+
+  # gitleaks over the commits this PR adds (on a push to main, the whole
+  # history). Nightly, security.yml scans the whole history too, with any
+  # rule gitleaks has added since.
+  scan-secrets:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+        with:
+          # gitleaks reads commits, not the working tree, so it needs them all.
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ]; then
+            make scan-secrets GITLEAKS_LOG_OPTS="$BASE_SHA..$HEAD_SHA"
+          else
+            make scan-secrets
+          fi
+
+  # -----------------------------------------------------------------
   # INFRASTRUCTURE VALIDATION
   # -----------------------------------------------------------------
   validate-infra:
@@ -339,6 +402,8 @@ jobs:
       - validate-widgetbook
       - e2e
       - lint-workflows
+      - scan-deps
+      - scan-secrets
       - validate-infra
     runs-on: ubuntu-latest
     steps:

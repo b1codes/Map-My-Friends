@@ -1,0 +1,88 @@
+name: Nightly Security Scans
+
+# The scans that can turn red without a code change, run on the default
+# branch every night:
+#   - new advisories for dependencies we already have (OSV-Scanner),
+#   - new gitleaks rules matching something already in the history,
+#   - the OWASP ZAP API scan, too slow to run on every PR (docs/testing.md
+#     has the timings).
+# Each job runs the same make target as locally and in ci.yml. A manual run
+# (workflow_dispatch) works from any branch, e.g. to scan a PR before merging.
+on:
+  schedule:
+    - cron: '41 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan-deps:
+    name: Dependency Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      # The frontend lockfiles aren't committed; see the job in ci.yml.
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # ratchet:subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version-file: ${{ github.workspace }}/.fvmrc
+          cache: true
+
+      - name: Resolve Frontend Lockfiles
+        run: |
+          (cd frontend && flutter pub get)
+          (cd frontend/golden_harness && flutter pub get)
+
+      - name: Run OSV-Scanner
+        run: make scan-deps
+
+  scan-secrets:
+    name: Secret Scan (Full History)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        run: make scan-secrets
+
+  dast:
+    name: ZAP API Scan
+    runs-on: ubuntu-latest
+    # scripts/dast.sh caps the scan at about 30 minutes; this leaves room for
+    # the image builds.
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # ratchet:docker/setup-buildx-action@v3
+
+      # Prints each failing alert with its URL and evidence, and writes the
+      # same summary to the job page.
+      - name: Run the Scan
+        run: make dast
+
+      # The full report, for triage: every alert with its request, response
+      # and ZAP's explanation. Uploaded on failure too, which is when it's
+      # needed most.
+      - name: Upload ZAP Report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: |
+            build/dast/zap-report.html
+            build/dast/zap-report.json
+            build/dast/zap-report.md
+            build/dast/openapi.json
+            build/dast/api.log
+            build/dast/stack.log
+          if-no-files-found: ignore

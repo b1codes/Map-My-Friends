@@ -101,6 +101,44 @@ Both suites run in a random order on every CI run, so a test that only passes af
 
 `.github/workflows/contracts-live.yml` checks the real Auth0, OSRM and Overpass against the third-party contracts. It runs nightly instead of per PR because those are public services with outages, and an outage shouldn't block unrelated work.
 
+## Security scans
+
+Three scanners look for what the test suites can't: vulnerable dependencies, leaked secrets, and holes a live attacker could find in the running API. The authorization and rate-limit rules themselves are tested in the backend suite.
+
+| Scan | What it checks | Fails when | Where it runs | Locally |
+| --- | --- | --- | --- | --- |
+| Dependency Scan | every lockfile (`backend/poetry.lock` and each `pubspec.lock`) against the [OSV](https://osv.dev) database, with OSV-Scanner | any known vulnerability that `.osv-scanner.toml` doesn't ignore | every PR (ci.yml), and nightly (security.yml), since new advisories appear without code changes | `make scan-deps` |
+| Secret Scan | gitleaks' rules plus a Django `SECRET_KEY` rule (`.gitleaks.toml`) over git commits | anything that looks like a credential, unless it is an allowlisted fixture | every PR, over the PR's commits; nightly over the whole history | `make scan-secrets` (whole history), or `make scan-secrets GITLEAKS_LOG_OPTS=origin/main..HEAD` |
+| ZAP API Scan | OWASP ZAP's API scan (passive and active rules: injection, error disclosure, headers, and so on) against a throwaway stack running as production does | a medium or high alert that `.zap/rules.tsv` doesn't triage, or any 5xx from the API | nightly and on demand (security.yml, workflow_dispatch); too slow for every PR (see below) | `make dast` |
+| DAST route check | the scan's API definition against the routes Django serves | a route is served that the scan doesn't know, or the other way round | every PR, in Test Backend | `make check-dast-routes` (needs `make up`) |
+
+Every scanner image is pinned by digest: OSV-Scanner in `scripts/scan-deps.sh`, gitleaks in the `Makefile`, ZAP in `scripts/dast.sh`.
+
+### The dependency scan
+
+The lockfiles come from the manifests git tracks, so a new package is scanned without any change here, and a missing lockfile fails rather than being skipped. `frontend/pubspec.lock` and `frontend/golden_harness/pubspec.lock` are not committed, so run `fvm flutter pub get` in both before `make scan-deps`; CI resolves them the same way the other jobs do.
+
+### The ZAP scan
+
+`scripts/dast.sh` documents each step. In short:
+
+- **The stack.** `docker-compose.e2e.yml` (API, Firestore emulator, third-party stubs) with `docker-compose.dast.yml` on top, which runs the API under gunicorn with DEBUG off, a random `DJANGO_SECRET_KEY`, collected static files and the code baked into the image. Scanning a DEBUG server would report DEBUG's behaviour instead of production's. The one difference from production is that `docker/dast/dast_settings.py` raises the throttle rates: the scan sends thousands of requests as one user, and at the real rates most would get 429. It runs as project `map-my-friends-dast` on port 8200, beside the dev and E2E stacks.
+- **What it attacks.** There is no hand-written OpenAPI spec. `scripts/dast_openapi.py` builds one from `contracts/api/interactions` (every request the app makes, with real bodies) plus `.zap/extra-operations.json` (endpoints the app doesn't call, which are still reachable). The route check fails when Django serves a route that neither file describes, when a listed route no longer exists, or when an extra operation gains a contract. `admin/` and `media/` are excluded there, each with its reason.
+- **As whom.** `scripts/dast_seed.py` registers a user, signs in for a SimpleJWT access token, and creates a person, a contact log and a trip through the API, so ZAP's requests reach real records instead of 404s. DELETEs get a second set of records, so the first one doesn't leave the rest of the scan with nothing to attack. ZAP sends the token on every request.
+- **Pass or fail.** `scripts/zap_gate.py` reads ZAP's JSON report: high and medium alerts fail, low ones warn, informational ones are listed. It prints each alert with up to five URLs and their evidence, and CI adds the same summary to the job page. Any 5xx the API answered also fails the run, listed by endpoint: it is an unhandled exception on input the API should have rejected, which ZAP itself only rates Low. The overlay settings log the tracebacks, which production doesn't (no `LOGGING` is configured, so with DEBUG off they go nowhere).
+- **Why nightly.** Measured on 2026-11-05 on an 8-core Mac: the stack is ready in 20 to 45 seconds with a cached image. ZAP took 10 minutes when the seeded records were deleted early on, 14 minutes before it crashed in a browser-based rule (now ignored), and over 16 minutes (more than 21,000 requests) once DELETEs got their own records, at which point it was stopped. That is well past the 10 minutes a PR check should take. `scripts/dast.sh` caps the active scan at 20 minutes, any one rule at 4, and ZAP's start-up and passive scan at 10, so a run ends with a report rather than hanging.
+- **Reports.** `build/dast/` gets `zap-report.html` (the one to read), `.json` and `.md`, the generated `openapi.json`, and the stack's logs. The nightly job uploads them as the `zap-report` artifact. The run also prints the API's responses by status: many 429s would mean a throttle got in the way, and any 5xx is worth reading in `stack.log`.
+
+`DAST_KEEP_STACK=1 make dast` leaves the stack up afterwards; `DAST_ZAP_OPTIONS=-S make dast` runs only the passive rules, in about a minute.
+
+### Triaging a finding
+
+Fix it if you can. That means upgrading the dependency, rotating and removing the secret, or changing the code. If it really can't be exploited here, or is a false positive, record that next to the scan, with a reason specific enough that a reviewer can check it:
+
+- **Dependency:** add an `[[IgnoredVulns]]` entry to `.osv-scanner.toml` with the id, a `reason`, and an `ignoreUntil` date no more than three months out. After that date it fails again and gets re-triaged. Delete the entry once the package is upgraded.
+- **Secret:** if it's real, it's already public once pushed. Rotate it first, then add its fingerprint (gitleaks prints it) to `.gitleaksignore` with a comment saying when it was rotated. For a test fixture, add a narrow allowlist to `.gitleaks.toml` that matches only the fixture's path and exact value, so a real secret in the same file still fails.
+- **ZAP alert:** add a line to `.zap/rules.tsv`: the plugin id, `IGNORE`, `INFO` or `WARN`, the rule name in brackets, and the reason, separated by tabs. To drop only some URLs, use `<id>`, `OUTOFSCOPE` and a URL regex. `FAIL` makes a low alert block too. Plugin ids are listed at [zaproxy.org/docs/alerts](https://www.zaproxy.org/docs/alerts/).
+
 ## Releases
 
 `.github/workflows/release.yml` deploys only after CI passes on `main`:

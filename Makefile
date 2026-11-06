@@ -104,6 +104,44 @@ update-goldens:
 e2e:
 	scripts/e2e.sh $(JOURNEY)
 
+# Security scans; docs/testing.md (Security scans) covers triage. CI runs
+# these same targets.
+#
+# scan-deps: every lockfile against the OSV database (scripts/scan-deps.sh).
+# The frontend lockfiles aren't committed: run `fvm flutter pub get` in
+# frontend/ and frontend/golden_harness first.
+scan-deps:
+	scripts/scan-deps.sh
+
+# scan-secrets: gitleaks over the git history, with .gitleaks.toml. The whole
+# history by default; one range with e.g.
+# `make scan-secrets GITLEAKS_LOG_OPTS=origin/main..HEAD`. The GIT_CONFIG_*
+# variables mark the mounted checkout as safe, since its owner isn't the
+# container's user on Linux.
+GITLEAKS_IMAGE := ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+GITLEAKS_LOG_OPTS ?=
+scan-secrets:
+	docker run --rm -v "$(CURDIR):/repo:ro" \
+		-e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo \
+		$(GITLEAKS_IMAGE) git /repo --config /repo/.gitleaks.toml --redact --no-banner \
+		$(if $(GITLEAKS_LOG_OPTS),--log-opts="$(GITLEAKS_LOG_OPTS)")
+
+# dast: the OWASP ZAP API scan against a throwaway production-like stack
+# (docker-compose.dast.yml), separate from the one `make up` runs. Reports go
+# to build/dast/. See scripts/dast.sh.
+dast:
+	scripts/dast.sh
+
+# The route check from `make dast` on its own: fails when the API serves a
+# route the scan's OpenAPI document doesn't describe, or the other way round.
+# Needs the dev stack up (`make up`).
+check-dast-routes:
+	@mkdir -p build/dast
+	docker compose exec -T api python - < scripts/list_api_routes.py > build/dast/routes.json
+	python3 scripts/dast_openapi.py --check-routes build/dast/routes.json
+
+.PHONY: scan-deps scan-secrets dast check-dast-routes
+
 # Poetry helpers
 install:
 	docker compose exec api poetry install

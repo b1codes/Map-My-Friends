@@ -1,0 +1,23 @@
+# ZAP rules for the API scan (scripts/dast.sh, make dast).
+#
+# Tab separated: plugin id, level, (rule name), reason.
+# Unlisted rules follow the alert's risk: High and Medium FAIL, Low WARN,
+# Informational INFO (scripts/zap_gate.py). A line here overrides that for one
+# rule. IGNORE, INFO and WARN need a reason. IGNORE also stops ZAP running an
+# active rule. To drop only some URLs: <id>\tOUTOFSCOPE\t<url regex>.
+# Plugin ids and names: https://www.zaproxy.org/docs/alerts/
+
+# Django's HTML 404 page, for URLs ZAP makes up that match no route. With
+# DEBUG off it holds no detail (no route list). Every real API route answers
+# JSON. Kept as INFO so it still shows in the report.
+100001	INFO	(Unexpected Content-Type was returned)	Django's plain HTML 404 for unrouted paths ZAP invents; DEBUG is off so it discloses nothing, and API routes answer JSON.
+
+# The nearest-station answer includes OpenStreetMap ids (osm_id), and ten-digit
+# ones look like Unix times from 2018-2019. Only these two read-only
+# reference-data endpoints are excluded; a timestamp anywhere else still warns.
+10096	OUTOFSCOPE	^http://api:8000/api/(stations|airports)/nearest/
+
+# DOM XSS needs a page that runs JavaScript in a browser; every API route
+# answers JSON. ZAP starts a headless browser for it, which took over two
+# minutes per run and once took ZAP down with it.
+40026	IGNORE	(Cross Site Scripting (DOM Based))	The API serves JSON only, no HTML pages with scripts, so there is no DOM to inject into; the Flutter web app isn't part of this scan.
