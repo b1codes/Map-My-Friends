@@ -114,6 +114,20 @@ Three scanners look for what the test suites can't: vulnerable dependencies, lea
 
 Every scanner image is pinned by digest: OSV-Scanner in `scripts/scan-deps.sh`, gitleaks in the `Makefile`, ZAP in `scripts/dast.sh`.
 
+### Security tests in the suites
+
+These run with the backend and frontend suites on every PR:
+
+- `backend/tests/test_authz_matrix.py` runs every API route and method as an anonymous caller, the owner, and another user. Non-owners must not see the owner's data, and a refused write must leave Firestore unchanged. It fails when a route is added without a row in the matrix.
+- `backend/tests/test_throttling.py` checks every rate limit at its exact boundary with a fake clock: per IP for anonymous callers, per user for signed-in ones, and whoever is calling on sign-up, password reset and login.
+- `backend/tests/test_deploy_settings.py` loads `config/settings.py` under a production environment and runs `manage.py check --deploy` with it. The dev, test and E2E stacks all run with DEBUG on, so without it the production settings would never run under test.
+- `backend/apps/common/tests/test_image_uploads.py` checks that only real PNG, JPEG and WebP images are stored. Each is re-encoded, which drops appended content and metadata, and saved under its real format.
+- `frontend/test/security/third_party_token_test.dart` checks that no request to a host other than the API carries the app's tokens. It fails when a new network call site appears in `lib/`.
+
+The E2E and DAST stacks raise the throttle rates (`docker/test-stack-settings/unthrottled_settings.py`), because their journeys and scans send far more requests from one address than a person would.
+
+What a production deployment must set: `DJANGO_SECRET_KEY` (with DEBUG off, which is the default, the app refuses to start on the committed development key), `DJANGO_NUM_PROXIES=1` behind nginx (otherwise every client shares nginx's address for rate limiting), `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, and `SECURE_SSL_REDIRECT=True` once nginx serves HTTPS. `backend/.env.example` lists them.
+
 ### The dependency scan
 
 The lockfiles come from the manifests git tracks, so a new package is scanned without any change here, and a missing lockfile fails rather than being skipped. Every lockfile is committed, so the scan checks exactly the versions CI and the release build install.
