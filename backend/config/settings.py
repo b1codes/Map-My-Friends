@@ -54,6 +54,10 @@ INSTALLED_APPS = [
     "whitenoise.runserver_nostatic",
     "django.contrib.staticfiles",
     "rest_framework",
+    # Records issued refresh tokens, so BLACKLIST_AFTER_ROTATION has somewhere
+    # to put a rotated one; without it that setting did nothing and every
+    # refresh token stayed valid for its whole lifetime.
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "apps.common",
     "apps.users",

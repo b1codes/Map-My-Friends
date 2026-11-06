@@ -351,6 +351,23 @@ class TokenTests(ThrottleIsolationMixin, FirestoreTestMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["username"], "owner-a")
 
+    def test_a_rotated_refresh_token_cannot_be_used_again(self):
+        # Each refresh hands out a new refresh token (ROTATE_REFRESH_TOKENS).
+        # The old one must stop working, or a stolen refresh token keeps
+        # minting access tokens for its full 7 days however often the owner
+        # refreshes.
+        old_refresh = self.obtain()["refresh"]
+        rotated = self.client.post(REFRESH_URL, {"refresh": old_refresh})
+        self.assertEqual(rotated.status_code, 200)
+
+        replay = self.client.post(REFRESH_URL, {"refresh": old_refresh})
+
+        self.assertEqual(replay.status_code, 401)
+        new_refresh = rotated.data["refresh"]
+        self.assertEqual(
+            self.client.post(REFRESH_URL, {"refresh": new_refresh}).status_code, 200
+        )
+
     def test_access_token_cannot_be_used_as_refresh(self):
         tokens = self.obtain()
 
