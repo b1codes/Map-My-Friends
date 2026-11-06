@@ -11,10 +11,4 @@
 # Remove the entry once the dependency is upgraded past the fix.
 # Triage steps: docs/testing.md, Security scans.
 
-# cryptography 49.0.0, fixed in 50.0.0: decrypting PKCS#7 EnvelopedData
-# leaks a Bleichenbacher padding oracle through its error messages.
-[[IgnoredVulns]]
-id = "GHSA-g6cj-pr64-35w5"
-ignoreUntil = 2027-02-05
-reason = "Also PYSEC-2026-3552. Only reachable through cryptography.hazmat.primitives.serialization.pkcs7 decryption, which nothing here calls: cryptography is installed for PyJWT's RS256 verification (Auth0 tokens) and google-auth. Triaged 2026-11-05; upgrade to >=50.0.0 with the next dependency bump."
-
+# No ignores: every known vulnerability is fixed by an upgrade.
