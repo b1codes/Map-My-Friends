@@ -16,7 +16,6 @@ UserThrottleTests.prime).
 from __future__ import annotations
 
 import itertools
-import unittest
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -77,10 +76,12 @@ class ThrottleTestCase(ThrottleIsolationMixin, APITestCase):
         self.assertLessEqual(wait, max_wait)
         return wait
 
-    def spend(self, url, count, ip="10.0.0.1", **extra):
-        """Send count requests that each pass the throttle."""
+    def spend(self, url, count, ip="10.0.0.1", spacing=0, **extra):
+        """Send count requests that each pass the throttle, spacing seconds
+        apart (7 keeps a 10/minute burst limit out of a daily test)."""
         for n in range(1, count + 1):
             self.assert_not_throttled(self.post(url, ip=ip, **extra), f"request {n}")
+            self.clock.advance(spacing)
 
 
 class ConfiguredRatesTests(ThrottleTestCase):
@@ -93,6 +94,7 @@ class ConfiguredRatesTests(ThrottleTestCase):
                 "user": "2000/day",
                 "anon_burst": "10/minute",
                 "anon_sustained": "50/day",
+                "login_burst": "10/minute",
             },
         )
 
@@ -131,11 +133,9 @@ class BurstLimitCases:
         self.assert_throttled(self.post(self.url, ip="10.0.0.1"), max_wait=MINUTE)
         self.assert_not_throttled(self.post(self.url, ip="10.0.0.2"))
 
-    # Bug: the view's only throttles are AnonRateThrottle subclasses, and
-    # AnonRateThrottle.get_cache_key returns None (never throttle) for any
-    # authenticated request. The view is AllowAny, so sending any valid access
-    # token, e.g. one for a throwaway account, turns the limit off entirely.
-    @unittest.expectedFailure
+    # AnonRateThrottle never limits an authenticated request, and these views
+    # accept anyone, so a token from a throwaway account used to switch the
+    # limit off. apps/users/throttles.py limits by IP whoever is calling.
     def test_signed_in_callers_are_limited_too(self):
         user = User.objects.create(username=f"token-holder-{next(_unique)}")
         auth = {"HTTP_AUTHORIZATION": f"Bearer {AccessToken.for_user(user)}"}
@@ -228,8 +228,10 @@ class SharedBurstBucketTests(ThrottleTestCase):
 
 
 class LoginThrottleTests(ThrottleTestCase):
-    """Token obtain has no throttle of its own, so it falls back to the
-    default anon limit: 100 a day per IP."""
+    """Login: 10 attempts a minute (login_burst) and 100 a day (anon) per IP.
+
+    The daily tests space requests 7 seconds apart so only the daily limit is
+    in play."""
 
     def setUp(self):
         super().setUp()
@@ -237,7 +239,7 @@ class LoginThrottleTests(ThrottleTestCase):
         self.user = User.objects.create_user(username="victim", password=PASSWORD)
 
     def test_login_allows_100_attempts_a_day_per_ip_then_429(self):
-        self.spend(self.url, 99)
+        self.spend(self.url, 99, spacing=7)
         hundredth = self.post(self.url, {"username": "victim", "password": "guess"})
         self.assertEqual(hundredth.status_code, 401)
 
@@ -248,15 +250,17 @@ class LoginThrottleTests(ThrottleTestCase):
         self.assertNotIn("access", blocked.data)
 
     def test_login_window_refills_after_a_day(self):
-        self.spend(self.url, 100)
-        self.clock.advance(DAY - 1)
+        self.spend(self.url, 100, spacing=7)
+        # The first attempt leaves the window a day after it was made, and
+        # spending took 100 * 7 seconds.
+        self.clock.advance(DAY - 700 - 1)
         self.assert_throttled(self.post(self.url), max_wait=DAY)
         self.clock.advance(2)
         login = self.post(self.url, {"username": "victim", "password": PASSWORD})
         self.assertEqual(login.status_code, 200)
 
     def test_login_limit_is_per_client_ip(self):
-        self.spend(self.url, 100, ip="10.0.0.1")
+        self.spend(self.url, 100, ip="10.0.0.1", spacing=7)
         self.assert_throttled(self.post(self.url, ip="10.0.0.1"), max_wait=DAY)
         login = self.post(
             self.url, {"username": "victim", "password": PASSWORD}, ip="10.0.0.2"
@@ -266,16 +270,12 @@ class LoginThrottleTests(ThrottleTestCase):
     def test_a_bearer_token_does_not_lift_the_login_limit(self):
         """Unlike register, token obtain ignores the Authorization header
         (authentication_classes is empty), so every caller is anonymous here
-        and a token can't switch the anon throttle off."""
+        and a token can't switch the limits off."""
         auth = {"HTTP_AUTHORIZATION": f"Bearer {AccessToken.for_user(self.user)}"}
-        self.spend(self.url, 100, **auth)
+        self.spend(self.url, 100, spacing=7, **auth)
         self.assert_throttled(self.post(self.url, **auth), max_wait=DAY)
 
-    # Gap: login has no burst limit, unlike register and password reset, so
-    # one IP can make 100 password guesses back to back, and with N addresses
-    # N * 100 a day against one account (nothing limits per username). 10 a
-    # minute, the same anon_burst register uses, is the limit asserted here.
-    @unittest.expectedFailure
+    # One IP mustn't make 100 password guesses back to back.
     def test_login_has_a_burst_limit(self):
         self.spend(self.url, 10)
         guess = self.post(self.url, {"username": "victim", "password": "guess"})

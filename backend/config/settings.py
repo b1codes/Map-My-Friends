@@ -203,6 +203,7 @@ REST_FRAMEWORK = {
         "user": "2000/day",
         "anon_burst": "10/minute",
         "anon_sustained": "50/day",
+        "login_burst": "10/minute",
     },
     "EXCEPTION_HANDLER": "apps.common.exception_handlers.firestore_exception_handler",
     # How many proxies sit in front of Django: 1 behind nginx in production,

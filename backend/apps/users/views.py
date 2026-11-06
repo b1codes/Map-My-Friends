@@ -4,7 +4,9 @@ from rest_framework import generics, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.common.ownership import owner_key_for
 
@@ -15,7 +17,11 @@ from .serializers import (
     UserProfileSerializer,
     validate_password_for,
 )
-from .throttles import BurstAnonRateThrottle, SustainedAnonRateThrottle
+from .throttles import (
+    BurstAnonRateThrottle,
+    LoginBurstRateThrottle,
+    SustainedAnonRateThrottle,
+)
 
 
 class UserProfileView(APIView):
@@ -146,3 +152,14 @@ class PasswordResetConfirmView(generics.GenericAPIView):
             return Response(
                 {"error": "Invalid request."}, status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class LoginView(TokenObtainPairView):
+    """Exchange a username and password for tokens.
+
+    Limited to 10 attempts a minute per client IP on top of the default 100 a
+    day, so a password can't be guessed back to back. The view ignores the
+    Authorization header, so every caller counts as anonymous here.
+    """
+
+    throttle_classes = [LoginBurstRateThrottle, AnonRateThrottle]
