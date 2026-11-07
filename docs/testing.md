@@ -10,7 +10,7 @@ What runs on every pull request, what each check enforces, and how to run the sa
 | --- | --- | --- | --- |
 | Lint & Format Backend | Ruff format and lint on `backend/` | anything isn't formatted, or a rule fires | `make lint-backend` |
 | Test Backend | the Django suite on the Firestore emulator, in random order, under coverage | a test fails, or branch coverage is below the gate | `make test-cov` |
-| Lint, Format, & Test Frontend | dart format, `flutter analyze` (the app and the golden harness), the Flutter suite in random order under coverage, goldens included | a test fails, a golden differs, the analyzer reports anything (infos too), or line coverage is below the gate | `make lint-frontend`, `make test-frontend-cov`, `make goldens` |
+| Lint, Format, & Test Frontend | dart format, `flutter analyze` (the app and the golden harness), the Flutter suite in random order under coverage, goldens included, then a release web build's download size | a test fails, a golden differs, the analyzer reports anything (infos too), line coverage is below the gate, or the web download is over [its budget](#web-download-size) | `make lint-frontend`, `make test-frontend-cov`, `make goldens`, `make web-size` |
 | Lint, Format, & Test Widgetbook | the component catalog is regenerated, formatted and analyzed, every entry opens, every entry matches its light and dark golden, and every entry passes the [accessibility checks](#accessibility) | the committed catalog is stale, an entry throws, a golden differs, or an accessibility check finds a different number of problems than its known gaps record | `make goldens` for the goldens; see the job for the rest |
 | E2E Journeys | the real app in headless Chrome against a throwaway full stack | a journey fails | `make e2e` |
 | Lint Workflows | actionlint and shellcheck on every workflow | a workflow has an error | `make lint-workflows` |
@@ -24,7 +24,7 @@ The contract tests have no job of their own. They're part of the backend and fro
 
 | Suite | Measures | Gate | Measured | Where the gate lives |
 | --- | --- | --- | --- | --- |
-| Backend | branch coverage of `apps/` and `config/` | 99% | 99.86% (2026-11-05) | `fail_under` in `backend/pyproject.toml` |
+| Backend | branch coverage of `apps/` and `config/` | 99% | 99.91% (2026-11-07) | `fail_under` in `backend/pyproject.toml` |
 | Frontend | line coverage of `lib/` | 97% | 98.76% (2026-11-03) | `minimumLineCoverage` in `frontend/tool/check_coverage.dart` |
 
 The gates sit a little under the measured totals. One uncovered line doesn't fail a PR, but an untested module, screen or endpoint does. Raise a gate when coverage rises, and don't lower one to get a PR through.
@@ -101,6 +101,8 @@ Both suites run in a random order on every CI run, so a test that only passes af
 
 `.github/workflows/contracts-live.yml` checks the real Auth0, OSRM and Overpass against the third-party contracts. It runs nightly instead of per PR because those are public services with outages, and an outage shouldn't block unrelated work.
 
+`.github/workflows/security.yml` runs the [security scans](#security-scans), and `.github/workflows/performance.yml` runs the [load test](#the-load-test). The load test also runs on a PR that changes it or its stack.
+
 ## Security scans
 
 Three scanners look for what the test suites can't: vulnerable dependencies, leaked secrets, and holes a live attacker could find in the running API. The authorization and rate-limit rules themselves are tested in the backend suite.
@@ -152,6 +154,60 @@ Fix it if you can. That means upgrading the dependency, rotating and removing th
 - **Dependency:** add an `[[IgnoredVulns]]` entry to `.osv-scanner.toml` with the id, a `reason`, and an `ignoreUntil` date no more than three months out. After that date it fails again and gets re-triaged. Delete the entry once the package is upgraded.
 - **Secret:** if it's real, it's already public once pushed. Rotate it first, then add its fingerprint (gitleaks prints it) to `.gitleaksignore` with a comment saying when it was rotated. For a test fixture, add a narrow allowlist to `.gitleaks.toml` that matches only the fixture's path and exact value, so a real secret in the same file still fails.
 - **ZAP alert:** add a line to `.zap/rules.tsv`: the plugin id, `IGNORE`, `INFO` or `WARN`, the rule name in brackets, and the reason, separated by tabs. To drop only some URLs, use `<id>`, `OUTOFSCOPE` and a URL regex. `FAIL` makes a low alert block too. Plugin ids are listed at [zaproxy.org/docs/alerts](https://www.zaproxy.org/docs/alerts/).
+
+## Performance
+
+Production is one or more Cloud Run instances (one vCPU, 512 MiB each, scaling to zero) in front of Firestore in the same region. A request's cost is mostly its Firestore round trips, which run one after another and each bill at least one document read, plus the CPU it holds on the instance. The checks follow from that:
+
+| Check | What it checks | Fails when | Where it runs | Locally |
+| --- | --- | --- | --- | --- |
+| Round-trip budgets | every API route the owner can call, sent with a small account and a large one, counting every Firestore RPC | a route's count differs from its budget at either size | every PR, in Test Backend | `make test-cov` |
+| Production indexes | every query those requests send, against `firestore.indexes.json` | a query would need an index that isn't declared | every PR, in Test Backend | `make test-cov` |
+| Large accounts | the people list and grid, Pulse, My Trips and the map with 500 people (and 2,000 logs, or 300 trips) | a list builds more than a screenful, or the map stops clustering | every PR, in the frontend suite | `make test-frontend-cov` |
+| App requests | what the real app asks the API for when it opens and on each tab | a request is repeated or new | every PR, in E2E Journeys | `make e2e` |
+| Web download size | a release web build's gzipped app and assets | over its budget | every PR, in the frontend job | `make web-size` |
+| Load test | one Cloud Run-sized instance under a steady mix of what the app sends, plus its cold start and memory | any failed request, a dropped iteration, a p95 over budget, a 5xx, a slow cold start, or too much memory | nightly, and on PRs that change it | `make load` |
+
+### Round-trip budgets
+
+`backend/tests/test_round_trip_budgets.py` counts the RPCs the Firestore client sends (`count_firestore_rpcs` in `apps/common/testing.py`) for one request per case. Each case runs twice: once with one of everything, and once with 8 people (3 logs each), 6 trips (4 stops each) and a request body carrying as many stops. The count must equal the case's budget both times. Budgets are exact, like `assertNumQueries`, so a saving fails too and the budget gets lowered to keep it. The completeness test fails when the authorization matrix lets the owner call a route and method that has no budget.
+
+Every route is flat today: 1 round trip for the people, contact-log and leg lists, 4 for the trip list, 2 to save a trip. A route that has to grow can be recorded as a known gap (`known_gap=(small, large)` plus the task tracking it), which fails if it gets worse and if it's fixed.
+
+What keeps them flat (see the docstrings in `apps/people/repositories.py` and `apps/trips/repositories.py`):
+
+- Each person stores their last contact, kept in step by every contact-log write, in a transaction. The people list doesn't query the logs.
+- Contact logs, stops and legs store their owner (logs and legs their own id too), so one collection-group query finds all of an owner's, or one of them.
+- A trip's writes go in one commit, and the result is built in memory instead of read back.
+- Contended transactions retry in rounds with a random wait between them (`fs.run_transaction`).
+
+### Production indexes
+
+The emulator answers any query, indexed or not. Production refuses one that needs an index nobody declared (FAILED_PRECONDITION, a 500). `backend/tests/test_firestore_indexes.py` records the query of every request in the budget table and checks it: one collection with equality filters or one order needs nothing; a collection-group query needs a `fieldOverrides` entry per field; equality plus an order, or two orders, need a composite index.
+
+**Deploying.** Indexes deploy separately from the code: `firebase deploy --only firestore:indexes`. Deploy them first, and wait until the console shows them built, before the code that queries them serves traffic. An override that adds `COLLECTION_GROUP` also has to keep the field's `COLLECTION` indexes, because an override replaces the defaults. The checker tests for that too.
+
+Data written before 2026-11-07 lacks the copied owner fields and stored last contact, and the new queries don't see it. Production had no real data then. Locally, `docker compose restart firestore` empties the dev emulator (it keeps data in memory only), and `make seed` refills it.
+
+### App requests
+
+The E2E stack's API logs every request it answers, by user (`docker/test-stack-settings/request_log.py`, loaded only there). `frontend/integration_test/journeys/requests_test.dart` opens the real app and checks that it asks for the profile, people and trips once each. A second journey, moving between tabs, is skipped as a known gap: every Pulse visit refetches people and every Me visit the profile ([ClickUp](https://app.clickup.com/t/86bd054ar)).
+
+### Web download size
+
+`frontend/tool/check_web_size.dart` reads a release web build and checks gzipped sizes against the budgets at its top: `main.dart.js` (1,745 KiB on 2026-11-07, budget 1,900), each bundled asset (largest 149 KiB, budget 200), and both together (2,351 KiB, budget 2,600). Assets load when first used, so the total is the most a visit downloads. CanvasKit comes from Google's CDN and isn't counted. A failing run names the file. Shrink it, or load it on demand, before raising a budget. This check is how the 2.5 MB logo was found.
+
+### The load test
+
+`scripts/load.sh` documents each step. In short:
+
+- **The stack.** `docker-compose.e2e.yml` with `docker-compose.perf.yml` on top: the API as one Cloud Run instance (DEBUG off, gunicorn with 1 worker and 8 threads, 1 vCPU, 512 MiB), with Toxiproxy adding 3 ms each way to every Firestore round trip (`PERF_FIRESTORE_LATENCY_MS`). It runs as project `map-my-friends-perf` on port 8300.
+- **The load.** `perf/load.js` (k6, pinned by digest) seeds 20 accounts through the API (25 people, 50 logs and 4 trips each), then runs five scenarios side by side for 3 minutes at fixed rates, about 26 requests/s: opening the app, browsing, logging contact, planning a trip, and signing in. `PERF_RATE_SCALE` multiplies the rates.
+- **Pass or fail.** Any failed request or check, any dropped iteration (the instance couldn't keep up), a scenario's p95 over its budget (in `perf/load.js`), any 5xx in the API's log, more than 20 s from restart to the first answer, a first hub lookup over 1.5 s, or peak memory over 400 MiB.
+- **Measured on 2026-11-07.** p95 was 40 to 60 ms locally and 46 to 83 ms on CI for everything but sign-in, against budgets of 150 to 250 ms. Sign-in was about 300 ms locally and 480 ms on CI, against 1,000: the password hash holds the one vCPU, and every request on the instance waits behind it. Peak memory was about 200 MiB, and the API answered about 5 s after a restart. At 4× the rate (about 100 requests/s) the instance still met every budget. At 10× (about 260/s offered) requests queued for 5 to 8 s, so one instance tops out between the two.
+- **When it fails.** Read the scenario table in `build/perf/summary.md` (on CI, the run's page and the `load-test` artifact) and `api.log`. A slower scenario usually has a route whose round trips grew, which the budgets should have caught first, or new CPU work in a request. The TimezoneFinder that was built on every person save (about 300 ms) showed up this way. Raise a budget only with a measured reason.
+
+`PERF_DURATION=1m make load` gives a quick run, and `PERF_KEEP_STACK=1` leaves the stack up.
 
 ## Releases
 
