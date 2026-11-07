@@ -15,6 +15,9 @@ services:
       # Shared API/third-party contracts, read by backend/tests/contracts.
       # Mounted beside /app so ../contracts resolves the same as on the host.
       - ./contracts:/contracts:ro
+      # The production index config, which backend/tests/test_firestore_indexes.py
+      # checks every query the API sends against.
+      - ./firestore.indexes.json:/firestore.indexes.json:ro
     ports:
       - "8000:8000"
     depends_on:

@@ -83,3 +83,17 @@ def is_valid_doc_id(doc_id) -> bool:
         and doc_id not in {".", ".."}
         and re.fullmatch(r"__.*__", doc_id) is None
     )
+
+
+# Firestore's limit on the writes in one commit.
+MAX_WRITES_PER_COMMIT = 500
+
+
+def delete_all(refs) -> None:
+    """Delete every document in refs, in as few commits as the limit allows."""
+    refs = list(refs)
+    for start in range(0, len(refs), MAX_WRITES_PER_COMMIT):
+        batch = get_client().batch()
+        for ref in refs[start : start + MAX_WRITES_PER_COMMIT]:
+            batch.delete(ref)
+        batch.commit()

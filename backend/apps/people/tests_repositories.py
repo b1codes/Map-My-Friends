@@ -1,3 +1,5 @@
+import threading
+
 from django.test import SimpleTestCase
 
 from apps.common import firestore as fs
@@ -185,6 +187,121 @@ class ContactLogRepositoryTests(FirestoreTestMixin, SimpleTestCase):
         person = self.people.get_for_owner(self.person_a.id, "owner-a")
         self.assertEqual(person.last_contact_channel, "VIDEO")
         self.assertTrue(person.last_contacted_at.startswith("2026-07-05"))
+
+
+class LastContactTests(FirestoreTestMixin, SimpleTestCase):
+    """A person's last contact is stored on the person, so listing people is
+    one query. Every log write has to keep it equal to their most recent
+    log, which is what these check, against the logs as they really are."""
+
+    collections_to_purge = ["people"]
+
+    def setUp(self):
+        super().setUp()
+        self.people = PersonRepository()
+        self.logs = ContactLogRepository()
+        self.person = self.people.create("owner-a", PERSON_DATA)
+
+    def log(self, day, channel="CALL"):
+        return self.logs.create(
+            "owner-a",
+            self.person.id,
+            {"channel": channel, "contacted_at": f"2026-07-{day:02d}T12:00:00+00:00"},
+        )
+
+    def last_contact(self):
+        person = self.people.get_for_owner(self.person.id, "owner-a")
+        return person.last_contacted_at, person.last_contact_channel
+
+    def assert_last_contact(self, day, channel):
+        self.assertEqual(
+            self.last_contact(), (f"2026-07-{day:02d}T12:00:00+00:00", channel)
+        )
+
+    def stored_fields(self):
+        return fs.collection("people").document(self.person.id).get().to_dict()
+
+    def test_none_until_the_first_log(self):
+        self.assertEqual(self.last_contact(), (None, None))
+        self.assertNotIn("last_contacted_at", self.stored_fields())
+
+    def test_an_older_log_written_later_does_not_replace_it(self):
+        self.log(9, "VIDEO")
+        self.log(3, "CALL")
+        self.assert_last_contact(9, "VIDEO")
+
+    def test_moving_the_latest_log_earlier_hands_it_to_the_next(self):
+        self.log(5, "CALL")
+        latest = self.log(9, "VIDEO")
+        self.logs.update(
+            latest.id, "owner-a", {"contacted_at": "2026-07-01T12:00:00+00:00"}
+        )
+        self.assert_last_contact(5, "CALL")
+
+    def test_moving_an_older_log_later_makes_it_the_latest(self):
+        older = self.log(2, "MESSAGE")
+        self.log(5, "CALL")
+        self.logs.update(
+            older.id, "owner-a", {"contacted_at": "2026-07-20T12:00:00+00:00"}
+        )
+        self.assert_last_contact(20, "MESSAGE")
+
+    def test_changing_the_latest_logs_channel(self):
+        latest = self.log(5, "CALL")
+        self.logs.update(latest.id, "owner-a", {"channel": "VIDEO"})
+        self.assert_last_contact(5, "VIDEO")
+
+    def test_a_note_edit_leaves_it(self):
+        self.log(5, "CALL")
+        older = self.log(2, "VIDEO")
+        self.logs.update(older.id, "owner-a", {"note": "Rang back"})
+        self.assert_last_contact(5, "CALL")
+
+    def test_deleting_an_older_log_leaves_it(self):
+        older = self.log(2, "VIDEO")
+        self.log(5, "CALL")
+        self.logs.delete(older.id, "owner-a")
+        self.assert_last_contact(5, "CALL")
+
+    def test_deleting_the_only_log_clears_it(self):
+        only = self.log(5, "CALL")
+        self.logs.delete(only.id, "owner-a")
+        self.assertEqual(self.last_contact(), (None, None))
+        self.assertNotIn("last_contacted_at", self.stored_fields())
+        self.assertNotIn("last_contact_channel", self.stored_fields())
+
+    def test_logs_written_at_once_leave_the_most_recent(self):
+        """Each write reads the person and writes it back. Without a
+        transaction, a write of an older log that read the person before a
+        newer one landed would put the older one back."""
+        days = [3, 17, 8, 25, 11, 21, 6, 14]
+        start = threading.Barrier(len(days))
+
+        def write(day):
+            start.wait()
+            self.log(day, f"CALL-{day}")
+
+        threads = [threading.Thread(target=write, args=(day,)) for day in days]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(len(self.logs.list_for_owner("owner-a")), len(days))
+        self.assert_last_contact(25, "CALL-25")
+
+    def test_a_person_write_cannot_set_it(self):
+        self.log(5, "CALL")
+        self.people.update(
+            self.person.id,
+            "owner-a",
+            {
+                "first_name": "Ada",
+                "last_contacted_at": "2030-01-01T00:00:00+00:00",
+                "last_contact_channel": "VIDEO",
+            },
+        )
+        self.assert_last_contact(5, "CALL")
 
 
 class OwnershipReassignmentTests(FirestoreTestMixin, SimpleTestCase):

@@ -41,20 +41,32 @@ FIRESTORE_RPCS = (
 )
 
 
+class RpcCounts(collections.Counter):
+    """Round trips by RPC name, plus the structured query of every run_query
+    (google.cloud.firestore_v1.types.StructuredQuery), in order."""
+
+    def __init__(self):
+        super().__init__()
+        self.queries: list = []
+
+
 @contextlib.contextmanager
 def count_firestore_rpcs():
     """Count the Firestore round trips made inside the block, by RPC name.
 
-    Yields a Counter that fills in as calls are made; sum(counter.values())
+    Yields an RpcCounts that fills in as calls are made; sum(counts.values())
     is the number of round trips. A streamed query counts once, however many
     documents it returns.
     """
-    counts: collections.Counter[str] = collections.Counter()
+    counts = RpcCounts()
 
     def counting(name, original):
         @functools.wraps(original)
         def wrapper(self, *args, **kwargs):
             counts[name] += 1
+            if name == "run_query":
+                request = kwargs.get("request") or args[0]
+                counts.queries.append(request["structured_query"])
             return original(self, *args, **kwargs)
 
         return wrapper

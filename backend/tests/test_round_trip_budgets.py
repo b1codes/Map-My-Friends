@@ -25,7 +25,7 @@ lets the owner call has no case here.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
@@ -35,6 +35,7 @@ from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from apps.common.testing import (
     FirestoreTestMixin,
+    RpcCounts,
     ThrottleIsolationMixin,
     count_firestore_rpcs,
     purge_collection,
@@ -194,13 +195,11 @@ BUDGETS: dict[tuple[str, str], Budget] = {
         status=400,
         rpcs=0,
     ),
-    ("person-list", "GET"): Budget(
-        url=lambda s: reverse("person-list"), known_gap=(2, 9), task=GAP
-    ),
+    ("person-list", "GET"): Budget(url=lambda s: reverse("person-list"), rpcs=1),
     ("person-list", "POST"): Budget(
-        url=lambda s: reverse("person-list"), payload=_new_person, status=201, rpcs=3
+        url=lambda s: reverse("person-list"), payload=_new_person, status=201, rpcs=1
     ),
-    ("person-detail", "GET"): Budget(url=_person_url, rpcs=2),
+    ("person-detail", "GET"): Budget(url=_person_url, rpcs=1),
     ("person-detail", "PUT"): Budget(
         url=_person_url,
         payload=lambda s: {
@@ -209,16 +208,14 @@ BUDGETS: dict[tuple[str, str], Budget] = {
             "city": "London",
             "country": "UK",
         },
-        rpcs=4,
+        rpcs=2,
     ),
     ("person-detail", "PATCH"): Budget(
-        url=_person_url, payload=lambda s: {"first_name": "Renamed"}, rpcs=4
+        url=_person_url, payload=lambda s: {"first_name": "Renamed"}, rpcs=2
     ),
-    ("person-detail", "DELETE"): Budget(
-        url=_person_url, status=204, known_gap=(4, 6), task=GAP
-    ),
+    ("person-detail", "DELETE"): Budget(url=_person_url, status=204, rpcs=3),
     ("contactlog-list", "GET"): Budget(
-        url=lambda s: reverse("contactlog-list"), known_gap=(3, 17), task=GAP
+        url=lambda s: reverse("contactlog-list"), rpcs=1
     ),
     ("contactlog-list", "POST"): Budget(
         url=lambda s: reverse("contactlog-list"),
@@ -230,7 +227,7 @@ BUDGETS: dict[tuple[str, str], Budget] = {
         status=201,
         rpcs=3,
     ),
-    ("contactlog-detail", "GET"): Budget(url=_log_url, known_gap=(3, 17), task=GAP),
+    ("contactlog-detail", "GET"): Budget(url=_log_url, rpcs=1),
     ("contactlog-detail", "PUT"): Budget(
         url=_log_url,
         payload=lambda s: {
@@ -239,18 +236,14 @@ BUDGETS: dict[tuple[str, str], Budget] = {
             "contacted_at": "2026-10-02T12:00:00Z",
             "note": "rewritten",
         },
-        known_gap=(5, 19),
-        task=GAP,
+        rpcs=4,
     ),
     ("contactlog-detail", "PATCH"): Budget(
         url=_log_url,
         payload=lambda s: {"note": "rewritten"},
-        known_gap=(5, 19),
-        task=GAP,
+        rpcs=2,
     ),
-    ("contactlog-detail", "DELETE"): Budget(
-        url=_log_url, status=204, known_gap=(4, 18), task=GAP
-    ),
+    ("contactlog-detail", "DELETE"): Budget(url=_log_url, status=204, rpcs=4),
     # The hub lookups search the in-memory reference data.
     ("nearest_airports", "GET"): Budget(
         url=lambda s: reverse("nearest_airports") + "?lat=51.5&lon=-0.12", rpcs=0
@@ -291,7 +284,7 @@ BUDGETS: dict[tuple[str, str], Budget] = {
         url=_trip_url,
         payload=lambda s: {"status": "BOOKED"},
         prepare=_book,
-        known_gap=(19, 25),
+        known_gap=(17, 21),
         task=GAP,
     ),
     ("trip-detail", "DELETE"): Budget(
@@ -328,13 +321,6 @@ BUDGETS: dict[tuple[str, str], Budget] = {
         task=GAP,
     ),
 }
-
-
-@dataclass
-class Measured:
-    small: int
-    large: int
-    by_rpc: dict = field(default_factory=dict)
 
 
 class BudgetBase(ThrottleIsolationMixin, FirestoreTestMixin, APITestCase):
@@ -434,7 +420,9 @@ class BudgetBase(ThrottleIsolationMixin, FirestoreTestMixin, APITestCase):
             leg=leg,
         )
 
-    def measure(self, key, budget: Budget, size: dict) -> tuple[int, dict]:
+    def measure(self, key, budget: Budget, size: dict) -> RpcCounts:
+        """Send the case's request against a fresh account of this size, and
+        return the Firestore RPCs it made."""
         seed = self.seed(size)
         if budget.prepare is not None:
             budget.prepare(seed)
@@ -451,18 +439,20 @@ class BudgetBase(ThrottleIsolationMixin, FirestoreTestMixin, APITestCase):
             budget.status,
             f"{key[1]} {url}: {getattr(response, 'data', response.content)}",
         )
-        return sum(counts.values()), dict(counts)
+        return counts
 
 
 class RoundTripBudgetTests(BudgetBase):
     def test_every_route_stays_within_its_budget(self):
         for key, budget in BUDGETS.items():
             with self.subTest(case=" ".join(key)):
-                small, small_by = self.measure(key, budget, SMALL)
-                large, large_by = self.measure(key, budget, LARGE)
+                small_by = self.measure(key, budget, SMALL)
+                large_by = self.measure(key, budget, LARGE)
+                small, large = small_by.total(), large_by.total()
                 label = (
                     f"{' '.join(key)}: {small} round trips with one of everything "
-                    f"{small_by}, {large} with a large account {large_by}"
+                    f"{dict(small_by)}, {large} with a large account "
+                    f"{dict(large_by)}"
                 )
                 if budget.known_gap is None:
                     self.assertEqual(
