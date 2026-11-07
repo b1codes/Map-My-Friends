@@ -56,11 +56,7 @@ class TripViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
         payload, stops, _legs = self._split_payload(serializer.validated_data)
 
-        owner_key = owner_key_for(request)
-        trip = self.repository.create(owner_key, payload)
-        if stops:
-            self.repository.replace_stops(trip.id, owner_key, stops)
-            trip = self.repository.get_for_owner(trip.id, owner_key)
+        trip = self.repository.create(owner_key_for(request), payload, stops=stops)
         return Response(self._represent(request, trip), status=status.HTTP_201_CREATED)
 
     def update(self, request, pk=None):
@@ -74,30 +70,26 @@ class TripViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
         payload, stops, legs = self._split_payload(serializer.validated_data)
 
-        owner_key = owner_key_for(request)
-        trip = self.repository.update(pk, owner_key, payload)
-        if trip is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-
         # Matching the old serializer: a supplied `stops` array replaces the
         # trip's stops wholesale, and `legs` patches existing legs by id.
-        if stops is not None:
-            self.repository.replace_stops(pk, owner_key, stops)
-        if legs:
-            for leg in legs:
-                leg_id = leg.get("id")
-                if not leg_id:
-                    continue
-                leg_payload = {
-                    k: (v.isoformat() if hasattr(v, "isoformat") else v)
-                    for k, v in leg.items()
-                    if k
-                    not in ("id", "trip_id", "departure_stop_id", "arrival_stop_id")
-                }
-                if leg_payload:
-                    self.repository.update_leg(pk, leg_id, owner_key, leg_payload)
+        leg_patches = []
+        for leg in legs or ():
+            leg_id = leg.get("id")
+            if not leg_id:
+                continue
+            leg_payload = {
+                k: (v.isoformat() if hasattr(v, "isoformat") else v)
+                for k, v in leg.items()
+                if k not in ("id", "trip_id", "departure_stop_id", "arrival_stop_id")
+            }
+            if leg_payload:
+                leg_patches.append((leg_id, leg_payload))
 
-        trip = self.repository.get_for_owner(pk, owner_key)
+        trip = self.repository.update(
+            pk, owner_key_for(request), payload, stops=stops, legs=leg_patches
+        )
+        if trip is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(self._represent(request, trip))
 
     def destroy(self, request, pk=None):
@@ -178,18 +170,11 @@ class TripLegViewSet(viewsets.ViewSet):
         return TripRepository()
 
     def list(self, request):
-        owner_key = owner_key_for(request)
-        legs = []
-        for trip in self.repository.list_for_owner(owner_key):
-            legs.extend(self.repository.list_legs(trip.id, owner_key))
+        legs = self.repository.list_all_legs(owner_key_for(request))
         return Response(TripLegSerializer(legs, many=True).data)
 
     def _find_leg(self, leg_id, owner_key):
-        for trip in self.repository.list_for_owner(owner_key):
-            for leg in self.repository.list_legs(trip.id, owner_key):
-                if leg.id == leg_id:
-                    return leg
-        return None
+        return self.repository.find_leg(leg_id, owner_key)
 
     def retrieve(self, request, pk=None):
         leg = self._find_leg(pk, owner_key_for(request))
@@ -214,8 +199,7 @@ class TripLegViewSet(viewsets.ViewSet):
         # Firestore rejects an empty update, so a no-op PATCH returns the leg.
         if not payload:
             return Response(TripLegSerializer(leg).data)
-        updated = self.repository.update_leg(leg.trip_id, pk, owner_key, payload)
-        return Response(TripLegSerializer(updated).data)
+        return Response(TripLegSerializer(self.repository.patch_leg(leg, payload)).data)
 
     @action(detail=True, methods=["post"])
     def smart_lookup(self, request, pk=None):
@@ -250,7 +234,7 @@ class TripLegViewSet(viewsets.ViewSet):
             if "arrival" in data and "time" in data["arrival"]:
                 payload["arrival_time"] = data["arrival"]["time"]
 
-            updated = self.repository.update_leg(leg.trip_id, pk, owner_key, payload)
+            updated = self.repository.patch_leg(leg, payload)
             return Response(TripLegSerializer(updated).data)
 
         return Response(

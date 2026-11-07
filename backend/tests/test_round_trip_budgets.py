@@ -50,10 +50,6 @@ OWNER = "owner-b1"
 LONDON = (51.5074, -0.1278, "Europe/London")
 HEATHROW = 2364  # An airport id in airports_export.json.
 
-# The routes that grow, recorded as found and being fixed in the same
-# subtask: Performance & load tests.
-GAP = "https://app.clickup.com/t/86bcqv0gd"
-
 # How much the large account holds. Big enough that one query per item shows
 # up as a different count, small enough to seed in about a second.
 LARGE = {"people": 8, "logs_per_person": 3, "trips": 6, "stops_per_trip": 4}
@@ -251,9 +247,7 @@ BUDGETS: dict[tuple[str, str], Budget] = {
     ("nearest-stations", "GET"): Budget(
         url=lambda s: reverse("nearest-stations") + "?lat=51.5&lon=-0.12", rpcs=0
     ),
-    ("trip-list", "GET"): Budget(
-        url=lambda s: reverse("trip-list"), known_gap=(4, 14), task=GAP
-    ),
+    ("trip-list", "GET"): Budget(url=lambda s: reverse("trip-list"), rpcs=4),
     ("trip-list", "POST"): Budget(
         url=lambda s: reverse("trip-list"),
         payload=lambda s: {
@@ -262,10 +256,9 @@ BUDGETS: dict[tuple[str, str], Budget] = {
             "stops": stops_payload(s),
         },
         status=201,
-        known_gap=(20, 22),
-        task=GAP,
+        rpcs=2,
     ),
-    ("trip-detail", "GET"): Budget(url=_trip_url, rpcs=5),
+    ("trip-detail", "GET"): Budget(url=_trip_url, rpcs=4),
     ("trip-detail", "PUT"): Budget(
         url=_trip_url,
         payload=lambda s: {
@@ -273,52 +266,44 @@ BUDGETS: dict[tuple[str, str], Budget] = {
             "date": "2026-11-14",
             "stops": stops_payload(s),
         },
-        known_gap=(22, 24),
-        task=GAP,
+        rpcs=5,
     ),
     ("trip-detail", "PATCH"): Budget(
-        url=_trip_url, payload=lambda s: {"name": "Renamed"}, rpcs=11
+        url=_trip_url, payload=lambda s: {"name": "Renamed"}, rpcs=5
     ),
     # Booking freezes a snapshot of every stop's people and hub.
     ("trip-detail", "PATCH", "book"): Budget(
         url=_trip_url,
         payload=lambda s: {"status": "BOOKED"},
         prepare=_book,
-        known_gap=(17, 21),
-        task=GAP,
+        rpcs=6,
     ),
-    ("trip-detail", "DELETE"): Budget(
-        url=_trip_url, status=204, known_gap=(7, 11), task=GAP
-    ),
+    ("trip-detail", "DELETE"): Budget(url=_trip_url, status=204, rpcs=4),
     ("trip-stops", "GET"): Budget(
-        url=lambda s: reverse("trip-stops", args=[s.trip]), rpcs=3
+        url=lambda s: reverse("trip-stops", args=[s.trip]), rpcs=2
     ),
     ("trip-stops", "POST"): Budget(
         url=lambda s: reverse("trip-stops", args=[s.trip]),
         payload=lambda s: {"sequence_order": 99, "location": point(2.35, 48.85)},
         status=201,
-        rpcs=12,
+        rpcs=5,
     ),
     ("trip-calculate-route", "POST"): Budget(
         url=lambda s: reverse("trip-calculate-route"),
         payload=lambda s: {"coordinates": [[-0.1278, 51.5074], [2.35, 48.85]]},
         rpcs=0,
     ),
-    ("tripleg-list", "GET"): Budget(
-        url=lambda s: reverse("tripleg-list"), known_gap=(5, 25), task=GAP
-    ),
-    ("tripleg-detail", "GET"): Budget(url=_leg_url, known_gap=(5, 25), task=GAP),
+    ("tripleg-list", "GET"): Budget(url=lambda s: reverse("tripleg-list"), rpcs=1),
+    ("tripleg-detail", "GET"): Budget(url=_leg_url, rpcs=1),
     ("tripleg-detail", "PATCH"): Budget(
         url=_leg_url,
         payload=lambda s: {"booking_reference": "ABC123"},
-        known_gap=(9, 29),
-        task=GAP,
+        rpcs=2,
     ),
     ("tripleg-smart-lookup", "POST"): Budget(
         url=lambda s: reverse("tripleg-smart-lookup", args=[s.leg]),
         payload=lambda s: {"identifier": "BA123"},
-        known_gap=(9, 29),
-        task=GAP,
+        rpcs=2,
     ),
 }
 
