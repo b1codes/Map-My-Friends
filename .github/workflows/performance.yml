@@ -55,7 +55,7 @@ jobs:
           name: load-test
           path: |
             build/perf/summary.md
-            build/perf/summary.json
+            build/perf/k6-summary.json
             build/perf/api.log
             build/perf/stack.log
           if-no-files-found: ignore

@@ -20,7 +20,7 @@
 #      the cold-start and memory budgets below.
 #
 # Results land in build/perf/: summary.md (also printed, and written to the
-# job page on CI), summary.json (every k6 metric), api.log and stack.log.
+# job page on CI), k6-summary.json (every k6 metric), api.log and stack.log.
 #
 # Environment (all optional):
 #   PERF_PROJECT              compose project name      (default map-my-friends-perf)
@@ -72,7 +72,9 @@ trap cleanup EXIT
 
 rm -rf "$OUT"
 mkdir -p "$OUT"
-# k6 runs as its own user (uid 12345) and writes the summaries here.
+# k6 runs as its own user (uid 12345) and writes k6-summary.* here. Files
+# it creates aren't writable by this script, so summary.md is written
+# fresh below, from k6's part and this script's.
 chmod 777 "$OUT"
 
 now_ms() { python3 -c 'import time; print(int(time.time() * 1000))'; }
@@ -108,7 +110,8 @@ done
 # --- 3. Cold start --------------------------------------------------------
 echo "==> Timing a cold start"
 username="cold-start-$(date +%s)"
-password="Cold!Start$RANDOM$RANDOM"
+# Random, because the API refuses a password that resembles the username.
+password="$(python3 -c 'import secrets; print("Pw!" + secrets.token_hex(12) + "9Z")')"
 curl -sf -o /dev/null -H 'Content-Type: application/json' \
   -d "{\"username\":\"$username\",\"email\":\"$username@example.com\",\"password\":\"$password\",\"password_confirm\":\"$password\"}" \
   "${API_URL}user/auth/register/"
@@ -153,11 +156,13 @@ grep -oE '" [1-5][0-9]{2} ' "$OUT/api.log" | sort | uniq -c | sort -rn || true
 
 # --- 5. Gate --------------------------------------------------------------
 result=0
+failures=()
 fail() {
   echo "FAIL: $*" >&2
-  echo "- ❌ $*" >>"$OUT/summary.md"
+  failures+=("- ❌ $*")
   result=1
 }
+measures="$OUT/measures.md"
 {
   echo "### Cold start and memory"
   echo
@@ -169,7 +174,7 @@ fail() {
   echo "| Peak memory | ${peak_mib} MiB | ${MEMORY_BUDGET_MIB} MiB of 512 |"
   echo "| Firestore latency added | ${LATENCY_MS} ms each way | |"
   echo
-} >>"$OUT/summary.md"
+} >"$measures"
 
 [[ $k6_status -eq 0 ]] || fail "k6 thresholds failed (exit $k6_status); see the table above"
 (( boot_ms <= BOOT_BUDGET_S * 1000 )) || fail "the API took ${boot_ms} ms to answer after a restart"
@@ -186,5 +191,10 @@ if [[ -n "$server_errors" ]]; then
   fail "the API answered 5xx (by endpoint above; tracebacks in build/perf/api.log)"
 fi
 
+{
+  cat "$OUT/k6-summary.md" 2>/dev/null || echo "## Load test (k6 wrote no summary)"
+  cat "$measures"
+  for line in "${failures[@]+"${failures[@]}"}"; do echo "$line"; done
+} >"$OUT/summary.md"
 cat "$OUT/summary.md"
 exit "$result"

@@ -120,6 +120,25 @@ function call(method, path, body, token, name, expected = 200) {
   return response;
 }
 
+// Sends [method, path, body] requests in parallel and returns the ids they
+// created, failing setup on any other status.
+function batch(requests, token, expected) {
+  const responses = http.batch(
+    requests.map(([method, path, body]) => ({
+      method,
+      url: BASE + path,
+      body: JSON.stringify(body),
+      params: { ...headers(token), tags: { name: `${method} ${path}` } },
+    })),
+  );
+  return responses.map((response, i) => {
+    if (response.status !== expected) {
+      fail(`${requests[i][0]} ${requests[i][1]}: ${response.status} ${response.body}`);
+    }
+    return json(response).id;
+  });
+}
+
 function json(response) {
   try {
     return response.json();
@@ -169,45 +188,43 @@ function seedUser(n, run, airports) {
   const tokens = json(call('POST', 'user/auth/token/', { username, password }, null, 'POST user/auth/token/'));
   const token = tokens.access;
 
-  const people = [];
-  for (let i = 0; i < PEOPLE_PER_USER; i++) {
-    const [city, country] = CITIES[i % CITIES.length];
-    const response = call(
-      'POST',
-      'people/',
-      { tag: i % 3 ? 'FRIEND' : 'FAMILY', first_name: `Friend ${i}`, last_name: username, city, country },
-      token,
-      'POST people/',
-      201,
-    );
-    people.push(json(response).id);
-  }
-  const logs = [];
-  people.forEach((person, i) => {
-    for (const day of [3, 17]) {
-      const response = call(
+  // Each kind of record goes in one parallel batch: sent one by one, a CI
+  // runner took over 5 minutes to seed.
+  const people = batch(
+    Array.from({ length: PEOPLE_PER_USER }, (_, i) => {
+      const [city, country] = CITIES[i % CITIES.length];
+      return [
+        'POST',
+        'people/',
+        { tag: i % 3 ? 'FRIEND' : 'FAMILY', first_name: `Friend ${i}`, last_name: username, city, country },
+      ];
+    }),
+    token,
+    201,
+  );
+  // One wave per day, so no two logs for one person are written at once:
+  // they'd contend for the person's last contact, and the emulator takes
+  // seconds to settle that.
+  const logs = [3, 17].flatMap((day) =>
+    batch(
+      people.map((person, i) => [
         'POST',
         'contact-logs/',
         { person, channel: 'CALL', contacted_at: `2026-10-${day}T1${i % 10}:00:00Z` },
-        token,
-        'POST contact-logs/',
-        201,
-      );
-      logs.push(json(response).id);
-    }
-  });
-  const trips = [];
-  for (let i = 0; i < TRIPS_PER_USER; i++) {
-    const response = call(
+      ]),
+      token,
+      201,
+    ),
+  );
+  const trips = batch(
+    Array.from({ length: TRIPS_PER_USER }, (_, i) => [
       'POST',
       'trips/',
       { name: `Trip ${i}`, date: '2026-12-01', stops: tripStops(people, airports), legs: [] },
-      token,
-      'POST trips/',
-      201,
-    );
-    trips.push(json(response).id);
-  }
+    ]),
+    token,
+    201,
+  );
   const legs = json(call('GET', 'trips/legs/', undefined, token, 'GET trips/legs/')).map((leg) => leg.id);
   return { username, password, token, people, logs, trips, legs };
 }
@@ -346,7 +363,8 @@ export function handleSummary(data) {
   ].join('\n');
   return {
     stdout: `${markdown}\n`,
-    [`${OUT}/summary.md`]: markdown,
-    [`${OUT}/summary.json`]: JSON.stringify(data, null, 2),
+    // scripts/load.sh adds its own measures to these in summary.md.
+    [`${OUT}/k6-summary.md`]: markdown,
+    [`${OUT}/k6-summary.json`]: JSON.stringify(data, null, 2),
   };
 }
