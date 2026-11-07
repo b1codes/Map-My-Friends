@@ -91,7 +91,11 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    - assets/Map-My-Friends-Default-1024x1024@1x.png
+    # The logo as the app draws it (at most 80 px, so 256 px covers 3x
+    # screens). The 1024 px original is only the launcher icons' source
+    # (flutter_launcher_icons.yaml): bundled, it was a 2.5 MB download for
+    # every web visitor (tool/check_web_size.dart).
+    - assets/logo-256.png
     - assets/data/airports.json
     - assets/data/stations.json
   # An image asset can refer to one or more resolution-specific "variants", see

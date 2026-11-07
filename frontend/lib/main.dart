@@ -285,7 +285,7 @@ class _MainScreenState extends State<MainScreen> {
                                 MapGlass.radiusMd,
                               ),
                               child: Image.asset(
-                                'assets/Map-My-Friends-Default-1024x1024@1x.png',
+                                'assets/logo-256.png',
                                 width: 48,
                                 height: 48,
                               ),

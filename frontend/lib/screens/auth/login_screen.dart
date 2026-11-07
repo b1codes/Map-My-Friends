@@ -120,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   MapGlass.radiusMd,
                                 ),
                                 child: Image.asset(
-                                  'assets/Map-My-Friends-Default-1024x1024@1x.png',
+                                  'assets/logo-256.png',
                                   width: 80,
                                   height: 80,
                                 ),
