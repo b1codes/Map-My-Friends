@@ -7,9 +7,65 @@ rather than Firestore itself.
 
 from __future__ import annotations
 
+import collections
+import contextlib
+import functools
+from unittest.mock import patch
+
 from django.core.cache import cache
+from google.cloud.firestore_v1.services.firestore.client import FirestoreClient
 
 from apps.common import firestore as fs
+
+# Every RPC the Firestore client can send. All of them go through the
+# generated FirestoreClient, whatever the higher-level call (document get,
+# query stream, batch commit, transaction), so counting calls here counts
+# round trips to Firestore.
+FIRESTORE_RPCS = (
+    "batch_get_documents",
+    "batch_write",
+    "begin_transaction",
+    "commit",
+    "create_document",
+    "delete_document",
+    "get_document",
+    "list_collection_ids",
+    "list_documents",
+    "listen",
+    "partition_query",
+    "rollback",
+    "run_aggregation_query",
+    "run_query",
+    "update_document",
+    "write",
+)
+
+
+@contextlib.contextmanager
+def count_firestore_rpcs():
+    """Count the Firestore round trips made inside the block, by RPC name.
+
+    Yields a Counter that fills in as calls are made; sum(counter.values())
+    is the number of round trips. A streamed query counts once, however many
+    documents it returns.
+    """
+    counts: collections.Counter[str] = collections.Counter()
+
+    def counting(name, original):
+        @functools.wraps(original)
+        def wrapper(self, *args, **kwargs):
+            counts[name] += 1
+            return original(self, *args, **kwargs)
+
+        return wrapper
+
+    with contextlib.ExitStack() as stack:
+        for name in FIRESTORE_RPCS:
+            original = getattr(FirestoreClient, name)
+            stack.enter_context(
+                patch.object(FirestoreClient, name, counting(name, original))
+            )
+        yield counts
 
 
 def _delete_document(reference, batch_size: int) -> None:
