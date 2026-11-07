@@ -1,3 +1,4 @@
+import 'package:map_my_friends/components/map/person_map_marker.dart';
 import 'dart:async';
 
 import 'package:bloc_test/bloc_test.dart';
@@ -1025,6 +1026,32 @@ void main() {
       expect(controller(tester).camera.rotation, 0);
       expect(find.text('N'), findsNothing);
     });
+  });
+
+  // 500 people around the map's centre are clustered, so the map draws a
+  // few dozen badges and pins rather than a pin per person. A badge draws a
+  // few of its members' pins too, which is why it isn't fewer (78 when this
+  // was written).
+  testWidgets('a large account is clustered, not drawn pin by pin', (
+    tester,
+  ) async {
+    when(() => peopleBloc.state).thenReturn(
+      PeopleLoaded([
+        for (var i = 0; i < 500; i++)
+          _person(
+            '$i',
+            'Friend',
+            'Number $i',
+            lat: _fallbackCenter.latitude + (i % 25 - 12) * 0.002,
+            lon: _fallbackCenter.longitude + (i ~/ 25 - 10) * 0.002,
+          ),
+      ]),
+    );
+    await pumpMap(tester);
+    await _settle(tester);
+
+    final pins = find.byType(PersonMapMarker, skipOffstage: false);
+    expect(pins.evaluate().length, lessThan(100));
   });
 }
 

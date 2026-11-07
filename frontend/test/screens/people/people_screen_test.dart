@@ -192,4 +192,31 @@ void main() {
     expect(find.text('Loading your people'), findsNothing);
     expect(find.text('Ann Lee'), findsOneWidget);
   });
+
+  // A large account builds only the cards on screen, so the list stays as
+  // quick to open with 500 people as with 5 (both layouts are lazy builders).
+  group('a large account', () {
+    final many = [
+      for (var i = 0; i < 500; i++) _person('$i', 'Friend', 'Number $i'),
+    ];
+
+    for (final (label, size) in [
+      ('phone list', const Size(400, 800)),
+      ('wide grid', const Size(1400, 900)),
+    ]) {
+      testWidgets('the $label builds only a screenful of 500 people', (
+        tester,
+      ) async {
+        when(() => peopleBloc.state).thenReturn(PeopleLoaded(many));
+        await pumpScreen(tester, size: size);
+        await settle(tester);
+
+        expect(find.text('Friend Number 0'), findsOneWidget);
+        expect(
+          find.byType(PersonCard, skipOffstage: false).evaluate().length,
+          lessThan(40),
+        );
+      });
+    }
+  });
 }

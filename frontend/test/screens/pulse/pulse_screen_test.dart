@@ -536,4 +536,32 @@ void main() {
       expect(find.byType(SnackBar), findsNothing);
     });
   });
+
+  // A large account builds only the roster rows on screen.
+  testWidgets('a large account builds only a screenful of 500 people', (
+    tester,
+  ) async {
+    whenListen(
+      bloc,
+      const Stream<PulseState>.empty(),
+      initialState: PulseLoaded(
+        people: [
+          for (var i = 0; i < 500; i++)
+            _person('$i', 'Friend', 'Number $i', daysAgo: i % 90),
+        ],
+        logs: [
+          for (var i = 0; i < 2000; i++)
+            _log('l$i', '${i % 500}', ContactChannel.call, i % 60),
+        ],
+      ),
+    );
+    await pumpPulse(tester);
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(find.byType(ContactRosterTile), findsWidgets);
+    expect(
+      find.byType(ContactRosterTile, skipOffstage: false).evaluate().length,
+      lessThan(40),
+    );
+  });
 }

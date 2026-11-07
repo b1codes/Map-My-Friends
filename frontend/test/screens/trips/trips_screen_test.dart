@@ -354,6 +354,30 @@ void main() {
     expect(find.byType(PulseIndicator), findsNothing);
     expect(find.text('Lisbon Weekend'), findsOneWidget);
   });
+
+  // A large account builds only the trip rows on screen.
+  testWidgets('a large account builds only a screenful of 300 trips', (
+    tester,
+  ) async {
+    withTrips([
+      for (var i = 0; i < 300; i++)
+        Trip(
+          id: 't$i',
+          name: 'Trip number $i',
+          date: DateTime(2026, 1 + i % 12, 1 + i % 28),
+          status: i.isEven ? TripStatus.draft : TripStatus.booked,
+          stops: _stops(3),
+        ),
+    ]);
+    await pumpTrips(tester);
+    await _settle(tester);
+
+    expect(find.byType(ListTile), findsWidgets);
+    expect(
+      find.byType(ListTile, skipOffstage: false).evaluate().length,
+      lessThan(40),
+    );
+  });
 }
 
 Future<void> _settle(WidgetTester tester) async {
