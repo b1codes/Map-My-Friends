@@ -18,7 +18,8 @@ services:
     image: map-my-friends-backend
     # The journeys sign up and sign in from one address many times a minute,
     # far past the real limits, so the throttle rates are raised
-    # (docker/test-stack-settings/unthrottled_settings.py).
+    # (docker/test-stack-settings/unthrottled_settings.py, which
+    # e2e_settings.py builds on).
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py runserver 0.0.0.0:8000 --noreload"
@@ -41,7 +42,10 @@ services:
       - NOMINATIM_SCHEME=http
       - OSRM_BASE_URL=http://stubs:8090/route/v1/driving
       - PYTHONPATH=/test-stack-settings
-      - DJANGO_SETTINGS_MODULE=unthrottled_settings
+      # The unthrottled settings plus a log of the requests the API answers,
+      # which the request-budget journeys read
+      # (docker/test-stack-settings/e2e_settings.py).
+      - DJANGO_SETTINGS_MODULE=e2e_settings
 
   firestore:
     build:

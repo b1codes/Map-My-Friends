@@ -37,6 +37,8 @@ services:
       # is how scripts/dast.sh reaches the published port.
       - ALLOWED_HOSTS=api,localhost,127.0.0.1
       - CORS_ALLOWED_ORIGINS=http://localhost:3000
+      # Without the E2E stack's request log (e2e_settings.py).
+      - DJANGO_SETTINGS_MODULE=unthrottled_settings
       - DJANGO_SQLITE_PATH=/tmp/dast.sqlite3
 
   stubs:

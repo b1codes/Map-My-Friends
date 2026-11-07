@@ -29,6 +29,8 @@ Nominatim, OSRM and the OpenStreetMap tile servers are volunteer-run. They rate-
 - **Tiles:** one plain tile for every request.
 - **Call log:** every call is logged. Read it with `E2EApi.stubLog()` and reset it with `E2EApi.clearStubLog()`.
 
+The E2E stack's API keeps a log too, of every request it answers, by user ([`request_log.py`](../../docker/test-stack-settings/request_log.py), loaded only on this stack). `E2EApi.requestLog(user)` reads it as `METHOD path` with ids as `{id}`, and `E2EApi.clearRequestLog()` resets it. The request-budget journeys in `journeys/requests_test.dart` use it to check what the app asks for when it opens and on each tab.
+
 ## Writing a journey
 
 Journeys live in `journeys/`, one file per area, and every file is imported by `all_test.dart`. `flutter drive` compiles once per target, so CI runs that single entry point.

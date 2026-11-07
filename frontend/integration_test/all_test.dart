@@ -5,6 +5,7 @@ import 'journeys/auth_test.dart' as auth;
 import 'journeys/map_test.dart' as map;
 import 'journeys/people_test.dart' as people;
 import 'journeys/profile_test.dart' as profile;
+import 'journeys/requests_test.dart' as requests;
 import 'journeys/trips_test.dart' as trips;
 
 void main() {
@@ -12,5 +13,6 @@ void main() {
   map.main();
   people.main();
   profile.main();
+  requests.main();
   trips.main();
 }

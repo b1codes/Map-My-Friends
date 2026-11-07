@@ -417,6 +417,29 @@ class E2EApi {
 
   static Future<void> clearStubLog() =>
       Dio().delete<dynamic>('$stubsUrl/_stub/requests');
+
+  static String get _requestLogUrl =>
+      Uri.parse(apiBaseUrl).resolve('/_e2e/requests/').toString();
+
+  /// The API requests [user] has sent since [clearRequestLog], oldest first,
+  /// as `METHOD path` with ids replaced by `{id}`. The E2E stack's API
+  /// records them (docker/test-stack-settings/request_log.py).
+  static Future<List<String>> requestLog(JourneyUser user) async {
+    final response = await Dio().get<dynamic>(
+      _requestLogUrl,
+      queryParameters: {'user': user.username},
+    );
+    return [
+      for (final entry in (response.data as List).cast<Map<String, dynamic>>())
+        '${entry['method']} ${(entry['path'] as String).replaceAll(_docId, '/{id}/')}',
+    ];
+  }
+
+  /// Firestore's generated document ids: 20 letters and digits.
+  static final RegExp _docId = RegExp(r'/[A-Za-z0-9]{20}/');
+
+  static Future<void> clearRequestLog() =>
+      Dio().delete<dynamic>(_requestLogUrl);
 }
 
 /// Retries a throttled (429) request after the wait DRF reports.

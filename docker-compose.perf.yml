@@ -44,6 +44,8 @@ services:
       - DJANGO_SECRET_KEY=${PERF_SECRET_KEY:?set PERF_SECRET_KEY, or run make load}
       - ALLOWED_HOSTS=api,localhost,127.0.0.1
       - CORS_ALLOWED_ORIGINS=http://localhost:3000
+      # Without the E2E stack's request log (e2e_settings.py).
+      - DJANGO_SETTINGS_MODULE=unthrottled_settings
       - DJANGO_SQLITE_PATH=/tmp/perf.sqlite3
       - FIRESTORE_EMULATOR_HOST=toxiproxy:8080
 
