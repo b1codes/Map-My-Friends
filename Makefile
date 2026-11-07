@@ -58,6 +58,14 @@ test-frontend-cov:
 	cd frontend && $(FLUTTER) test --coverage --test-randomize-ordering-seed random
 	cd frontend && $(DART) run tool/check_coverage.dart
 
+# The web download budget, the same as CI: a release web build, then
+# frontend/tool/check_web_size.dart against it.
+web-size:
+	cd frontend && $(FLUTTER) build web --release
+	cd frontend && $(DART) run tool/check_web_size.dart build/web
+
+.PHONY: web-size
+
 # Static analysis, the same as CI. Ruff's version is read from
 # `required-version` in backend/pyproject.toml; actionlint is pinned by digest
 # here, and CI runs this target.

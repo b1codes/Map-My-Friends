@@ -192,6 +192,15 @@ jobs:
       - name: Check Coverage Gate
         run: dart run tool/check_coverage.dart
 
+      # What a visitor's browser downloads, gzipped: the compiled app and
+      # each bundled asset, against the budgets in tool/check_web_size.dart.
+      # Writes the table to the job page.
+      - name: Build Web Release
+        run: flutter build web --release
+
+      - name: Check Web Download Size
+        run: dart run tool/check_web_size.dart build/web
+
       - name: Upload Coverage Report
         if: ${{ !cancelled() && hashFiles('frontend/coverage/lcov.info') != '' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
