@@ -11,6 +11,7 @@ without touching the datastore.
 
 from __future__ import annotations
 
+import threading
 import time
 
 from django.conf import settings
@@ -22,6 +23,21 @@ from timezonefinder import TimezoneFinder
 
 USER_AGENT = "map_my_friends_global_connect"
 MAX_ATTEMPTS = 3
+
+
+# Each thread's TimezoneFinder. Building one loads the timezone polygons,
+# about 300 ms of CPU against about 1 ms for a lookup, and the library says an
+# instance isn't safe to share between threads (gunicorn runs the API in
+# several). Built per call, it held a Cloud Run instance's one vCPU for 300 ms
+# on every person save.
+_finders = threading.local()
+
+
+def _timezone_finder() -> TimezoneFinder:
+    finder = getattr(_finders, "finder", None)
+    if finder is None:
+        finder = _finders.finder = TimezoneFinder()
+    return finder
 
 
 class GeocodingUnavailable(ValidationError):
@@ -48,7 +64,7 @@ def geocode_address(
         domain=settings.NOMINATIM_DOMAIN,
         scheme=settings.NOMINATIM_SCHEME,
     )
-    finder = TimezoneFinder()
+    finder = _timezone_finder()
 
     # Structured query gives better international accuracy than a free-text one.
     query = {"city": city, "state": state, "country": country}
