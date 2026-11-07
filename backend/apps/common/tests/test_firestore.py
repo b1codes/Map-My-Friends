@@ -1,10 +1,12 @@
 import os
 from unittest import mock
+from unittest.mock import patch
 
 import firebase_admin
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.test import SimpleTestCase, override_settings
+from google.api_core import exceptions
 
 from apps.common import firestore as fs
 from apps.common.testing import FirestoreTestMixin
@@ -100,3 +102,71 @@ class FirestoreClientInitialisationTests(SimpleTestCase):
 
         with mock.patch.object(fs, "_lock", _LockLostRace()):
             self.assertIs(fs.get_client(), winner)
+
+
+class RunTransactionTests(FirestoreTestMixin, SimpleTestCase):
+    """run_transaction retries contention in rounds with a random wait
+    between them, and nothing else."""
+
+    collections_to_purge = ["run_transaction_tests"]
+
+    def setUp(self):
+        super().setUp()
+        sleep = patch("apps.common.firestore.time.sleep")
+        self.sleep = sleep.start()
+        self.addCleanup(sleep.stop)
+
+    def rounds(self):
+        """Run the transaction function once per round, without the client's
+        own transaction wrapper, so a test decides how each round ends."""
+        return patch("apps.common.firestore.gcloud_transactional", lambda f: f)
+
+    @staticmethod
+    def contention():
+        # What the client raises when every attempt in a round aborted.
+        error = ValueError("Failed to commit transaction in 3 attempts.")
+        error.__cause__ = exceptions.Aborted("contention")
+        return error
+
+    def test_commits_and_returns_the_result(self):
+        ref = fs.collection("run_transaction_tests").document("doc")
+
+        def write(transaction):
+            transaction.set(ref, {"written": True})
+            return "done"
+
+        self.assertEqual(fs.run_transaction(write), "done")
+        self.assertTrue(ref.get().to_dict()["written"])
+        self.sleep.assert_not_called()
+
+    def test_waits_a_growing_random_time_after_each_round_lost(self):
+        calls = []
+
+        def lose_three_rounds(_transaction):
+            calls.append(1)
+            if len(calls) <= 3:
+                raise self.contention()
+            return "done"
+
+        with self.rounds():
+            self.assertEqual(fs.run_transaction(lose_three_rounds), "done")
+        waits = [c.args[0] for c in self.sleep.call_args_list]
+        self.assertEqual(len(waits), 3)
+        for round_, wait in enumerate(waits):
+            self.assertLessEqual(wait, fs.BACKOFF_BASE_S * 2**round_)
+
+    def test_gives_up_after_the_last_round(self):
+        def always_lose(_transaction):
+            raise self.contention()
+
+        with self.rounds(), self.assertRaises(ValueError):
+            fs.run_transaction(always_lose)
+        self.assertEqual(self.sleep.call_count, fs.TRANSACTION_ROUNDS - 1)
+
+    def test_other_errors_are_not_retried(self):
+        def broken(_transaction):
+            raise ValueError("a bug in the transaction's own code")
+
+        with self.rounds(), self.assertRaisesRegex(ValueError, "own code"):
+            fs.run_transaction(broken)
+        self.sleep.assert_not_called()

@@ -22,7 +22,6 @@ import itertools
 from dataclasses import dataclass, field, fields, replace
 from datetime import UTC, datetime
 
-from google.cloud.firestore_v1 import transactional
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 from apps.airports import reference as airport_reference
@@ -430,7 +429,6 @@ class TripRepository:
             {**data, "sequence_order": sequence_order}, 0, owner_key
         )
 
-        @transactional
         def create(transaction) -> TripStopRecord | None:
             trip = trip_ref.get(transaction=transaction)
             if not trip.exists or (trip.to_dict() or {}).get("owner_key") != owner_key:
@@ -457,7 +455,7 @@ class TripRepository:
             write.add_missing_legs()
             return stop
 
-        return create(fs.transaction())
+        return fs.run_transaction(create)
 
     def replace_stops(self, trip_id: str, owner_key: str, stops_data: list) -> bool:
         """Replace a trip's stops wholesale, and so its legs, in one commit.

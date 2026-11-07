@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass, fields
 from datetime import UTC, datetime
 
-from google.cloud.firestore_v1 import DELETE_FIELD, transactional
+from google.cloud.firestore_v1 import DELETE_FIELD
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 from apps.common import firestore as fs
@@ -275,7 +275,6 @@ class ContactLogRepository:
 
         # In a transaction, so two logs written at once can't leave the
         # person showing the older one as their last contact.
-        @transactional
         def write(transaction) -> bool:
             person = person_ref.get(transaction=transaction)
             person_data = person.to_dict() if person.exists else None
@@ -286,7 +285,7 @@ class ContactLogRepository:
                 transaction.update(person_ref, _last_contact(payload))
             return True
 
-        if not write(fs.transaction()):
+        if not fs.run_transaction(write):
             return None
         return self._record(ref.id, person_id, payload)
 
@@ -301,7 +300,6 @@ class ContactLogRepository:
             .limit(2)
         )
 
-        @transactional
         def write(transaction):
             # The two most recent logs are enough: whether or not this log is
             # one of them, the other is the most recent of the rest.
@@ -319,7 +317,7 @@ class ContactLogRepository:
             latest = max(candidates, key=lambda log: log["contacted_at"], default=None)
             transaction.update(person_ref, _last_contact(latest))
 
-        write(fs.transaction())
+        fs.run_transaction(write)
 
     def update(
         self, log_id: str, owner_key: str | None, data: dict
