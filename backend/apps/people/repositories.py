@@ -286,7 +286,7 @@ class ContactLogRepository:
                 transaction.update(person_ref, _last_contact(payload))
             return True
 
-        if not write(fs.get_client().transaction()):
+        if not write(fs.transaction()):
             return None
         return self._record(ref.id, person_id, payload)
 
@@ -319,7 +319,7 @@ class ContactLogRepository:
             latest = max(candidates, key=lambda log: log["contacted_at"], default=None)
             transaction.update(person_ref, _last_contact(latest))
 
-        write(fs.get_client().transaction())
+        write(fs.transaction())
 
     def update(
         self, log_id: str, owner_key: str | None, data: dict

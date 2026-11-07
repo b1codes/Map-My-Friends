@@ -97,3 +97,17 @@ def delete_all(refs) -> None:
         for ref in refs[start : start + MAX_WRITES_PER_COMMIT]:
             batch.delete(ref)
         batch.commit()
+
+
+# How many times a transaction is tried before it gives up. The client's
+# default is 5. A retried transaction keeps its place in line, so each
+# attempt that loses to a concurrent writer is followed by one that goes
+# first. But a person or trip being written by several requests at once (a
+# log saved twice from a flaky connection, the load test) can need one
+# attempt per writer.
+MAX_TRANSACTION_ATTEMPTS = 10
+
+
+def transaction():
+    """A new transaction, retried up to MAX_TRANSACTION_ATTEMPTS times."""
+    return get_client().transaction(max_attempts=MAX_TRANSACTION_ATTEMPTS)

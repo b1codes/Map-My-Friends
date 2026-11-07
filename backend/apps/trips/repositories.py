@@ -457,7 +457,7 @@ class TripRepository:
             write.add_missing_legs()
             return stop
 
-        return create(fs.get_client().transaction())
+        return create(fs.transaction())
 
     def replace_stops(self, trip_id: str, owner_key: str, stops_data: list) -> bool:
         """Replace a trip's stops wholesale, and so its legs, in one commit.
