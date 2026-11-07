@@ -140,6 +140,15 @@ check-dast-routes:
 
 .PHONY: scan-deps scan-secrets dast check-dast-routes
 
+# Load test: perf/load.js in k6 against a throwaway stack shaped like one
+# Cloud Run instance (docker-compose.perf.yml), with Firestore latency
+# added. About 6 minutes; results in build/perf/. scripts/load.sh lists the
+# settings, e.g. PERF_DURATION=1m make load. CI runs it nightly.
+load:
+	scripts/load.sh
+
+.PHONY: load
+
 # Poetry helpers
 install:
 	docker compose exec api poetry install

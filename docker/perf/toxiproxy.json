@@ -1,0 +1,8 @@
+[
+  {
+    "name": "firestore",
+    "listen": "0.0.0.0:8080",
+    "upstream": "firestore:8080",
+    "enabled": true
+  }
+]

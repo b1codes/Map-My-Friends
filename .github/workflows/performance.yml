@@ -1,0 +1,61 @@
+name: Nightly Performance
+
+# The k6 load test (perf/load.js) against a stack shaped like one Cloud Run
+# instance, too slow to run on every PR (about 6 minutes with the image
+# builds). The round-trip budgets in the backend suite already run on every
+# PR; this catches what they can't: latency under concurrent load, a worker
+# that dies or leaks, and a slow cold start. docs/testing.md (Performance)
+# has the budgets and what to do when one fails.
+#
+# It runs the same make target as locally. A manual run (workflow_dispatch)
+# works from any branch, e.g. to check a PR before merging, and a PR that
+# changes the load test or its stack runs it too.
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - perf/**
+      - scripts/load.sh
+      - docker-compose.perf.yml
+      - docker-compose.e2e.yml
+      - docker/perf/**
+      - .github/workflows/performance.yml
+
+permissions:
+  contents: read
+
+jobs:
+  load:
+    name: Load Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # ratchet:docker/setup-buildx-action@v3
+
+      - name: Run the Load Test
+        run: make load
+
+      # The latency table, cold start and memory, on the run's page.
+      - name: Write the Summary
+        if: ${{ !cancelled() }}
+        run: cat build/perf/summary.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      # Every k6 metric, and the API's log (tracebacks for any 5xx). Uploaded
+      # on failure too, which is when they're needed most.
+      - name: Upload Results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: load-test
+          path: |
+            build/perf/summary.md
+            build/perf/summary.json
+            build/perf/api.log
+            build/perf/stack.log
+          if-no-files-found: ignore
