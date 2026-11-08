@@ -4,6 +4,8 @@ Automation covers almost everything: the backend and frontend unit suites, the [
 
 If an item here becomes automatable, move it into a suite and delete it from this list.
 
+The checks that need a real Google Cloud project, done once on the first deploy and again after infrastructure changes, are in [docs/deploy.md](deploy.md#the-first-deploy).
+
 ## Sign-in with Auth0
 
 The E2E journeys cover username and password accounts. Auth0 redirects to a hosted login page, which can't run headless.

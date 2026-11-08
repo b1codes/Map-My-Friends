@@ -8,15 +8,18 @@ What runs on every pull request, what each check enforces, and how to run the sa
 
 | Job | What it checks | Fails when | Locally |
 | --- | --- | --- | --- |
-| Lint & Format Backend | Ruff format and lint on `backend/` | anything isn't formatted, or a rule fires | `make lint-backend` |
+| Lint & Format Backend | Ruff format and lint on `backend/` and `smoke/` | anything isn't formatted, or a rule fires | `make lint-backend` |
 | Test Backend | the Django suite on the Firestore emulator, in random order, under coverage | a test fails, or branch coverage is below the gate | `make test-cov` |
 | Lint, Format, & Test Frontend | dart format, `flutter analyze` (the app and the golden harness), the Flutter suite in random order under coverage, goldens included, then a release web build's download size | a test fails, a golden differs, the analyzer reports anything (infos too), line coverage is below the gate, or the web download is over [its budget](#web-download-size) | `make lint-frontend`, `make test-frontend-cov`, `make goldens`, `make web-size` |
 | Lint, Format, & Test Widgetbook | the component catalog is regenerated, formatted and analyzed, every entry opens, every entry matches its light and dark golden, and every entry passes the [accessibility checks](#accessibility) | the committed catalog is stale, an entry throws, a golden differs, or an accessibility check finds a different number of problems than its known gaps record | `make goldens` for the goldens; see the job for the rest |
 | E2E Journeys | the real app in headless Chrome against a throwaway full stack | a journey fails | `make e2e` |
 | Lint Workflows | actionlint and shellcheck on every workflow | a workflow has an error | `make lint-workflows` |
-| Validate Terraform Configuration | `terraform fmt` | anything isn't formatted | `terraform fmt -check -recursive infra` |
+| Production Image | the [production image](#the-production-image), booted as Cloud Run runs it, then scanned | a hadolint finding, a behaviour check, or a fixable HIGH/CRITICAL CVE | `make prod-image` |
+| Smoke Test | the [smoke test](#the-smoke-test)'s own tests, then the smoke test against the production image on a throwaway stack | a check fails | `make smoke` |
+| Firestore Rules | [`firestore.rules`](#firestore-rules) in the emulator | any client access is allowed | `make test-rules` |
+| Validate Terraform | [`infra/`](#terraform): fmt, validate, `terraform test` with mocked providers, tflint, trivy config | anything isn't formatted or valid, an assertion fails, or a lint or misconfiguration finding | `make check-infra` |
 
-`make check` runs the linters and both coverage gates, which is everything above except the catalog, the goldens (off Linux x64) and the journeys. The backend half needs the dev stack (`make up`). Frontend targets use `fvm`; override with `make check FLUTTER=flutter DART=dart`.
+`make check` runs the linters and both coverage gates, which is everything above except the catalog, the goldens (off Linux x64), the journeys and the infrastructure checks. The backend half needs the dev stack (`make up`). Frontend targets use `fvm`; override with `make check FLUTTER=flutter DART=dart`.
 
 The contract tests have no job of their own. They're part of the backend and frontend suites.
 
@@ -101,7 +104,9 @@ Both suites run in a random order on every CI run, so a test that only passes af
 
 `.github/workflows/contracts-live.yml` checks the real Auth0, OSRM and Overpass against the third-party contracts. It runs nightly instead of per PR because those are public services with outages, and an outage shouldn't block unrelated work.
 
-`.github/workflows/security.yml` runs the [security scans](#security-scans), and `.github/workflows/performance.yml` runs the [load test](#the-load-test). The load test also runs on a PR that changes it or its stack.
+`.github/workflows/security.yml` runs the [security scans](#security-scans) and the production image's checks (new CVEs appear in its OS packages without any code change), and `.github/workflows/performance.yml` runs the [load test](#the-load-test). The load test also runs on a PR that changes it or its stack.
+
+`.github/workflows/smoke.yml` runs the [smoke test](#the-smoke-test) against production every hour, once `SMOKE_BASE_URL` is set.
 
 ## Security scans
 
@@ -109,7 +114,7 @@ Three scanners look for what the test suites can't: vulnerable dependencies, lea
 
 | Scan | What it checks | Fails when | Where it runs | Locally |
 | --- | --- | --- | --- | --- |
-| Dependency Scan | every lockfile (`backend/poetry.lock` and each `pubspec.lock`) against the [OSV](https://osv.dev) database, with OSV-Scanner | any known vulnerability that `.osv-scanner.toml` doesn't ignore | every PR (ci.yml), and nightly (security.yml), since new advisories appear without code changes | `make scan-deps` |
+| Dependency Scan | every lockfile (`backend/poetry.lock`, each `pubspec.lock`, and the rules test's `package-lock.json`) against the [OSV](https://osv.dev) database, with OSV-Scanner | any known vulnerability that `.osv-scanner.toml` doesn't ignore | every PR (ci.yml), and nightly (security.yml), since new advisories appear without code changes | `make scan-deps` |
 | Secret Scan | gitleaks' rules plus a Django `SECRET_KEY` rule (`.gitleaks.toml`) over git commits | anything that looks like a credential, unless it is an allowlisted fixture | every PR, over the PR's commits; nightly over the whole history | `make scan-secrets` (whole history), or `make scan-secrets GITLEAKS_LOG_OPTS=origin/main..HEAD` |
 | ZAP API Scan | OWASP ZAP's API scan (passive and active rules: injection, error disclosure, headers, and so on) against a throwaway stack running as production does | a medium or high alert that `.zap/rules.tsv` doesn't triage, or any 5xx from the API | nightly and on demand (security.yml, workflow_dispatch); too slow for every PR (see below) | `make dast` |
 | DAST route check | the scan's API definition against the routes Django serves | a route is served that the scan doesn't know, or the other way round | every PR, in Test Backend | `make check-dast-routes` (needs `make up`) |
@@ -128,7 +133,7 @@ These run with the backend and frontend suites on every PR:
 
 The E2E and DAST stacks raise the throttle rates (`docker/test-stack-settings/unthrottled_settings.py`), because their journeys and scans send far more requests from one address than a person would.
 
-What a production deployment must set: `DJANGO_SECRET_KEY` (with DEBUG off, which is the default, the app refuses to start on the committed development key), `DJANGO_NUM_PROXIES=1` behind nginx (otherwise every client shares nginx's address for rate limiting), `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, and `SECURE_SSL_REDIRECT=True` once nginx serves HTTPS. `backend/.env.example` lists them.
+What a production deployment must set: `DJANGO_SECRET_KEY` (with DEBUG off, which is the default, the app refuses to start on the committed development key), `DJANGO_NUM_PROXIES=1` behind Cloud Run's front end (otherwise every client shares its address for rate limiting), `ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `SECURE_SSL_REDIRECT=True` and `GS_BUCKET_NAME`. Terraform sets them all (`infra/locals.tf`), `infra/tests` checks it does, and `backend/.env.example` lists them.
 
 ### The dependency scan
 
@@ -209,12 +214,54 @@ The E2E stack's API logs every request it answers, by user (`docker/test-stack-s
 
 `PERF_DURATION=1m make load` gives a quick run, and `PERF_KEEP_STACK=1` leaves the stack up.
 
+## Infrastructure and deployment
+
+Four checks cover what's deployed and how, none of which needs a Google Cloud project. A fifth, the smoke test, also runs against the real deployment.
+
+### The production image
+
+`backend/Dockerfile` builds two images. `dev` is for the dev, test and E2E stacks. `production` is what Cloud Run runs, and what the DAST and load-test stacks run too: the app's dependencies only, no compilers, pip or Poetry, a non-root user, gunicorn on `$PORT` with one worker and 8 threads, translations compiled, static files collected, and Django's SQLite tables migrated into a template at build time, so a cold start copies a file instead of running `migrate`.
+
+`scripts/prod-image.sh` (`make prod-image`) lints the Dockerfile with hadolint, then starts the image the way Cloud Run does: configured only through env, on `$PORT`, at 1 vCPU and 512 MiB, with the root filesystem read-only apart from `/tmp`. It checks:
+
+- `/health` answers a probe's own Host over plain HTTP, other hosts get 400, and plain HTTP is redirected
+- DEBUG is off: an unknown page is a plain 404, with no debug page
+- HSTS is set, CORS allows only the web app, and static files are served
+- it runs as non-root, with no build or dev tooling
+- it stops on SIGTERM within Cloud Run's 10 s, and exits cleanly
+- without its own `DJANGO_SECRET_KEY` it exits with an error instead of serving
+
+Then Trivy fails it on a HIGH or CRITICAL CVE with a fix available, or a secret in any layer. The base image can lag Debian's security fixes, so the build applies them. The release runs the same script on the image it pushes.
+
+### Firestore rules
+
+Django uses the Admin SDK, which bypasses `firestore.rules`, so the rules deny every client. `docker/firebase-emulator/rules-test` (`make test-rules`) holds them to that with @firebase/rules-unit-testing in the emulator, in 264 checks. It tries get, list, owner query, collection-group query, create, set, update, delete, batch and transaction on every collection the API writes. Each runs as signed out, a stranger, the owner, the owner with a verified email, and an admin claim. Each must get permission-denied, and the data is compared afterwards to show nothing changed. A last group loads looser rules and shows the checks then fail.
+
+### Terraform
+
+`scripts/infra.sh` (`make check-infra`) runs `terraform fmt`, `validate` against the locked providers, `terraform test`, tflint (recommended rules plus the Google ruleset) and `trivy config`. The images are pinned in `scripts/tool-images.sh`.
+
+`infra/tests/infra.tftest.hcl` applies the configuration against mocked providers and asserts what it must be: the API scales to zero and stops at `max_instances`; probes call `/health`; DEBUG is off; the hosts and CORS origins are only the service's and the web app's; the secret key comes only from Secret Manager and never enters state; photos are readable by URL but the bucket can't be listed; no account gets Owner or Editor; only `release.yml` on `main` can deploy; old images are cleaned up; and Firestore is protected from deletion. A mock can't show the real API would accept the config. `validate` and tflint catch most of that, and the first apply catches the rest.
+
+trivy's two findings are deliberate, so each carries a `#trivy:ignore` with its reason: the bucket's public object reads, and no object versioning.
+
+### The smoke test
+
+`smoke/smoke.py` checks a deployed API the way a user would use it. `/health` answers, sign-in works, the nearest airport to Heathrow is LHR, a trip can be created, listed and deleted in Firestore, and the web app's origin passes CORS. It deletes its trip even when a later check fails.
+
+| Where | Against | When |
+| --- | --- | --- |
+| Smoke Test job, `make smoke` | the production image on a throwaway stack (the DAST stack, with the Firestore emulator), after the script's own tests (`smoke/test_smoke.py`, against a fake API) | every PR |
+| `release.yml` | the new revision before it takes traffic, then the live URL | every release |
+| `smoke.yml` | production (`SMOKE_BASE_URL`) | hourly, and on demand. A failure opens a `smoke-failure` issue. |
+
 ## Releases
 
-`.github/workflows/release.yml` deploys only after CI passes on `main`:
+`.github/workflows/release.yml` deploys to Cloud Run and Firebase Hosting, only after CI passes on `main`. [docs/deploy.md](deploy.md) has each step and how to roll back:
 
-- It runs when the CI Pipeline finishes on `main`. Its gate job continues only if that run succeeded and was a push.
-- It deploys the commit CI tested, not whatever `main` points at by then. The web build checks out that commit, and the server fast-forwards to it.
+- It runs when the CI Pipeline finishes on `main`. Its gate job continues only if that run succeeded and was a push, and only once the GCP repository variables are set ([infra/README.md](../infra/README.md)).
+- It deploys the commit CI tested, not whatever `main` points at by then.
+- A new API revision gets no traffic until it passes the smoke test at its own URL. If the live URL then fails, traffic goes back to the previous revision.
 - A manual run (`workflow_dispatch`) on `main` deploys `main` as it is, for when CI itself is broken. Use it sparingly.
 
 Branch protection on `main` requires **CI Passed** (from GitHub Actions) as well as a code-owner review, so a PR can't merge with a failing job. That's a repository setting, not a file. A new CI job only blocks merges once it's listed in CI Passed's `needs`.
