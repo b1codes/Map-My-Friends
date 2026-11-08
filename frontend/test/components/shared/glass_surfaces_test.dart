@@ -383,6 +383,36 @@ void main() {
         )
         .color!;
 
+    // The message sat in a Padding that wasn't Expanded, so its Flexible
+    // text had unbounded width and a long message ran off the screen (the
+    // real password-reset message by 759 px). ClickUp 86bcqz5c1, item 2.
+    for (final (label, action) in [('', null), (' and an action', 'Undo')]) {
+      testWidgets('a long toast$label wraps on a phone', (tester) async {
+        tester.view
+          ..devicePixelRatio = 1
+          ..physicalSize = const Size(390, 844);
+        addTearDown(tester.view.reset);
+        const message =
+            "If an account exists for that email, we've sent a link to reset "
+            'your password. It expires in an hour, so check your inbox and '
+            'your spam folder soon.';
+        await toast(
+          tester,
+          (c) => GlassToast.show(
+            c,
+            message,
+            tone: ToastTone.failure,
+            actionLabel: action,
+            onAction: action == null ? null : () {},
+          ),
+        );
+
+        expect(tester.takeException(), isNull);
+        expect(find.text(message), findsOneWidget);
+        expect(tester.getSize(find.text(message)).width, lessThan(390));
+      });
+    }
+
     testWidgets('a neutral toast carries the message and no icon', (
       tester,
     ) async {

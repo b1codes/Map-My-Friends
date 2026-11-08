@@ -386,58 +386,63 @@ class GlassToast {
               child: Row(
                 children: <Widget>[
                   Container(width: 3, color: accent),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      MapSpacing.sm,
-                      14,
-                      MapSpacing.sm,
-                      14,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        if (leading != null) ...<Widget>[
-                          Icon(leading, size: 18, color: accent),
-                          const SizedBox(width: MapSpacing.xs),
-                        ],
-                        Flexible(
-                          child: Text(
-                            message,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                        ),
-                        if (actionLabel != null &&
-                            onAction != null) ...<Widget>[
-                          const SizedBox(width: MapSpacing.sm),
-                          // The follow-up offer lives inside the panel and
-                          // reads in the accent, so the message stays one
-                          // object rather than a notice with a button bolted
-                          // to its edge.
-                          TextButton(
-                            onPressed: () {
-                              messenger.hideCurrentSnackBar();
-                              onAction();
-                            },
-                            style: TextButton.styleFrom(
-                              foregroundColor: accent,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: MapSpacing.xs,
-                              ),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
+                  // Expanded, so the message gets the panel's width and
+                  // wraps. Without it the Flexible text below had unbounded
+                  // width, and a long toast ran off the screen instead.
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        MapSpacing.sm,
+                        14,
+                        MapSpacing.sm,
+                        14,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          if (leading != null) ...<Widget>[
+                            Icon(leading, size: 18, color: accent),
+                            const SizedBox(width: MapSpacing.xs),
+                          ],
+                          Flexible(
                             child: Text(
-                              actionLabel,
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: accent,
-                                fontWeight: FontWeight.w600,
+                              message,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface,
                               ),
                             ),
                           ),
+                          if (actionLabel != null &&
+                              onAction != null) ...<Widget>[
+                            const SizedBox(width: MapSpacing.sm),
+                            // The follow-up offer lives inside the panel and
+                            // reads in the accent, so the message stays one
+                            // object rather than a notice with a button bolted
+                            // to its edge.
+                            TextButton(
+                              onPressed: () {
+                                messenger.hideCurrentSnackBar();
+                                onAction();
+                              },
+                              style: TextButton.styleFrom(
+                                foregroundColor: accent,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: MapSpacing.xs,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                actionLabel,
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: accent,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ],
