@@ -105,6 +105,21 @@ class AuthorizationHeaderTests(TestCase):
     def test_challenge_header_advertises_bearer(self):
         self.assertEqual(self.backend.authenticate_header(None), "Bearer")
 
+    # A header is bytes on the wire, and nothing makes a client send UTF-8.
+    # Decoding them used to raise UnicodeDecodeError: a 500 on every route,
+    # for anyone. Found by the API fuzz test (tests/test_fuzz_api.py).
+    def test_token_that_is_not_utf8_is_rejected(self):
+        with self.assertRaisesMessage(
+            exceptions.AuthenticationFailed, "invalid characters"
+        ):
+            self.backend.authenticate(request_with("Bearer \x80\xff"))
+
+    def test_scheme_that_is_not_utf8_is_rejected(self):
+        with self.assertRaisesMessage(
+            exceptions.AuthenticationFailed, "invalid characters"
+        ):
+            self.backend.authenticate(request_with("B\xe9arer abc"))
+
 
 class MockTokenTests(TestCase):
     def setUp(self):
@@ -386,3 +401,12 @@ class Auth0EndpointTests(FirestoreTestMixin, APITestCase):
 
         self.assertEqual(response.status_code, 401)
         self.assertIn("No credentials provided", response.data["detail"])
+
+    def test_header_that_is_not_utf8_is_401(self, _fetch):
+        # WSGI hands headers over as latin-1: this is the raw byte 0x80.
+        self.client.credentials(HTTP_AUTHORIZATION="Bearer \x80")
+
+        response = self.client.get("/api/user/profile/")
+
+        self.assertEqual(response.status_code, 401)
+        self.assertIn("invalid characters", response.data["detail"])

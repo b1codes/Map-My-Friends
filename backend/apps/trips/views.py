@@ -15,6 +15,14 @@ from .serializers import (
 from .services import OSRMService, RoutingError, TransportLookupService
 
 
+def _not_an_object():
+    """The answer to a body that is valid JSON but not an object (a list, a
+    string, a number, null), which the actions below read fields from."""
+    return Response(
+        {"error": "Expected a JSON object."}, status=status.HTTP_400_BAD_REQUEST
+    )
+
+
 class TripViewSet(viewsets.ViewSet):
     permission_classes = [IsAuthenticated]
 
@@ -127,6 +135,8 @@ class TripViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["post"])
     def calculate_route(self, request):
+        if not isinstance(request.data, dict):
+            return _not_an_object()
         coordinates = request.data.get("coordinates")
 
         if not coordinates or not isinstance(coordinates, list):
@@ -208,6 +218,8 @@ class TripLegViewSet(viewsets.ViewSet):
         if leg is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+        if not isinstance(request.data, dict):
+            return _not_an_object()
         identifier = request.data.get("identifier", leg.booking_reference)
         if not identifier:
             return Response(

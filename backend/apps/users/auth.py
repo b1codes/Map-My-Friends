@@ -40,11 +40,22 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
             )
             raise exceptions.AuthenticationFailed(msg)
 
-        auth_type = auth_header[0].decode("utf-8").lower()
+        # Header bytes arrive as whatever the client sent. Bytes that aren't
+        # UTF-8 can't be a token this API issued: refuse them, as DRF's own
+        # TokenAuthentication does, rather than raising a 500.
+        try:
+            auth_type = auth_header[0].decode("utf-8").lower()
+            token = auth_header[1].decode("utf-8")
+        except UnicodeError as e:
+            raise exceptions.AuthenticationFailed(
+                _(
+                    "Invalid Authorization header. It should not contain "
+                    "invalid characters."
+                )
+            ) from e
         if auth_type != "bearer":
             return None
 
-        token = auth_header[1].decode("utf-8")
         return self.authenticate_credentials(request, token)
 
     def authenticate_header(self, request):

@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
@@ -651,6 +652,17 @@ class TripStopsActionTests(TripViewTestCase):
 class CalculateRouteTests(TripViewTestCase):
     GEOMETRY = {"type": "LineString", "coordinates": [[-87.6, 41.8], [-0.1, 51.5]]}
 
+    # Valid JSON, but not an object: request.data.get() used to raise
+    # AttributeError, a 500. Found by the API fuzz test.
+    def test_body_that_is_not_an_object_is_400(self):
+        for body in ([[1, 2], [3, 4]], "coordinates", 42, True, None):
+            with self.subTest(body=body):
+                response = self.client.post(
+                    ROUTE_URL, json.dumps(body), content_type="application/json"
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("JSON object", response.data["error"])
+
     def osrm_response(self, body):
         response = MagicMock()
         response.json.return_value = body
@@ -927,6 +939,17 @@ class SmartLookupTests(TripViewTestCase):
 
     def set_leg(self, **fields):
         self.trips.update_leg(self.trip["id"], self.leg_id, "owner-a", fields)
+
+    # Found by the API fuzz test: a 500, as in calculate_route.
+    def test_body_that_is_not_an_object_is_400(self):
+        self.set_leg(transport_type="FLIGHT", booking_reference="BA123")
+        for body in (["BA123"], "BA123", 7, False, None):
+            with self.subTest(body=body):
+                response = self.client.post(
+                    self.url, json.dumps(body), content_type="application/json"
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("JSON object", response.data["error"])
 
     def test_flight_lookup_uses_booking_reference_and_merges_ticket_data(self):
         self.set_leg(
