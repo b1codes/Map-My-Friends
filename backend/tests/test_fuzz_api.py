@@ -394,8 +394,10 @@ for _interaction in interactions():
 
 def _forged_auth0(payload: dict) -> str:
     """A token with Auth0's issuer, signed with a key Auth0 never issued."""
+    # The issuer last, so a generated "iss" claim can't replace it (PyJWT
+    # refuses to sign a non-string issuer).
     return jwt.encode(
-        {"iss": "https://map-my-friends.us.auth0.com/", **payload},
+        {**payload, "iss": "https://map-my-friends.us.auth0.com/"},
         "not-auth0",
         algorithm="HS256",
     )
