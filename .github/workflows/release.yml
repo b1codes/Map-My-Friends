@@ -1,9 +1,18 @@
 name: Production Release Pipeline
 
-# Deploys only a commit on main that passed CI: this runs when the CI Pipeline
-# finishes there, and only if it succeeded (the CI Passed job covers every
-# check). It deploys that commit, not whatever main points at by then.
-# A manual run deploys the head of main as it is, for when CI itself is broken.
+# Deploys only a commit on main that passed CI. This runs when the CI
+# Pipeline finishes there, and only if it succeeded (the CI Passed job covers
+# every check). It deploys that commit, not whatever main points at by then.
+# A manual run deploys main's head as it is, for when CI itself is broken.
+#
+# Where: Cloud Run (the API) and Firebase Hosting (the web app), on what
+# infra/ creates. docs/deploy.md has the steps and how to roll back. Nothing
+# deploys until the repository variables from infra/README.md are set; until
+# then the gate job says so in its summary and stops.
+#
+# A new API revision starts with no traffic and is smoke-tested at its own
+# URL. Traffic moves to it only if that passes, and if the live URL then
+# fails the smoke test, traffic goes back to the previous revision.
 on:
   workflow_run:
     workflows: [ CI Pipeline ]
@@ -21,6 +30,8 @@ permissions:
 env:
   # The commit CI tested (or main's head on a manual run).
   DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+  # The Firebase CLI version the emulator image uses (docker/firebase-emulator).
+  FIREBASE_TOOLS: firebase-tools@13.35.1
 
 jobs:
   # A failed or cancelled CI run, one for a pull request whose branch happens
@@ -32,89 +43,193 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push')
+    outputs:
+      configured: ${{ steps.configured.outputs.configured }}
     steps:
       - name: Record the commit being deployed
-        run: echo "Deploying $DEPLOY_SHA" >> "$GITHUB_STEP_SUMMARY"
+        run: echo "Deploying commit $DEPLOY_SHA" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check the deploy is configured
+        id: configured
+        env:
+          PROJECT: ${{ vars.GCP_PROJECT_ID }}
+        run: |
+          if [ -n "$PROJECT" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Not deployed: the GCP repository variables aren't set (infra/README.md, Connecting the release)." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   # -----------------------------------------------------------------
-  # BACKEND DEPLOYMENT (EC2)
+  # API (Cloud Run)
   # -----------------------------------------------------------------
-  deploy-backend:
-    name: Deploy Django Backend to EC2
+  deploy-api:
+    name: Deploy the API to Cloud Run
     needs: gate
+    if: needs.gate.outputs.configured == 'true'
     runs-on: ubuntu-latest
-    steps:
-      # Fast-forwards the server's main to the tested commit rather than
-      # pulling main's head, which may be a newer commit CI hasn't passed.
-      # If the server is already past it (a newer release went first),
-      # --ff-only leaves it there instead of going back.
-      - name: Execute Deploy Command via SSH
-        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # ratchet:appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          envs: DEPLOY_SHA
-          script: |
-            set -e
-            cd /home/ubuntu/Map-My-Friends
-            git fetch origin main
-            git merge --ff-only "$DEPLOY_SHA"
-            chmod +x deploy.sh
-            ./deploy.sh
-
-  # -----------------------------------------------------------------
-  # FRONTEND DEPLOYMENT (S3 + CloudFront)
-  # -----------------------------------------------------------------
-  deploy-frontend:
-    name: Deploy Flutter Frontend to S3 & CloudFront
-    needs: gate
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation; no key exists
+    env:
+      PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      SERVICE: ${{ vars.GCP_SERVICE_NAME }}
+      IMAGE: ${{ vars.GCP_IMAGE_REPOSITORY }}:${{ github.event.workflow_run.head_sha || github.sha }}
+      API_URL: ${{ vars.API_URL }}
+      CANDIDATE_URL: ${{ vars.CANDIDATE_URL }}
+      WEB_ORIGIN: https://${{ vars.FIREBASE_HOSTING_SITE }}.web.app
     steps:
       - name: Checkout Code
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
         with:
           ref: ${{ env.DEPLOY_SHA }}
 
-      - name: Set up Java
-        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # ratchet:actions/setup-java@v4
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # ratchet:google-github-actions/auth@v3
         with:
-          distribution: 'zulu'
-          java-version: '17'
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # ratchet:google-github-actions/setup-gcloud@v3.0.1
+
+      # The same checks as the Production Image job, on the exact image
+      # that's about to be pushed.
+      - name: Build and Check the Image
+        run: |
+          docker build --target production -t "$IMAGE" backend
+          PROD_IMAGE="$IMAGE" PROD_IMAGE_SKIP_BUILD=1 make prod-image
+
+      - name: Push the Image
+        run: |
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+          docker push "$IMAGE"
+
+      # Before any new code serves: a query without its index fails in
+      # production only (the emulator ignores indexes).
+      - name: Deploy Firestore Rules and Indexes
+        run: npx --yes "$FIREBASE_TOOLS" deploy --only firestore --project "$PROJECT" --non-interactive
+
+      - name: Wait for the Indexes to Build
+        run: |
+          for _ in $(seq 1 60); do
+            pending=$(
+              { gcloud firestore indexes composite list --project "$PROJECT" --format=json
+                gcloud firestore indexes fields list --project "$PROJECT" --format=json
+              } | grep -c '"CREATING"' || true
+            )
+            if [ "$pending" = 0 ]; then
+              echo "All indexes are ready."
+              exit 0
+            fi
+            echo "$pending index(es) still building..."
+            sleep 30
+          done
+          echo "::error::Indexes were still building after 30 minutes."
+          exit 1
+
+      - name: Record the Serving Revision
+        id: previous
+        run: |
+          revision=$(gcloud run services describe "$SERVICE" --region "$REGION" \
+            --format='value(status.traffic[0].revisionName)')
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          echo "Serving before this deploy: ${revision:-none}" >> "$GITHUB_STEP_SUMMARY"
+
+      # A new revision, reachable only at the candidate URL.
+      - name: Deploy a Revision with No Traffic
+        run: |
+          gcloud run deploy "$SERVICE" --image "$IMAGE" --region "$REGION" \
+            --no-traffic --tag candidate --quiet
+
+      - name: Smoke Test the New Revision
+        env:
+          SMOKE_BASE_URL: ${{ env.CANDIDATE_URL }}
+          SMOKE_WEB_ORIGIN: ${{ env.WEB_ORIGIN }}
+        run: python3 smoke/smoke.py
+
+      - name: Move Traffic to the New Revision
+        id: shift
+        run: gcloud run services update-traffic "$SERVICE" --region "$REGION" --to-latest
+
+      - name: Smoke Test the Live URL
+        env:
+          SMOKE_BASE_URL: ${{ env.API_URL }}
+          SMOKE_WEB_ORIGIN: ${{ env.WEB_ORIGIN }}
+        run: python3 smoke/smoke.py
+
+      - name: Roll Back to the Previous Revision
+        if: failure() && steps.shift.outcome == 'success' && steps.previous.outputs.revision != ''
+        env:
+          PREVIOUS: ${{ steps.previous.outputs.revision }}
+        run: |
+          gcloud run services update-traffic "$SERVICE" --region "$REGION" \
+            --to-revisions "$PREVIOUS=100"
+          echo "::error::The live smoke test failed; traffic is back on $PREVIOUS."
+
+      - name: Summary
+        if: success()
+        run: echo "Deployed $IMAGE to $API_URL" >> "$GITHUB_STEP_SUMMARY"
+
+  # -----------------------------------------------------------------
+  # WEB APP (Firebase Hosting)
+  # -----------------------------------------------------------------
+  # After the API, so the app never goes out ahead of the API it calls.
+  deploy-web:
+    name: Deploy the Web App to Firebase Hosting
+    needs: deploy-api
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      SITE: ${{ vars.FIREBASE_HOSTING_SITE }}
+      API_URL: ${{ vars.API_URL }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # ratchet:subosito/flutter-action@v2
         with:
           channel: 'stable'
-          # Pinned to the SDK this project is developed and tested against.
-          # Floating on latest stable meant CI and the production web build
-          # used a Flutter nobody had run: it broke version solving on the
-          # exact intl pin, and dart format disagreed with local output.
-          # The pin lives in .fvmrc so local (fvm) and CI read one value;
-          # bump it with `fvm use <version>` at the repo root.
+          # The pin lives in .fvmrc, so local (fvm) and CI read one value.
           flutter-version-file: ${{ github.workspace }}/.fvmrc
           cache: true
 
-      - name: Install Dependencies
-        run: flutter pub get
+      - name: Build the Web App
+        working-directory: frontend
+        run: |
+          flutter pub get
+          flutter build web --release --dart-define=API_BASE_URL="$API_URL/api/"
 
-      - name: Build Web App
-        run: flutter build web --release
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # ratchet:aws-actions/configure-aws-credentials@v4
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # ratchet:google-github-actions/auth@v3
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SERVICE_ACCOUNT }}
 
-      - name: Sync built files to S3
+      # firebase.json names no site (it's per project); the CLI deploys to
+      # the one firebase.json names, so name it here.
+      - name: Deploy to Firebase Hosting
         run: |
-          aws s3 sync build/web/ s3://${{ secrets.AWS_S3_BUCKET_NAME }} --delete
+          jq --arg site "$SITE" '.hosting.site = $site' firebase.json > firebase.deploy.json
+          mv firebase.deploy.json firebase.json
+          npx --yes "$FIREBASE_TOOLS" deploy --only "hosting:$SITE" \
+            --project "$PROJECT" --non-interactive
 
-      - name: Invalidate CloudFront Cache
+      - name: Check the Web App Answers
         run: |
-          aws cloudfront create-invalidation --distribution-id ${{ secrets.AWS_CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+          status=$(curl -s -o /dev/null -w '%{http_code}' "https://$SITE.web.app/")
+          if [ "$status" != 200 ]; then
+            echo "::error::https://$SITE.web.app/ answered $status after the deploy."
+            exit 1
+          fi
+          echo "Deployed the web app to https://$SITE.web.app/" >> "$GITHUB_STEP_SUMMARY"
