@@ -362,6 +362,23 @@ jobs:
           fi
 
   # -----------------------------------------------------------------
+  # PRODUCTION IMAGE
+  # -----------------------------------------------------------------
+  # The image Cloud Run runs, built and started as Cloud Run would, then
+  # scanned. Fails on a hadolint finding, a behaviour check (health, host
+  # check, HTTPS redirect, DEBUG, CORS, SIGTERM, the SECRET_KEY guard), or a
+  # fixable HIGH/CRITICAL CVE. The scan runs nightly too (security.yml).
+  prod-image:
+    name: Production Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Build and Check the Image
+        run: make prod-image
+
+  # -----------------------------------------------------------------
   # INFRASTRUCTURE VALIDATION
   # -----------------------------------------------------------------
   validate-infra:
@@ -398,6 +415,7 @@ jobs:
       - lint-workflows
       - scan-deps
       - scan-secrets
+      - prod-image
       - validate-infra
     runs-on: ubuntu-latest
     steps:

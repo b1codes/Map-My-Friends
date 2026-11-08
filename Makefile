@@ -148,6 +148,15 @@ check-dast-routes:
 
 .PHONY: scan-deps scan-secrets dast check-dast-routes
 
+# The production image (backend/Dockerfile's production target), built and
+# checked the way Cloud Run will run it: hadolint, a read-only boot on $PORT
+# at 1 vCPU / 512 MiB, what clients and probes see, SIGTERM, the SECRET_KEY
+# guard, and a Trivy scan. See scripts/prod-image.sh.
+prod-image:
+	scripts/prod-image.sh
+
+.PHONY: prod-image
+
 # Load test: perf/load.js in k6 against a throwaway stack shaped like one
 # Cloud Run instance (docker-compose.perf.yml), with Firestore latency
 # added. About 6 minutes; results in build/perf/. scripts/load.sh lists the

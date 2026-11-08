@@ -3,6 +3,8 @@ name: Nightly Security Scans
 # The scans that can turn red without a code change, run on the default
 # branch every night:
 #   - new advisories for dependencies we already have (OSV-Scanner),
+#   - new CVEs in the production image's OS packages and libraries (Trivy,
+#     with the rest of the image checks),
 #   - new gitleaks rules matching something already in the history,
 #   - the OWASP ZAP API scan, too slow to run on every PR (docs/testing.md
 #     has the timings).
@@ -26,6 +28,16 @@ jobs:
 
       - name: Run OSV-Scanner
         run: make scan-deps
+
+  prod-image:
+    name: Production Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Build and Check the Image
+        run: make prod-image
 
   scan-secrets:
     name: Secret Scan (Full History)
