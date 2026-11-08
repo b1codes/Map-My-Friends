@@ -4,7 +4,8 @@
 #   scripts/scan-deps.sh
 #
 # The lockfiles come from the manifests git tracks: each pyproject.toml's
-# poetry.lock and each pubspec.yaml's pubspec.lock. A new package is scanned
+# poetry.lock, each pubspec.yaml's pubspec.lock and each package.json's
+# package-lock.json. A new package is scanned
 # without editing this script, and one whose lockfile is missing fails, so
 # nothing is skipped quietly.
 #
@@ -27,17 +28,18 @@ while IFS= read -r manifest; do
   case "$(basename "$manifest")" in
     pyproject.toml) lock="$dir/poetry.lock" ;;
     pubspec.yaml) lock="$dir/pubspec.lock" ;;
+    package.json) lock="$dir/package-lock.json" ;;
   esac
   if [[ -f "$lock" ]]; then
     lockfiles+=(-L "$lock")
   else
     missing+=("$lock")
   fi
-done < <(git ls-files '*pyproject.toml' '*pubspec.yaml')
+done < <(git ls-files '*pyproject.toml' '*pubspec.yaml' '*package.json')
 
 if [[ ${#missing[@]} -gt 0 ]]; then
   printf 'Missing lockfile: %s\n' "${missing[@]}" >&2
-  echo "Run poetry lock or flutter pub get next to its manifest first." >&2
+  echo "Run poetry lock, flutter pub get or npm install next to its manifest first." >&2
   exit 1
 fi
 

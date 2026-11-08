@@ -6,7 +6,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     default-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g firebase-tools@13
+# Exact, so every run (the dev stack, the API's tests, the rules tests and the
+# release's rules and index deploy) uses the same emulator and CLI.
+RUN npm install -g firebase-tools@13.35.1
 
 WORKDIR /workspace
 

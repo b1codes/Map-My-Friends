@@ -157,6 +157,14 @@ prod-image:
 
 .PHONY: prod-image
 
+# firestore.rules against the Firestore emulator: every kind of direct client
+# access must be refused (docker/firebase-emulator/rules-test). About a
+# minute, most of it building the emulator image the first time.
+test-rules:
+	scripts/test-rules.sh
+
+.PHONY: test-rules
+
 # Load test: perf/load.js in k6 against a throwaway stack shaped like one
 # Cloud Run instance (docker-compose.perf.yml), with Firestore latency
 # added. About 6 minutes; results in build/perf/. scripts/load.sh lists the

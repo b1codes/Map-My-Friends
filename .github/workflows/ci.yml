@@ -379,6 +379,22 @@ jobs:
         run: make prod-image
 
   # -----------------------------------------------------------------
+  # FIRESTORE RULES
+  # -----------------------------------------------------------------
+  # firestore.rules in the emulator: every get, list, query, write, batch
+  # and transaction a client could try, signed out and signed in, must be
+  # refused, and leave the data unchanged.
+  test-rules:
+    name: Firestore Rules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Test the Rules
+        run: make test-rules
+
+  # -----------------------------------------------------------------
   # INFRASTRUCTURE VALIDATION
   # -----------------------------------------------------------------
   validate-infra:
@@ -416,6 +432,7 @@ jobs:
       - scan-deps
       - scan-secrets
       - prod-image
+      - test-rules
       - validate-infra
     runs-on: ubuntu-latest
     steps:
