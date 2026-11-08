@@ -30,17 +30,10 @@ import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:golden_harness/golden_harness.dart';
-import 'package:map_my_friends/main.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:timezone/data/latest.dart' as tz;
 
 import '../helpers/recording_http_overrides.dart';
-import 'fake_api.dart';
+import 'app_session.dart';
 import 'known_gaps.dart';
 import 'monkey.dart';
 
@@ -52,8 +45,8 @@ const _seedDefine = String.fromEnvironment(
 );
 
 /// App launches per run, and actions per launch.
-const _sessions = int.fromEnvironment('MONKEY_SESSIONS', defaultValue: 4);
-const _steps = int.fromEnvironment('MONKEY_STEPS', defaultValue: 150);
+const _sessions = int.fromEnvironment('MONKEY_SESSIONS', defaultValue: 12);
+const _steps = int.fromEnvironment('MONKEY_STEPS', defaultValue: 250);
 
 /// A real-time budget for the whole run, in minutes. When set, sessions
 /// keep coming (up to [_maxSessions]) until it's spent. 0 means "run
@@ -75,26 +68,15 @@ final DateTime? _deadline = _minutes == 0
 
 final Directory _outDir = Directory('build/monkey');
 
-/// The network, for the whole run. One instance, re-pointed at each
-/// session's [FakeApi]: the app's service singletons build their HTTP
-/// clients once, from whatever overrides are installed then, and keep them.
-/// A fresh overrides object per session would leave them talking to the
-/// first session's API.
-final RecordingHttpOverrides _http = RecordingHttpOverrides();
-
 /// Off unless asked for: see the library comment.
 const _enabled = bool.fromEnvironment('MONKEY');
 
 void main() {
   setUpAll(() async {
     if (!_enabled) return;
-    tz.initializeTimeZones();
-    // The app's real typefaces, loaded before the first session: text takes
-    // the space it does on a device (so overflows are real ones), and every
-    // session lays out the same whatever ran before it, so a seed replays
-    // alone exactly as it ran in the batch.
-    await loadRealFonts();
-    HttpOverrides.global = _http;
+    // Real fonts, and one network for every session, so a seed replays
+    // alone exactly as it ran in the batch (see app_session.dart).
+    await setUpAppSessions();
     // ignore: avoid_print
     print(
       'Monkey: base seed $_baseSeed, '
@@ -109,7 +91,7 @@ void main() {
     testWidgets(
       'monkey session seed $seed',
       (tester) => _session(tester, seed),
-      // Hangs fail rather than stall CI: a session of 150 actions takes
+      // Hangs fail rather than stall CI: a session of 250 actions takes
       // about 10 seconds.
       timeout: const Timeout(Duration(minutes: 5)),
       skip: !_enabled,
@@ -123,36 +105,17 @@ Future<void> _session(WidgetTester tester, int seed) async {
 
   final random = Random(seed);
   final semantics = tester.ensureSemantics();
-  final api = FakeApi(random: Random(seed));
-  _http
-    ..responder = api.respond
-    ..requests.clear()
-    ..offline = false
-    ..latency = Duration.zero;
-  final http = _http;
-  final launched = <String>[];
-  _installPlugins(launched);
   final located = random.nextBool();
-  GeolocatorPlatform.instance = _Location(granted: located);
-
-  FlutterSecureStorage.setMockInitialValues({
-    'access_token': FakeApi.accessToken,
-    'refresh_token': FakeApi.refreshToken,
-    'username': 'ada',
-  });
-  // A fresh device: getInstance() otherwise hands back the last session's
-  // instance, settings and all, and the seed no longer replays on its own.
-  SharedPreferences.resetStatic();
-  SharedPreferences.setMockInitialValues({});
-  imageCache
-    ..clear()
-    ..clearLiveImages();
-  final prefs = await SharedPreferences.getInstance();
-
   final window = monkeyWindows[random.nextInt(monkeyWindows.length)];
-  tester.view
-    ..devicePixelRatio = 1
-    ..physicalSize = window;
+  final session = await AppSession.start(
+    tester,
+    window: window,
+    located: located,
+    seed: seed,
+  );
+  final api = session.api;
+  final http = session.http;
+  final launched = session.launched;
 
   late final Monkey monkey;
   var signedOutFor = 0;
@@ -209,15 +172,6 @@ Future<void> _session(WidgetTester tester, int seed) async {
       'seed $seed, window ${window.width.toInt()}×${window.height.toInt()}, '
       'location ${located ? 'granted' : 'declined'}';
   try {
-    await tester.pumpWidget(MyApp(prefs: prefs));
-    for (var i = 0; i < 10; i++) {
-      await tester.pump(const Duration(milliseconds: 100));
-    }
-    expect(
-      find.byType(MainScreen),
-      findsOneWidget,
-      reason: 'the app did not open signed in',
-    );
     await monkey.run(steps: _steps, until: deadline);
     await monkey.settle();
     if (_survey) {
@@ -236,14 +190,10 @@ Future<void> _session(WidgetTester tester, int seed) async {
     rethrow;
   } finally {
     monkey.reset();
-    tester.view.reset();
+    session.restore(tester);
     semantics.dispose();
-    _uninstallPlugins();
   }
-  // Unmount, and run out the clock on whatever the app scheduled (toasts,
-  // debounces, retries), so no timer outlives the session.
-  await tester.pumpWidget(const SizedBox.shrink());
-  await tester.pump(const Duration(seconds: 30));
+  await AppSession.unmount(tester);
 }
 
 void _appendSurvey(int seed, Monkey monkey) {
@@ -312,63 +262,5 @@ Future<void> _saveFailure(
     '  make monkey MONKEY_SEED=$seed MONKEY_SESSIONS=1 MONKEY_STEPS=$_steps\n'
     'Action log: frontend/${logFile.path}\n'
     'Screenshot: frontend/${shot.path}\n',
-  );
-}
-
-const _imagePicker = MethodChannel('plugins.flutter.io/image_picker');
-const _urlLauncher = MethodChannel('plugins.flutter.io/url_launcher');
-
-void _installPlugins(List<String> launched) {
-  final messenger =
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-  // The user opens the photo picker and cancels it.
-  messenger.setMockMethodCallHandler(_imagePicker, (_) async => null);
-  // Phone, SMS and attribution links "open" in another app.
-  messenger.setMockMethodCallHandler(_urlLauncher, (call) async {
-    final url = (call.arguments as Map<Object?, Object?>?)?['url'];
-    if (call.method == 'launch') launched.add('$url');
-    return true;
-  });
-}
-
-void _uninstallPlugins() {
-  final messenger =
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-  messenger
-    ..setMockMethodCallHandler(_imagePicker, null)
-    ..setMockMethodCallHandler(_urlLauncher, null);
-}
-
-/// A device where the user answered the location prompt one way or the
-/// other. Granted puts them in Milwaukee, among the seeded friends.
-class _Location extends GeolocatorPlatform {
-  _Location({required this.granted});
-
-  final bool granted;
-
-  @override
-  Future<bool> isLocationServiceEnabled() async => true;
-
-  @override
-  Future<LocationPermission> checkPermission() async =>
-      granted ? LocationPermission.whileInUse : LocationPermission.denied;
-
-  @override
-  Future<LocationPermission> requestPermission() => checkPermission();
-
-  @override
-  Future<Position> getCurrentPosition({
-    LocationSettings? locationSettings,
-  }) async => Position(
-    latitude: 43.0389,
-    longitude: -87.9065,
-    timestamp: DateTime.utc(2026, 3, 5),
-    accuracy: 10,
-    altitude: 0,
-    altitudeAccuracy: 0,
-    heading: 0,
-    headingAccuracy: 0,
-    speed: 0,
-    speedAccuracy: 0,
   );
 }

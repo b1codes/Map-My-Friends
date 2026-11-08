@@ -98,7 +98,8 @@ class Monkey {
     this.knownGaps = const [],
     this.survey = false,
     this.recover,
-  }) : random = Random(seed);
+  }) : random = Random(seed),
+       errors = ErrorWatch(knownGaps);
 
   final WidgetTester tester;
   final int seed;
@@ -119,6 +120,9 @@ class Monkey {
 
   /// Filed problems: logged and counted when they recur, not failed.
   final List<KnownGap> knownGaps;
+
+  /// Every error the app reports while the monkey runs.
+  final ErrorWatch errors;
 
   /// Keep going past problems, collecting each distinct one in [findings],
   /// instead of failing on the first. For triage, not for CI.
@@ -198,7 +202,7 @@ class Monkey {
   /// comes first. Fails with the seed and the action log on the first
   /// problem.
   Future<void> run({required int steps, DateTime? until}) async {
-    _listen();
+    errors.start();
     for (var i = 0; i < steps; i++) {
       if (until != null && DateTime.now().isAfter(until)) break;
       await act();
@@ -255,81 +259,24 @@ class Monkey {
     await tester.pump(const Duration(milliseconds: 16));
   }
 
-  /// Every error Flutter reported since the last check. The monkey takes
-  /// them over from the test binding, which keeps only the first of several
-  /// and only its exception, to tell filed problems from new ones.
-  ///
-  /// Each is described the moment it's reported, while the widget that
-  /// raised it is still in the tree: described later, the inspector walks
-  /// the ancestors of an element that has since been deactivated, which is
-  /// itself an assertion, and loses the error's source line.
-  final List<({String type, String report, String full})> _errors = [];
-  FlutterExceptionHandler? _bindingHandler;
-
-  void _listen() {
-    if (_bindingHandler != null) return;
-    _bindingHandler = FlutterError.onError;
-    FlutterError.onError = (details) => _errors.add(_capture(details));
-  }
-
-  static ({String type, String report, String full}) _capture(
-    FlutterErrorDetails details,
-  ) {
-    String full;
-    try {
-      full = details.toString();
-    } catch (e) {
-      full = '${details.exceptionAsString()}\n(not described: $e)';
-    }
-    return (
-      type: details.exception.runtimeType.toString(),
-      report: _report(full, details.stack),
-      full: full,
-    );
-  }
-
-  /// The error's description, up to its stack trace: what overflowed, and
-  /// the widget (with its source line) that built it.
-  static String _report(String text, StackTrace? trace) {
-    final stack = text.indexOf('When the exception was thrown');
-    final head = stack < 0 ? text : text.substring(0, stack);
-    final lines = head.trim().split('\n');
-    // The app's own frames, which say where an assertion came from when the
-    // description doesn't (a disposed widget, an async callback).
-    final ours = (trace?.toString() ?? '')
-        .split('\n')
-        .where((l) => l.contains('package:map_my_friends/'))
-        .take(8)
-        .map((l) => '  $l');
-    return [
-      ...(lines.length > 40 ? [...lines.take(40), '…'] : lines),
-      if (ours.isNotEmpty) ...['App frames:', ...ours],
-    ].join('\n');
-  }
-
   void _check() {
-    final errors = [..._errors];
-    _errors.clear();
-    final pending = tester.takeException();
-    if (pending != null) {
-      errors.add(_capture(FlutterErrorDetails(exception: pending as Object)));
-    }
-    for (final (:type, :report, :full) in errors) {
-      final gap = knownGaps.where((g) => g.matches(report, this)).firstOrNull;
-      if (gap == null) {
-        if (survey) {
-          final key = signature(report);
-          findings
-              .putIfAbsent(key, () => (report: full, steps: []))
-              .steps
-              .add('$_step ($conditions)');
-          _record('PROBLEM: $key');
-          continue;
-        }
-        _fail('threw $type:\n$report');
+    for (final problem in errors.take(tester)) {
+      final gap = problem.gap;
+      if (gap != null) {
+        knownGapHits.update(gap, (n) => n + 1, ifAbsent: () => 1);
+        _record('known gap, ${gap.what} (${gap.task})');
+        continue;
       }
-      knownGapHits.update(gap, (n) => n + 1, ifAbsent: () => 1);
-      _record('known gap, ${gap.what} (${gap.task})');
+      if (survey) {
+        final key = signature(problem.report);
+        findings
+            .putIfAbsent(key, () => (report: problem.full, steps: []))
+            .steps
+            .add('$_step ($conditions)');
+        _record('PROBLEM: $key');
+        continue;
+      }
+      _fail('threw ${problem.type}:\n${problem.report}');
     }
     for (final invariant in invariants) {
       final problem = invariant(tester);
@@ -666,12 +613,123 @@ class Monkey {
   /// Puts the window back the way the harness set it up, for the next
   /// session. Call from the harness's tear-down.
   void reset() {
-    if (_bindingHandler != null) {
-      FlutterError.onError = _bindingHandler;
-      _bindingHandler = null;
-    }
+    errors.stop();
     tester.platformDispatcher.clearTextScaleFactorTestValue();
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     tester.testTextInput.hide();
+  }
+}
+
+/// One error the app reported, described while its widget was still live.
+class Problem {
+  Problem(this.type, this.report, this.full, this.gap);
+
+  final String type;
+
+  /// The description up to the stack trace, plus the app's own frames.
+  final String report;
+
+  /// Everything Flutter said, stack included.
+  final String full;
+
+  /// The filed task this is, if any.
+  final KnownGap? gap;
+}
+
+/// Collects every error Flutter reports, and tells filed ones ([knownGaps])
+/// from new ones.
+///
+/// It takes errors over from the test binding, which keeps only the first
+/// of several and only its exception. Each is described the moment it's
+/// reported, while the widget that raised it is still in the tree:
+/// described later, the inspector walks the ancestors of an element that
+/// has since been deactivated (itself an assertion) and loses the error's
+/// source line.
+class ErrorWatch {
+  ErrorWatch(this.knownGaps);
+
+  final List<KnownGap> knownGaps;
+  final List<({String type, String report, String full})> _seen = [];
+  FlutterExceptionHandler? _bindingHandler;
+
+  /// Starts collecting. Call [stop] before the test ends: the binding checks
+  /// its handler is back.
+  void start() {
+    if (_bindingHandler != null) return;
+    _bindingHandler = FlutterError.onError;
+    FlutterError.onError = (details) => _seen.add(_capture(details));
+  }
+
+  void stop() {
+    if (_bindingHandler == null) return;
+    FlutterError.onError = _bindingHandler;
+    _bindingHandler = null;
+  }
+
+  /// Every error since the last call, each matched against [knownGaps] at
+  /// the current text size.
+  List<Problem> take(WidgetTester tester) {
+    final seen = [..._seen];
+    _seen.clear();
+    final pending = tester.takeException();
+    if (pending != null) {
+      seen.add(_capture(FlutterErrorDetails(exception: pending as Object)));
+    }
+    final scale = tester.platformDispatcher.textScaleFactor;
+    return [
+      for (final (:type, :report, :full) in seen)
+        Problem(
+          type,
+          report,
+          full,
+          knownGaps.where((g) => g.matches(report, scale)).firstOrNull,
+        ),
+    ];
+  }
+
+  /// Fails on any error since the last call that isn't a known gap.
+  void expectNone(WidgetTester tester) {
+    final unexpected = take(tester).where((p) => p.gap == null).toList();
+    if (unexpected.isNotEmpty) {
+      fail(
+        '${unexpected.length} unexpected error(s):\n\n'
+        '${unexpected.map((p) => '${p.type}:\n${p.report}').join('\n\n')}',
+      );
+    }
+  }
+
+  static ({String type, String report, String full}) _capture(
+    FlutterErrorDetails details,
+  ) {
+    String full;
+    try {
+      full = details.toString();
+    } catch (e) {
+      full = '${details.exceptionAsString()}\n(not described: $e)';
+    }
+    return (
+      type: details.exception.runtimeType.toString(),
+      report: _report(full, details.stack),
+      full: full,
+    );
+  }
+
+  /// The error's description, up to its stack trace: what overflowed, and
+  /// the widget (with its source line) that built it.
+  static String _report(String text, StackTrace? trace) {
+    final stack = text.indexOf('When the exception was thrown');
+    final head = stack < 0 ? text : text.substring(0, stack);
+    final lines = head.trim().split('\n');
+    // The app's own frames, which say where an assertion came from when the
+    // description doesn't (a disposed widget, an async callback).
+    final ours = (trace?.toString() ?? '')
+        .split('\n')
+        .where((l) => l.contains('package:map_my_friends/'))
+        .take(8)
+        .map((l) => '  $l');
+    return [
+      ...(lines.length > 40 ? [...lines.take(40), '…'] : lines),
+      if (ours.isNotEmpty) ...['App frames:', ...ours],
+    ].join('\n');
   }
 }

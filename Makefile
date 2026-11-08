@@ -112,6 +112,30 @@ update-goldens:
 e2e:
 	scripts/e2e.sh $(JOURNEY)
 
+# The monkey (frontend/test/monkey): the real app under seeded random input.
+# With no variables it's the PR run (a fixed seed, 12 sessions of 250
+# actions). MONKEY_SEED=<n>|random, MONKEY_SESSIONS, MONKEY_STEPS,
+# MONKEY_MINUTES (a time budget, as the nightly run uses) and
+# MONKEY_SURVEY=true (collect every distinct problem into
+# frontend/build/monkey/survey.txt instead of failing) are passed through.
+# A failure prints the `make monkey ...` that replays it.
+MONKEY_VARS := MONKEY_SEED MONKEY_SESSIONS MONKEY_STEPS MONKEY_MINUTES MONKEY_SURVEY
+monkey:
+	cd frontend && $(FLUTTER) test test/monkey --dart-define=MONKEY=true \
+		$(foreach v,$(MONKEY_VARS),$(if $($(v)),--dart-define=$(v)=$($(v))))
+
+# Property-based fuzzing of every API route (backend/tests/test_fuzz_api.py)
+# on the dev stack. The PR profile also runs inside `make test`.
+# FUZZ_PROFILE=nightly draws 1,000 requests per route (about 18 minutes);
+# FUZZ_SEED=<n> replays a nightly seed.
+FUZZ_PROFILE ?= pr
+fuzz:
+	docker compose exec -T -e FIRESTORE_PROJECT_ID=test-fuzz \
+		-e FUZZ_PROFILE=$(FUZZ_PROFILE) $(if $(FUZZ_SEED),-e FUZZ_SEED=$(FUZZ_SEED)) \
+		api python manage.py test tests.test_fuzz_api
+
+.PHONY: monkey fuzz
+
 # Security scans; docs/testing.md (Security scans) covers triage. CI runs
 # these same targets.
 #
