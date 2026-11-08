@@ -6,12 +6,14 @@
 # It keeps the E2E stack's Firestore emulator and third-party stubs, and runs
 # the API as one production instance would on Cloud Run:
 #   - DEBUG off, a random SECRET_KEY (scripts/load.sh makes one per run)
-#   - the code baked into the image, not bind-mounted from the host
+#   - the production image itself (backend/Dockerfile's production target),
+#     so the code is baked in, not bind-mounted from the host
 #   - one vCPU and 512 MiB, Cloud Run's defaults for an instance. Going over
 #     the memory limit kills the API, which fails the run.
 #   - gunicorn with one worker and 8 threads (gthread), the shape Cloud Run
-#     recommends for one vCPU, and its access log on, so scripts/load.sh can
-#     count what the API answered
+#     recommends for one vCPU (backend/gunicorn.conf.py), and its access log,
+#     which scripts/load.sh counts what the API answered from
+#   - uploads on a tmpfs, standing in for the Cloud Storage bucket
 #   - Firestore reached through Toxiproxy, which adds the latency of a
 #     same-region round trip (PERF_FIRESTORE_LATENCY_MS each way, set by
 #     scripts/load.sh). The emulator answers in about a millisecond, so
@@ -22,16 +24,15 @@
 # requests from one address. See docker/test-stack-settings/unthrottled_settings.py.
 services:
   api:
+    build:
+      target: production
     image: map-my-friends-backend:perf
-    # One line per command: in a folded scalar, a more-indented continuation
-    # line keeps its line break, and the shell would run the options as a
-    # command of their own.
-    command: >
-      sh -c "python manage.py collectstatic --noinput >/dev/null &&
-             python manage.py migrate --noinput &&
-             exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 1 --threads 8 --timeout 0 --access-logfile -"
+    # The image's own entrypoint and gunicorn command, as on Cloud Run.
+    command: !reset null
     volumes: !override
       - ./docker/test-stack-settings:/test-stack-settings:ro
+    tmpfs:
+      - /app/media:mode=1777
     ports: !override
       - "${PERF_API_PORT:-8300}:8000"
     cpus: 1
@@ -41,6 +42,7 @@ services:
       - stubs
     environment:
       - DJANGO_DEBUG=False
+      - PORT=8000
       - DJANGO_SECRET_KEY=${PERF_SECRET_KEY:?set PERF_SECRET_KEY, or run make load}
       - ALLOWED_HOSTS=api,localhost,127.0.0.1
       - CORS_ALLOWED_ORIGINS=http://localhost:3000

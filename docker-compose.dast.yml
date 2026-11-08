@@ -8,28 +8,34 @@
 # DEBUG's behaviour (verbose error pages, CORS open to every origin, mock
 # Auth0 tokens accepted) rather than what users actually reach:
 #   - DEBUG off, a random SECRET_KEY (scripts/dast.sh makes one per run)
-#   - gunicorn, as in docker-compose.prod.yml, after collectstatic, so static
-#     files come from WhiteNoise's manifest storage as they do in production
-#   - the code baked into the image, not bind-mounted from the host
-#   - gunicorn's access log on, so scripts/dast.sh can count what the API
-#     answered (many 429s would mean the scan hit a throttle)
+#   - the production image itself (backend/Dockerfile's production target):
+#     gunicorn, static files from WhiteNoise's manifest, the code baked in
+#   - gunicorn's access log, on in production too, so scripts/dast.sh can
+#     count what the API answered (many 429s would mean the scan hit a
+#     throttle)
+#   - uploads on a tmpfs, standing in for the Cloud Storage bucket
 #
 # The one deliberate difference from production is the throttle rates, raised
 # for the E2E stack too; see docker/test-stack-settings/unthrottled_settings.py.
 services:
   api:
+    build:
+      target: production
     image: map-my-friends-backend:dast
-    command: >
-      sh -c "python manage.py collectstatic --noinput >/dev/null &&
-             python manage.py migrate --noinput &&
-             gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --access-logfile -"
+    # The image's own entrypoint and gunicorn command, as on Cloud Run.
+    command: !reset null
     # Only the settings overlay; the code is the image's.
     volumes: !override
       - ./docker/test-stack-settings:/test-stack-settings:ro
+    # Production stores uploads in Cloud Storage; the image's /app is
+    # read-only to the app user.
+    tmpfs:
+      - /app/media:mode=1777
     ports: !override
       - "${DAST_API_PORT:-8200}:8000"
     environment:
       - DJANGO_DEBUG=False
+      - PORT=8000
       # Required: the stack refuses to start without one. scripts/dast.sh
       # passes a fresh random key; there is no default on purpose.
       - DJANGO_SECRET_KEY=${DAST_SECRET_KEY:?set DAST_SECRET_KEY, or run make dast}

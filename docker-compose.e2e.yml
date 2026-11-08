@@ -14,7 +14,7 @@ services:
   api:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      target: dev
     image: map-my-friends-backend
     # The journeys sign up and sign in from one address many times a minute,
     # far past the real limits, so the throttle rates are raised

@@ -1,0 +1,14 @@
+# Kept out of every image: local environments, caches, test output and
+# anything a developer's machine wrote under backend/.
+.venv
+**/__pycache__
+**/*.pyc
+.coverage
+.coverage.*
+htmlcov
+media
+staticfiles
+*.sqlite3
+.env
+.env.*
+!.env.example
