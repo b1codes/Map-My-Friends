@@ -23,6 +23,7 @@ import 'package:map_my_friends/services/api_service.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
+import '../../helpers/people_writes.dart';
 
 class MockPeopleBloc extends MockBloc<PeopleEvent, PeopleState>
     implements PeopleBloc {}
@@ -93,6 +94,7 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     peopleBloc = MockPeopleBloc();
+    answerPeopleWrites(peopleBloc);
     api = MockApiService();
     when(() => peopleBloc.state).thenReturn(PeopleLoaded([_existing]));
     when(
@@ -252,6 +254,35 @@ void main() {
       expect(person.latitude, isNull);
       expect(find.byType(AddEditPersonScreen), findsNothing);
       expect(find.text('open'), findsOneWidget);
+    });
+
+    // The form used to close as soon as Save was tapped, so a save that
+    // failed (offline, a server error) lost everything typed. Found by the
+    // edge-case tests (test/edge_cases).
+    testWidgets('a save that fails stays open with what was typed', (
+      tester,
+    ) async {
+      answerPeopleWrites(peopleBloc, error: Exception('offline'));
+      await pumpForm(tester);
+      await fillRequired(tester);
+
+      await save(tester);
+
+      expect(find.byType(AddEditPersonScreen), findsOneWidget);
+      expect(
+        tester.widget<TextFormField>(field('First Name')).controller!.text,
+        'Cy',
+      );
+      expect(find.textContaining("Couldn't save Cy"), findsOneWidget);
+      // Ready to try again.
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Save Person'),
+            )
+            .onPressed,
+        isNotNull,
+      );
     });
 
     testWidgets('sends the optional fields and the chosen tag and pin', (

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:bloc_test/bloc_test.dart';
@@ -9,6 +10,23 @@ import 'package:map_my_friends/models/person.dart';
 import 'package:map_my_friends/services/api_service.dart';
 
 class MockApiService extends Mock implements ApiService {}
+
+/// A write's `done`, with its outcome recorded as soon as it settles (an
+/// error with no listener yet would otherwise escape the test).
+class _Outcome {
+  _Outcome() {
+    done.future.then<void>(
+      (_) => saved = true,
+      onError: (Object e) {
+        error = e;
+      },
+    );
+  }
+
+  final done = Completer<void>();
+  bool saved = false;
+  Object? error;
+}
 
 void main() {
   setUpAll(() {
@@ -103,8 +121,12 @@ void main() {
         ],
       );
 
+      // A failed save used to replace the list with PeopleError: People
+      // showed "Couldn't load your people" with no retry until the app
+      // restarted. Found by the edge-case tests (offline save).
+      late _Outcome failed;
       blocTest<PeopleBloc, PeopleState>(
-        'emits [PeopleError] on failure',
+        'keeps the list and reports a failure to the caller',
         build: () {
           when(
             () => apiService.addPerson(any()),
@@ -112,8 +134,56 @@ void main() {
           return peopleBloc;
         },
         seed: () => PeopleLoaded(testPeople),
-        act: (bloc) => bloc.add(AddPerson(newPerson)),
-        expect: () => [const PeopleError('Exception: Failed to add')],
+        act: (bloc) =>
+            bloc.add(AddPerson(newPerson, done: (failed = _Outcome()).done)),
+        expect: () => <PeopleState>[],
+        verify: (_) => expect(failed.error, isA<Exception>()),
+      );
+
+      late _Outcome saved;
+      blocTest<PeopleBloc, PeopleState>(
+        'tells the caller once the person is saved',
+        build: () {
+          when(
+            () => apiService.addPerson(any()),
+          ).thenAnswer((_) async => newPerson);
+          return peopleBloc;
+        },
+        seed: () => PeopleLoaded(testPeople),
+        act: (bloc) =>
+            bloc.add(AddPerson(newPerson, done: (saved = _Outcome()).done)),
+        expect: () => [
+          PeopleLoaded([...testPeople, newPerson]),
+        ],
+        verify: (_) => expect(saved.saved, isTrue),
+      );
+
+      // Events run concurrently. Each save used to write back the list it
+      // started with, so the slower of two saves dropped the faster's person.
+      final third = newPerson.copyWith(id: '3', firstName: 'Jim');
+      blocTest<PeopleBloc, PeopleState>(
+        'two saves in flight at once both end up in the list',
+        build: () {
+          when(() => apiService.addPerson(newPerson)).thenAnswer(
+            (_) => Future.delayed(
+              const Duration(milliseconds: 20),
+              () => newPerson,
+            ),
+          );
+          when(() => apiService.addPerson(third)).thenAnswer(
+            (_) => Future.delayed(const Duration(milliseconds: 5), () => third),
+          );
+          return peopleBloc;
+        },
+        seed: () => PeopleLoaded(testPeople),
+        act: (bloc) => bloc
+          ..add(AddPerson(newPerson))
+          ..add(AddPerson(third)),
+        wait: const Duration(milliseconds: 50),
+        expect: () => [
+          PeopleLoaded([...testPeople, third]),
+          PeopleLoaded([...testPeople, third, newPerson]),
+        ],
       );
     });
 
@@ -135,8 +205,9 @@ void main() {
         ],
       );
 
+      late _Outcome failed;
       blocTest<PeopleBloc, PeopleState>(
-        'emits [PeopleError] on failure',
+        'keeps the list and reports a failure to the caller',
         build: () {
           when(
             () => apiService.updatePerson(any()),
@@ -144,8 +215,11 @@ void main() {
           return peopleBloc;
         },
         seed: () => PeopleLoaded(testPeople),
-        act: (bloc) => bloc.add(UpdatePerson(updatedPerson)),
-        expect: () => [const PeopleError('Exception: Failed to update')],
+        act: (bloc) => bloc.add(
+          UpdatePerson(updatedPerson, done: (failed = _Outcome()).done),
+        ),
+        expect: () => <PeopleState>[],
+        verify: (_) => expect(failed.error, isA<Exception>()),
       );
     });
 
@@ -161,8 +235,9 @@ void main() {
         expect: () => [const PeopleLoaded([])],
       );
 
+      late _Outcome failed;
       blocTest<PeopleBloc, PeopleState>(
-        'emits [PeopleError] on failure',
+        'keeps the list and reports a failure to the caller',
         build: () {
           when(
             () => apiService.deletePerson('1'),
@@ -170,38 +245,64 @@ void main() {
           return peopleBloc;
         },
         seed: () => PeopleLoaded(testPeople),
-        act: (bloc) => bloc.add(const DeletePerson('1')),
-        expect: () => [const PeopleError('Exception: Failed to delete')],
+        act: (bloc) =>
+            bloc.add(DeletePerson('1', done: (failed = _Outcome()).done)),
+        expect: () => <PeopleState>[],
+        verify: (_) => expect(failed.error, isA<Exception>()),
       );
     });
 
+    // A change made before the list arrived (or after it failed to load)
+    // used to be refused or silently dropped. It now goes to the API, and
+    // the list is loaded with it.
     group('before the list has loaded', () {
+      final added = testPerson.copyWith(id: '9', firstName: 'Late');
+
       blocTest<PeopleBloc, PeopleState>(
-        'AddPerson reports an error instead of calling the API',
-        build: () => peopleBloc,
-        act: (bloc) => bloc.add(AddPerson(testPerson)),
+        'AddPerson saves, then loads the list with the new person',
+        build: () {
+          when(
+            () => apiService.addPerson(any()),
+          ).thenAnswer((_) async => added);
+          when(
+            () => apiService.getPeople(),
+          ).thenAnswer((_) async => [testPerson, added]);
+          return peopleBloc;
+        },
+        act: (bloc) => bloc.add(AddPerson(added)),
         expect: () => [
-          const PeopleError('Cannot add person before loading list'),
+          PeopleLoading(),
+          PeopleLoaded([testPerson, added]),
         ],
-        verify: (_) => verifyNever(() => apiService.addPerson(any())),
       );
 
       blocTest<PeopleBloc, PeopleState>(
-        'UpdatePerson is ignored',
-        build: () => peopleBloc,
+        'UpdatePerson saves, then loads the list',
+        build: () {
+          when(
+            () => apiService.updatePerson(any()),
+          ).thenAnswer((_) async => testPerson);
+          when(
+            () => apiService.getPeople(),
+          ).thenAnswer((_) async => testPeople);
+          return peopleBloc;
+        },
         seed: () => PeopleLoading(),
         act: (bloc) => bloc.add(UpdatePerson(testPerson)),
-        expect: () => <PeopleState>[],
-        verify: (_) => verifyNever(() => apiService.updatePerson(any())),
+        // Already loading, so the reload's PeopleLoading isn't a change.
+        expect: () => [PeopleLoaded(testPeople)],
       );
 
       blocTest<PeopleBloc, PeopleState>(
-        'DeletePerson is ignored',
-        build: () => peopleBloc,
+        'DeletePerson deletes, then loads the list',
+        build: () {
+          when(() => apiService.deletePerson('1')).thenAnswer((_) async {});
+          when(() => apiService.getPeople()).thenAnswer((_) async => []);
+          return peopleBloc;
+        },
         seed: () => const PeopleError('earlier failure'),
         act: (bloc) => bloc.add(const DeletePerson('1')),
-        expect: () => <PeopleState>[],
-        verify: (_) => verifyNever(() => apiService.deletePerson(any())),
+        expect: () => [PeopleLoading(), const PeopleLoaded([])],
       );
     });
 

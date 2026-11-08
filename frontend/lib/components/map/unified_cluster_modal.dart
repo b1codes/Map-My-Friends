@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../models/person.dart';
@@ -134,6 +136,13 @@ class UnifiedClusterModal extends StatelessWidget {
                     final peopleBloc = context.read<PeopleBloc>();
 
                     tripBloc.add(LinkPersonToStop(p, index));
+                    // The toast's action runs after this sheet has closed,
+                    // so a failure is reported from the app's navigator,
+                    // which outlives it.
+                    final host = Navigator.of(
+                      context,
+                      rootNavigator: true,
+                    ).context;
 
                     GlassToast.show(
                       context,
@@ -146,7 +155,18 @@ class UnifiedClusterModal extends StatelessWidget {
                           preferredAirport: stop.airport,
                           preferredStation: stop.station,
                         );
-                        peopleBloc.add(UpdatePerson(updatedPerson));
+                        final saved = Completer<void>();
+                        peopleBloc.add(
+                          UpdatePerson(updatedPerson, done: saved),
+                        );
+                        saved.future.catchError((Object _) {
+                          if (!host.mounted) return;
+                          GlassToast.show(
+                            host,
+                            "Couldn't update ${p.firstName}'s preferred stop.",
+                            tone: ToastTone.failure,
+                          );
+                        });
                       },
                     );
                   },

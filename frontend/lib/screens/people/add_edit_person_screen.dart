@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:typed_data';
 
 import 'package:clock/clock.dart';
@@ -255,7 +257,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
     );
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (_isSaving) return;
     if (_formKey.currentState!.validate()) {
       setState(() => _isSaving = true);
@@ -287,24 +289,39 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
         preferredStation: _preferredStation,
       );
 
-      if (widget.person != null) {
-        context.read<PeopleBloc>().add(
-          UpdatePerson(
-            person,
-            profileImage: _selectedImage,
-            imageBytes: _selectedImageBytes,
-          ),
+      // Close only once the person is saved. If the save fails (offline,
+      // a server error), stay open with everything typed, so it can be
+      // tried again; the form used to close first and lose it.
+      final saved = Completer<void>();
+      context.read<PeopleBloc>().add(
+        widget.person != null
+            ? UpdatePerson(
+                person,
+                profileImage: _selectedImage,
+                imageBytes: _selectedImageBytes,
+                done: saved,
+              )
+            : AddPerson(
+                person,
+                profileImage: _selectedImage,
+                imageBytes: _selectedImageBytes,
+                done: saved,
+              ),
+      );
+      try {
+        await saved.future;
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _isSaving = false);
+        GlassToast.show(
+          context,
+          "Couldn't save ${person.firstName}. Check your connection and "
+          'try again.',
+          tone: ToastTone.failure,
         );
-      } else {
-        context.read<PeopleBloc>().add(
-          AddPerson(
-            person,
-            profileImage: _selectedImage,
-            imageBytes: _selectedImageBytes,
-          ),
-        );
+        return;
       }
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
     }
   }
 

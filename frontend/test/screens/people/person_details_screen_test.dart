@@ -28,6 +28,7 @@ import 'package:map_my_friends/screens/people/add_edit_person_screen.dart';
 import 'package:map_my_friends/screens/people/person_details_screen.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
+import '../../helpers/people_writes.dart';
 
 class MockPeopleBloc extends MockBloc<PeopleEvent, PeopleState>
     implements PeopleBloc {}
@@ -91,6 +92,7 @@ void main() {
 
   setUp(() {
     peopleBloc = MockPeopleBloc();
+    answerPeopleWrites(peopleBloc);
     tripBloc = MockTripBloc();
     settingsCubit = MockMapSettingsCubit();
     nearbyAirports = MockAirportBloc();
@@ -417,6 +419,23 @@ void main() {
       verify(() => peopleBloc.add(const DeletePerson('p1'))).called(1);
       expect(find.byType(PersonDetailsScreen), findsNothing);
       expect(find.text('open'), findsOneWidget);
+    });
+
+    testWidgets('a delete that fails stays on the person and says so', (
+      tester,
+    ) async {
+      answerPeopleWrites(peopleBloc, error: Exception('offline'));
+      await pumpDetails(tester, 'p1');
+
+      await tester.tap(find.byTooltip('Delete'));
+      await _settle(tester);
+      await tester.tap(
+        find.descendant(of: find.byType(Dialog), matching: find.text('Delete')),
+      );
+      await _settle(tester);
+
+      expect(find.byType(PersonDetailsScreen), findsOneWidget);
+      expect(find.textContaining("Couldn't delete Ann"), findsOneWidget);
     });
   });
 }

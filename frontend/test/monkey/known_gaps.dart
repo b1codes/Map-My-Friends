@@ -57,11 +57,6 @@ final knownGaps = <KnownGap>[
   ),
   KnownGap(
     'https://app.clickup.com/t/86bcqz5c1',
-    'a long toast overflows instead of wrapping (item 2)',
-    (report, _) => _overflowIn(report, ['glass_surfaces.dart'], edge: 'right'),
-  ),
-  KnownGap(
-    'https://app.clickup.com/t/86bcqz5c1',
     'the cluster sheet overflows (item 4)',
     (report, _) => _overflowIn(report, ['unified_cluster_modal.dart']),
   ),

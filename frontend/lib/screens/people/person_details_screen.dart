@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -88,7 +90,22 @@ class PersonDetailsScreen extends StatelessWidget {
                     tone: ThermalButtonTone.danger,
                   );
                   if (!confirmed) return;
-                  peopleBloc.add(DeletePerson(person.id));
+                  // Leave only once they're gone; if the delete fails,
+                  // stay, so the person is still there to try again.
+                  final deleted = Completer<void>();
+                  peopleBloc.add(DeletePerson(person.id, done: deleted));
+                  try {
+                    await deleted.future;
+                  } catch (_) {
+                    if (!context.mounted) return;
+                    GlassToast.show(
+                      context,
+                      "Couldn't delete ${person.firstName}. Check your "
+                      'connection and try again.',
+                      tone: ToastTone.failure,
+                    );
+                    return;
+                  }
                   navigator.pop();
                 },
               ),

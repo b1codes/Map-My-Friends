@@ -15,6 +15,7 @@ import 'package:map_my_friends/models/station.dart';
 import 'package:map_my_friends/models/trip.dart';
 import 'package:map_my_friends/screens/people/person_details_screen.dart';
 import 'package:mocktail/mocktail.dart';
+import '../../helpers/people_writes.dart';
 
 class MockTripBloc extends MockBloc<TripEvent, TripState> implements TripBloc {}
 
@@ -70,6 +71,7 @@ void main() {
   setUp(() {
     tripBloc = MockTripBloc();
     peopleBloc = MockPeopleBloc();
+    answerPeopleWrites(peopleBloc);
     when(() => tripBloc.state).thenReturn(const TripState());
     when(() => peopleBloc.state).thenReturn(const PeopleLoaded([]));
   });
@@ -286,6 +288,36 @@ void main() {
       expect(event.person.preferredStationId, '7');
       expect(event.person.preferredStation, same(station));
       expect(event.person.preferredAirportId, isNull);
+    });
+
+    testWidgets('a preference that fails to save says so', (tester) async {
+      answerPeopleWrites(peopleBloc, error: Exception('offline'));
+      when(() => tripBloc.state).thenReturn(
+        TripState(
+          stops: [
+            TripStop(
+              location: const LatLng(2, 2),
+              sequenceOrder: 0,
+              station: _station(),
+            ),
+          ],
+        ),
+      );
+      await openModal(tester, [_ada]);
+
+      await tester.tap(find.byTooltip('Link to Stop'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('A: Station Union Station'));
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Set as Preferred'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining("Couldn't update Ada's preferred stop"),
+        findsOneWidget,
+      );
     });
 
     testWidgets('opens the person after closing the modal', (tester) async {
