@@ -9,10 +9,11 @@ What runs on every pull request, what each check enforces, and how to run the sa
 | Job | What it checks | Fails when | Locally |
 | --- | --- | --- | --- |
 | Lint & Format Backend | Ruff format and lint on `backend/` and `smoke/` | anything isn't formatted, or a rule fires | `make lint-backend` |
-| Test Backend | the Django suite on the Firestore emulator, in random order, under coverage | a test fails, or branch coverage is below the gate | `make test-cov` |
+| Test Backend | the Django suite on the Firestore emulator, in random order, under coverage, including the [API fuzz test](#api-fuzzing)'s fixed 50 requests per route | a test fails, or branch coverage is below the gate | `make test-cov`, `make fuzz` |
 | Lint, Format, & Test Frontend | dart format, `flutter analyze` (the app and the golden harness), the Flutter suite in random order under coverage, goldens included, then a release web build's download size | a test fails, a golden differs, the analyzer reports anything (infos too), line coverage is below the gate, or the web download is over [its budget](#web-download-size) | `make lint-frontend`, `make test-frontend-cov`, `make goldens`, `make web-size` |
 | Lint, Format, & Test Widgetbook | the component catalog is regenerated, formatted and analyzed, every entry opens, every entry matches its light and dark golden, and every entry passes the [accessibility checks](#accessibility) | the committed catalog is stale, an entry throws, a golden differs, or an accessibility check finds a different number of problems than its known gaps record | `make goldens` for the goldens; see the job for the rest |
 | E2E Journeys | the real app in headless Chrome against a throwaway full stack | a journey fails | `make e2e` |
+| Monkey | the real app under [seeded random input](#monkey-and-fuzz-tests): 12 launches of 250 actions, the same seed every run | any exception, layout overflow or unknown API route that isn't a [known gap](#known-gaps) | `make monkey` |
 | Lint Workflows | actionlint and shellcheck on every workflow | a workflow has an error | `make lint-workflows` |
 | Production Image | the [production image](#the-production-image), booted as Cloud Run runs it, then scanned | a hadolint finding, a behaviour check, or a fixable HIGH/CRITICAL CVE | `make prod-image` |
 | Smoke Test | the [smoke test](#the-smoke-test)'s own tests, then the smoke test against the production image on a throwaway stack | a check fails | `make smoke` |
@@ -107,6 +108,8 @@ Both suites run in a random order on every CI run, so a test that only passes af
 `.github/workflows/security.yml` runs the [security scans](#security-scans) and the production image's checks (new CVEs appear in its OS packages without any code change), and `.github/workflows/performance.yml` runs the [load test](#the-load-test). The load test also runs on a PR that changes it or its stack.
 
 `.github/workflows/smoke.yml` runs the [smoke test](#the-smoke-test) against production every hour, once `SMOKE_BASE_URL` is set.
+
+`.github/workflows/monkey.yml` runs the [monkey and fuzz tests](#monkey-and-fuzz-tests) with random seeds: the widget monkey for 25 minutes, the web monkey for 20, and the API fuzz test's nightly profile. Each job writes its seed and the `make` line that replays it to the run's summary before it starts. A manual run takes a seed.
 
 ## Security scans
 
@@ -254,6 +257,83 @@ trivy's two findings are deliberate, so each carries a `#trivy:ignore` with its 
 | Smoke Test job, `make smoke` | the production image on a throwaway stack (the DAST stack, with the Firestore emulator), after the script's own tests (`smoke/test_smoke.py`, against a fake API) | every PR |
 | `release.yml` | the new revision before it takes traffic, then the live URL | every release |
 | `smoke.yml` | production (`SMOKE_BASE_URL`) | hourly, and on demand. A failure opens a `smoke-failure` issue. |
+
+## Monkey and fuzz tests
+
+Scripted tests check what someone meant to do. These check what happens when nobody means anything: a toddler with the phone, a user hammering a button that seems slow, a client sending garbage. There are four parts, and each runs briefly with a fixed seed on every PR and at length with random seeds nightly.
+
+| Part | What it drives | Per PR | Nightly | Locally |
+| --- | --- | --- | --- | --- |
+| Widget monkey | the real app over an in-memory API | 12 launches × 250 actions, fixed seed (Monkey job, about a minute) | 25 minutes, random seeds | `make monkey` |
+| Edge cases | the same app, each risky situation done on purpose | all of them (in the frontend suite) | | `fvm flutter test test/edge_cases` |
+| Web monkey | the same engine in Chrome, against the E2E stack | | 20 minutes, random seed | `make monkey-web` |
+| API fuzz | every API route, with Hypothesis | 50 requests per route, derandomized (in Test Backend) | 5,000 per route, random seed | `make fuzz` |
+
+### The widget monkey
+
+[`frontend/test/monkey`](../frontend/test/monkey) runs `MyApp` exactly as `main.dart` wires it: the real blocs, services, Dio and interceptors. Only the network and the plugins are replaced. `FakeApi` is a stateful in-memory API built from the contract examples, so adding a friend changes what the next list returns. It sits under [`RecordingHttpOverrides`](../frontend/test/helpers/recording_http_overrides.dart), below every `HttpClient` the app creates. The device has a signed-in session, location granted or declined, an image picker the user cancels, and links that "open". The account starts with people whose names are long, emoji, right-to-left and accented.
+
+The engine ([`integration_test/support/monkey/monkey.dart`](../frontend/integration_test/support/monkey/monkey.dart)) picks weighted actions with a seeded `Random`:
+
+- taps on controls and on random points, double taps, long presses, five rapid taps on one control, and two fingers at once
+- drags, flings and two-finger pinches
+- typing awkward text into a random field (2,000 characters, emoji, right-to-left, combining marks, HTML, SQL and format strings), and the keyboard's action key
+- system back, tab switches, and waits
+- going to the background and back, window resizes and rotations, text at 100–200%
+- the network going offline or slowing to 3 seconds per reply (widget monkey only)
+
+After every action it lets a random amount of time pass, so taps land at every point of a request or a transition. Then it checks for errors. It fails on any exception or layout overflow the app reports, on any request to a route `FakeApi` doesn't have, and on an action that hasn't finished after 60 seconds (a hang). Signing out is allowed. After a few steps on the sign-in screen, it signs back in so the session keeps exploring.
+
+Every app launch is a session with its own seed (the run's base seed plus its index) and its own fresh device. The real fonts are loaded first, so text takes the space it does on a device. A seed replays alone exactly as it ran in the batch.
+
+**When it fails**, the output names the seed and the command that replays that session, and lists the last 60 actions:
+
+```
+Monkey (seed 20261111) found a problem at step 10: threw FlutterError: A RenderFlex overflowed …
+  make monkey MONKEY_SEED=20261111 MONKEY_SESSIONS=1 MONKEY_STEPS=250
+```
+
+`frontend/build/monkey/seed-<n>.log` has every action and request, and `seed-<n>.png` is the screen it failed on. CI uploads both as the `monkey-failure` artifact. Fix the bug with a test that fails first. Converting the steps into a deterministic regression test is usually a few lines in [`test/edge_cases`](../frontend/test/edge_cases). Or file it and add a known gap.
+
+**Triage mode:** `make monkey MONKEY_SURVEY=true MONKEY_SESSIONS=120 MONKEY_SEED=5000` runs every session to the end. It collects each distinct problem (by error and source line) into `frontend/build/monkey/survey.txt`, with the seeds, steps, window and text size where it happened. That's how the known gaps were found and sorted.
+
+### Known gaps
+
+[`known_gaps.dart`](../frontend/integration_test/support/monkey/known_gaps.dart) lists problems that are already filed, each with its ClickUp task and a matcher on the error report (the widget and file that overflowed, and the text size). A match is logged and counted ("hit known gaps: …") instead of failing, so the monkey keeps looking for new problems. When a task is fixed, delete its entry. If the fix is incomplete, the monkey says so.
+
+### Edge cases
+
+[`frontend/test/edge_cases`](../frontend/test/edge_cases) does on purpose what the monkey does at random, on each main screen. It checks the outcome, not just the absence of errors:
+
+- a double tap submits once (counted at the API)
+- taps while a screen loads, and back while a save is on its way
+- background and back, and rotation, keeping a half-filled form
+- offline at launch then back online, an offline save that keeps the form, and a slow network
+- 130% and 200% text
+- long names and special characters, sent and shown as typed
+
+A case that finds a bug keeps asserting the right behaviour and is skipped with its task link, as the E2E journeys are.
+
+### The web monkey
+
+[`integration_test/monkey_test.dart`](../frontend/integration_test/monkey_test.dart) runs the same engine on the real web engine and plugins, in Chrome, against the real API on the E2E stack. It signs up an account with awkward names first. It never taps the Auth0 buttons, because hosted sign-in leaves the app, and it presses back only while a route can pop, because on the web the last back is the browser's and leaves the page. A web test's prints don't reach the output, so it sends each action to the stub server, whose log (`frontend/build/e2e/stack.log`, uploaded on failure) shows where a run stopped. A failure saves a screenshot to `frontend/build/e2e/screenshots/`. It's not in `all_test.dart`, so the per-PR journeys stay deterministic.
+
+There's no native-device monkey (`adb shell monkey`). CI has no Android runner, and mobile release builds still point at a placeholder API URL (filed by the infra subtask). The manual QA checklist covers a stress pass on a real phone.
+
+### API fuzzing
+
+[`backend/tests/test_fuzz_api.py`](../backend/tests/test_fuzz_api.py) sends every route and method requests generated from a valid one:
+
+- the body the app really sends, with fields dropped, nulled or swapped for random JSON and awkward strings (NUL, lone surrogates, 10,000 characters, impossible dates), extra fields added, and nested stops and legs mutated the same way
+- ids that are real, someone else's, or junk
+- query strings of any shape, and bodies half-sent or form-encoded
+- callers signed in, signed out, or holding a garbage or forged Auth0 token
+
+Every answer must hold to three properties: no 5xx; a 4xx body is JSON; and a 2xx the app parses matches its contract schema, for the caller the contract describes. A new route fails `test_every_route_is_fuzzed` until it has a target.
+
+Schemathesis would need an OpenAPI document, which the API doesn't have. Hypothesis covers the same ground in-process, against the Firestore emulator, with no new production dependency.
+
+**When it fails**, Hypothesis prints the smallest request that still fails, which is the bug report. It also prints a `@reproduce_failure(...)` line that replays exactly that request. Nightly failures replay with `make fuzz FUZZ_PROFILE=nightly FUZZ_SEED=<seed from the run's summary>`. Fix it with a test that fails first, next to the code it fixes. Every bug the fuzz test has found so far was a 500.
 
 ## Releases
 

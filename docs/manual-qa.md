@@ -60,3 +60,4 @@ The catalog checks that every control has a name, every tap target is big enough
 - [ ] **Gestures:** panning, pinch-zooming and rotating the map are smooth on a mid-range Android phone, with no stutter when clusters split.
 - [ ] **Layout:** the bottom bar in portrait and the rail in landscape and on tablets don't overlap the notch, the home indicator or the keyboard.
 - [ ] **Text size:** the largest system text size still leaves every screen usable. The catalog checks 200%. iOS's largest accessibility size is about 310%, so check that one by hand.
+- [ ] **Stress:** on a native Android and iOS build, mash the controls for a minute: rapid taps on Save, two-finger taps, swipes while sheets open and close, back mid-save, background and back, rotating. The monkey covers this on the web engine only (see [Monkey and fuzz tests](testing.md#monkey-and-fuzz-tests)). On Android, `adb shell monkey -p <package> -s <seed> --throttle 100 2000` does it for you.
