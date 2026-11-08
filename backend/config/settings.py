@@ -68,6 +68,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # First, so Cloud Run's probes are answered before the host check and the
+    # HTTPS redirect, neither of which a probe would pass. See config/health.py.
+    "config.health.HealthCheckMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
