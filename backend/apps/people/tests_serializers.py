@@ -149,6 +149,23 @@ class PersonValidationTests(SimpleTestCase):
         self.assertTrue(is_valid, serializer.errors)
         self.assertEqual(serializer.validated_data, {"tag": "FRIEND"})
 
+    # The app draws pins with int.parse on the hex, so anything else
+    # crashed every screen showing that pin. The API took any string up to
+    # the length limit. Found by the nightly API fuzz test ("7").
+    BAD_COLOURS = ("7", "red", "#12345", "#1234567", "2196F3", "#GGGGGG", "")
+    GOOD_COLOURS = ("#2196F3", "#abcdef", "#000000")
+
+    def test_pin_color_must_be_a_hex_colour(self):
+        for value in self.BAD_COLOURS:
+            with self.subTest(value=value):
+                is_valid, serializer = self.validate(pin_color=value)
+                self.assertFalse(is_valid)
+                self.assertIn("pin_color", serializer.errors)
+        for value in self.GOOD_COLOURS:
+            with self.subTest(value=value):
+                is_valid, serializer = self.validate(pin_color=value)
+                self.assertTrue(is_valid, serializer.errors)
+
     def test_reference_ids_are_checked_against_the_exports(self):
         cases = {
             "preferred_airport": "Unknown airport id.",

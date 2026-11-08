@@ -148,7 +148,7 @@
             "phone_number": { "type": ["string", "null"] },
             "profile_image": { "anyOf": [{ "$ref": "#/$defs/Url" }, { "type": "null" }] },
             "timezone": { "type": ["string", "null"] },
-            "pin_color": { "type": "string" },
+            "pin_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
             "pin_style": { "$ref": "#/$defs/PinStyle" },
             "pin_icon_type": { "$ref": "#/$defs/PinIconType" },
             "pin_emoji": { "type": ["string", "null"] },
@@ -216,7 +216,7 @@
         "longitude": { "type": ["number", "null"], "minimum": -180, "maximum": 180 },
         "profile_image": { "anyOf": [{ "$ref": "#/$defs/Url" }, { "type": "null" }] },
         "timezone": { "type": ["string", "null"] },
-        "pin_color": { "type": "string" },
+        "pin_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
         "pin_style": { "$ref": "#/$defs/PinStyle" },
         "pin_icon_type": { "$ref": "#/$defs/PinIconType" },
         "pin_emoji": { "type": ["string", "null"] }

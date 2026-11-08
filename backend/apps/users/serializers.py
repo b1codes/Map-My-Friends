@@ -3,6 +3,8 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from apps.common.fields import PinColorField
+
 
 def validate_password_for(password, user):
     """Django's password validators, run against `user`, as a DRF error.
@@ -34,7 +36,7 @@ class UserProfileSerializer(serializers.Serializer):
     street = serializers.CharField(max_length=255, required=False, allow_blank=True)
     birth_date = serializers.DateField(required=False, allow_null=True)
     phone_number = serializers.CharField(required=False, allow_blank=True)
-    pin_color = serializers.CharField(max_length=7, required=False)
+    pin_color = PinColorField(required=False)
     pin_style = serializers.ChoiceField(
         choices=["teardrop", "circle", "square", "triangle", "diamond"], required=False
     )

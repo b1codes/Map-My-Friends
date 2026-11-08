@@ -27,6 +27,7 @@ import '../../components/shared/chromatic_pulse.dart';
 import '../../components/shared/glass_surfaces.dart';
 import '../../components/shared/glass_header.dart';
 import '../../utils/initials.dart';
+import '../../utils/pin_color.dart';
 
 class AddEditPersonScreen extends StatefulWidget {
   final Person? person;
@@ -192,9 +193,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
   }
 
   void _showColorPicker() {
-    final Color pickerColor = Color(
-      int.parse(_pinColor.replaceFirst('#', '0xFF')),
-    );
+    final Color pickerColor = parsePinColor(_pinColor);
     GlassDialog.panel(
       context,
       title: 'Pick a Pin Color',

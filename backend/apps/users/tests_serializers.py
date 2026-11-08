@@ -87,6 +87,27 @@ class UserProfileSerializerTests(TestCase):
             serializer = UserProfileSerializer(data={"pin_emoji": value}, partial=True)
             self.assertTrue(serializer.is_valid(), serializer.errors)
 
+    # The app draws pins with int.parse on the hex, so anything else
+    # crashed every screen showing that pin. The API took any string up to
+    # the length limit. Found by the nightly API fuzz test ("7").
+    BAD_COLOURS = ("7", "red", "#12345", "#1234567", "2196F3", "#GGGGGG", "")
+    GOOD_COLOURS = ("#2196F3", "#abcdef", "#000000")
+
+    def test_pin_color_must_be_a_hex_colour(self):
+        for value in self.BAD_COLOURS:
+            with self.subTest(value=value):
+                serializer = UserProfileSerializer(
+                    data={"pin_color": value}, partial=True
+                )
+                self.assertFalse(serializer.is_valid())
+                self.assertIn("pin_color", serializer.errors)
+        for value in self.GOOD_COLOURS:
+            with self.subTest(value=value):
+                serializer = UserProfileSerializer(
+                    data={"pin_color": value}, partial=True
+                )
+                self.assertTrue(serializer.is_valid(), serializer.errors)
+
 
 class RegisterSerializerTests(TestCase):
     def data(self, **overrides):

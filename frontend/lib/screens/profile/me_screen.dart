@@ -26,6 +26,7 @@ import '../../components/shared/chromatic_pulse.dart';
 import '../../components/shared/glass_surfaces.dart';
 import '../../components/shared/glass_header.dart';
 import '../../utils/initials.dart';
+import '../../utils/pin_color.dart';
 
 class MeScreen extends StatefulWidget {
   /// Injectable picker. Production leaves this null and gets the platform
@@ -124,9 +125,7 @@ class _MeScreenState extends State<MeScreen> {
   }
 
   void _showColorPicker() {
-    final Color pickerColor = Color(
-      int.parse(_pinColor.replaceFirst('#', '0xFF')),
-    );
+    final Color pickerColor = parsePinColor(_pinColor);
     GlassDialog.panel(
       context,
       title: 'Pick a Pin Color',

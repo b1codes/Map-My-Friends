@@ -28,6 +28,32 @@ void main() {
       }
     });
 
+    // The colour comes from the API. Anything but #RRGGBB made int.parse
+    // throw, and every screen drawing that pin with it. The API now refuses
+    // such colours, but older records may hold one. Found by the nightly API
+    // fuzz test.
+    for (final hex in ['7', 'red', '#12345', '', '#GGGGGG']) {
+      testWidgets('draws a pin whose colour "$hex" is not a hex colour', (
+        tester,
+      ) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: CustomMapMarker(
+                pinColorHex: hex,
+                pinStyle: 'circle',
+                pinIconType: 'initials',
+                initials: 'AB',
+              ),
+            ),
+          ),
+        );
+
+        expect(tester.takeException(), isNull);
+        expect(find.text('AB'), findsOneWidget);
+      });
+    }
+
     testWidgets('renders initials correctly', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
