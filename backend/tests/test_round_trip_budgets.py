@@ -1,11 +1,12 @@
 """Firestore round-trip budgets: every API route, at two sizes of data.
 
-The API runs on AWS and Firestore on GCP, so every round trip is a
-cross-cloud call, and a request's round trips run one after another. A request
-whose round trips grow with the caller's data (one more query per friend, per
-trip, per stop) gets slower and dearer for every user as they use the app,
-and nothing else in the suites would notice: against the local emulator a
-round trip costs about a millisecond.
+The API runs on Cloud Run beside Firestore, so a round trip is a few
+milliseconds, but each one is billed (document reads), and a request's round
+trips run one after another, holding an instance's thread the whole time. A
+request whose round trips grow with the caller's data (one more query per
+friend, per trip, per stop) gets slower and dearer for every user as they use
+the app, and nothing else in the suites would notice: against the local
+emulator a round trip costs about a millisecond.
 
 Each case sends one request as the owner of the seeded data, twice: once with
 a small account (one of everything) and once with a large one (many people,

@@ -138,7 +138,7 @@ class ProductionSettingsTests(SimpleTestCase):
         self.assertEqual(self.prod.X_FRAME_OPTIONS, "DENY")
 
     def test_https_is_recognised_behind_the_proxy(self):
-        # nginx terminates TLS and sets X-Forwarded-Proto (nginx.conf.example).
+        # Cloud Run's front end terminates TLS and sets X-Forwarded-Proto.
         # Without this, SECURE_SSL_REDIRECT would redirect every proxied
         # request forever, and request.is_secure() would always be False.
         self.assertTrue(self.prod.SECURE_SSL_REDIRECT)
@@ -235,7 +235,8 @@ class ThrottleClientIdentityTests(SimpleTestCase):
         self.assertEqual(first, "203.0.113.7")
 
     def test_behind_one_proxy_the_client_is_the_address_the_proxy_saw(self):
-        # nginx appends the address it received the request from, so with one
+        # Cloud Run's front end appends the address it received the request
+        # from (as nginx would), so with one
         # proxy the last entry is the real client and earlier ones are
         # whatever the client sent.
         rest_framework = {**settings.REST_FRAMEWORK, "NUM_PROXIES": 1}

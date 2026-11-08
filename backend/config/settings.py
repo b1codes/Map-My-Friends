@@ -238,8 +238,9 @@ REST_FRAMEWORK = {
         "login_burst": "10/minute",
     },
     "EXCEPTION_HANDLER": "apps.common.exception_handlers.firestore_exception_handler",
-    # How many proxies sit in front of Django: 1 behind nginx in production,
-    # 0 when clients connect directly (dev). Throttles identify an anonymous
+    # How many proxies sit in front of Django: 1 on Cloud Run (its front end
+    # appends the connecting address to X-Forwarded-For; infra/locals.tf sets
+    # it), 0 when clients connect directly (dev). Throttles identify an anonymous
     # client by the address the outermost proxy saw. Left unset, DRF used the
     # whole X-Forwarded-For header, which the client writes, so a new value
     # per request escaped every anonymous limit.
@@ -276,10 +277,9 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
     SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "False").lower() == "true"
-    # nginx terminates TLS and always sets X-Forwarded-Proto
-    # (nginx.conf.example), so it's the proxy's word, not the client's. Without
-    # it, is_secure() is always False behind the proxy and SECURE_SSL_REDIRECT
-    # redirects forever.
+    # Cloud Run's front end terminates TLS and always sets X-Forwarded-Proto,
+    # so it's the proxy's word, not the client's. Without this, is_secure() is
+    # always False behind the proxy and SECURE_SSL_REDIRECT redirects forever.
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
