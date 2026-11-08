@@ -224,6 +224,9 @@ AGENTS.override.md
 .coverage.*
 htmlcov/
 
+# Hypothesis's caches (backend/tests/test_fuzz_api.py)
+.hypothesis/
+
 # FVM: per-project Flutter SDK link (the pinned version lives in .fvmrc)
 .fvm/
 

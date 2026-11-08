@@ -34,6 +34,8 @@ dev = [
     # Validates API and third-party responses against the shared JSON Schemas
     # in contracts/ (backend/tests/contracts).
     "jsonschema>=4.23.0,<5.0.0",
+    # Property-based fuzzing of every API route (tests/test_fuzz_api.py).
+    "hypothesis>=6.135.0,<7.0.0",
 ]
 
 [build-system]
