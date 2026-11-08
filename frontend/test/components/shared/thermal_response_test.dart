@@ -239,6 +239,37 @@ void main() {
       expect(taps, 1);
     });
 
+    // A finger that went down on a surface the app then removed (a sheet
+    // that closed, a screen that was replaced) still lifts, and the pointer
+    // up is still delivered to it. It used to animate disposed controllers:
+    // "AnimationController.reverse() called after dispose()". Found by the
+    // monkey test.
+    for (final reduceMotion in [false, true]) {
+      testWidgets('a finger lifting after the surface is gone does nothing'
+          '${reduceMotion ? ' (reduced motion)' : ''}', (tester) async {
+        await tester.pumpWidget(_host(reduceMotion: reduceMotion));
+        final gesture = await _press(tester);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await gesture.up();
+        await tester.pump();
+
+        expect(tester.takeException(), isNull);
+      });
+
+      testWidgets('a cancelled pointer after the surface is gone does nothing'
+          '${reduceMotion ? ' (reduced motion)' : ''}', (tester) async {
+        await tester.pumpWidget(_host(reduceMotion: reduceMotion));
+        final gesture = await _press(tester);
+
+        await tester.pumpWidget(const SizedBox.shrink());
+        await gesture.cancel();
+        await tester.pump();
+
+        expect(tester.takeException(), isNull);
+      });
+    }
+
     testWidgets('the glow is painted over the child but never hit-tests', (
       tester,
     ) async {
