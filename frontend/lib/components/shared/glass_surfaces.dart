@@ -90,49 +90,54 @@ class GlassSheet extends StatelessWidget {
       isScrollControlled: false,
       builder: (context) {
         final theme = Theme.of(context);
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            if (title != null) ...<Widget>[
-              Text(title, style: theme.textTheme.titleMedium),
-              const SizedBox(height: MapSpacing.sm),
-            ],
-            for (final action in actions)
-              Padding(
-                padding: const EdgeInsets.only(bottom: MapSpacing.xs),
-                child: ThermalResponse(
-                  borderRadius: MapGlass.radiusSm,
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    action.onTap();
-                  },
-                  child: GlassInlay(
+        // A sheet that isn't scroll-controlled gets at most 9/16 of the
+        // window: about 220 px on a phone in landscape, less than a title
+        // and three choices need. Scrolling keeps the last ones reachable.
+        return SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              if (title != null) ...<Widget>[
+                Text(title, style: theme.textTheme.titleMedium),
+                const SizedBox(height: MapSpacing.sm),
+              ],
+              for (final action in actions)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: MapSpacing.xs),
+                  child: ThermalResponse(
                     borderRadius: MapGlass.radiusSm,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: MapSpacing.sm,
-                      vertical: 14,
-                    ),
-                    child: Row(
-                      children: <Widget>[
-                        Icon(
-                          action.icon,
-                          size: 20,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                        const SizedBox(width: MapSpacing.sm),
-                        Expanded(
-                          child: Text(
-                            action.label,
-                            style: theme.textTheme.titleSmall,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      action.onTap();
+                    },
+                    child: GlassInlay(
+                      borderRadius: MapGlass.radiusSm,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: MapSpacing.sm,
+                        vertical: 14,
+                      ),
+                      child: Row(
+                        children: <Widget>[
+                          Icon(
+                            action.icon,
+                            size: 20,
+                            color: theme.colorScheme.onSurface,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: MapSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              action.label,
+                              style: theme.textTheme.titleSmall,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         );
       },
     );

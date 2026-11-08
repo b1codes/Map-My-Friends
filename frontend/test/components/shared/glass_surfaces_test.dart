@@ -133,6 +133,57 @@ void main() {
       expect(find.text('Take a photo'), findsNothing);
     });
 
+    // A phone in landscape gives a non-scroll-controlled sheet 9/16 of
+    // 390 px. The photo choices (title, camera, gallery, remove) need more,
+    // and the column didn't scroll: the last choices were cut off under
+    // Flutter's overflow stripes and couldn't be tapped. Found by the
+    // monkey test.
+    testWidgets('actions scroll when the window is too short for them', (
+      tester,
+    ) async {
+      tester.view
+        ..devicePixelRatio = 1
+        ..physicalSize = const Size(844, 390);
+      addTearDown(tester.view.reset);
+      final chosen = <String>[];
+      await tester.pumpWidget(
+        _launcher(
+          (context) => GlassSheet.actions(
+            context,
+            title: 'Profile photo',
+            actions: [
+              for (final label in [
+                'Take a Photo',
+                'Choose from Gallery',
+                'Remove',
+              ])
+                SheetAction(
+                  icon: Icons.photo,
+                  label: label,
+                  onTap: () => chosen.add(label),
+                ),
+            ],
+          ),
+        ),
+      );
+      await tester.tap(find.text('go'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      await tester.scrollUntilVisible(
+        find.text('Remove'),
+        50,
+        scrollable: find.descendant(
+          of: find.byType(GlassSheet),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      await tester.tap(find.text('Remove'));
+      await tester.pumpAndSettle();
+
+      expect(chosen, ['Remove']);
+    });
+
     testWidgets('actions without a title shows only the choices', (
       tester,
     ) async {
