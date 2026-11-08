@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars (git-ignored) and fill in. variables.tf has the rest.
+project_id = "your-gcp-project-id"
+
+# region        = "us-central1"
+# max_instances = 3
+# api_domain    = "api.mapmyfriends.com"
+# web_domain    = "mapmyfriends.com"
