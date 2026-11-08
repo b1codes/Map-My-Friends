@@ -92,7 +92,7 @@ import 'package:map_my_friends/services/routing_service.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../services/service_test_support.dart' show seedTokens;
-import 'recording_http_overrides.dart';
+import '../helpers/recording_http_overrides.dart';
 
 // JWT-shaped and URL-safe, so a percent-encoded copy is still a substring.
 const _accessToken = 'eyJhbGciOiJIUzI1NiJ9.access-SECRET-7f3a.sig';

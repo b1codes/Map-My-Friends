@@ -53,6 +53,14 @@ class RecordingHttpOverrides extends HttpOverrides {
   /// Answers each request; replace it per test. Defaults to an empty 404.
   Responder responder = (_) => const CannedResponse(404, []);
 
+  /// Time every reply takes to arrive, for a slow network. It runs on the
+  /// test's clock, so a `tester.pump(latency)` delivers it.
+  Duration latency = Duration.zero;
+
+  /// When true, every request fails with a [SocketException] as it would
+  /// with no connection. The request is still recorded.
+  bool offline = false;
+
   @override
   HttpClient createHttpClient(SecurityContext? context) =>
       _RecordingHttpClient(this);
@@ -166,7 +174,24 @@ class _RecordingRequest implements HttpClientRequest {
           e.key: List.unmodifiable(e.value),
       }, List.unmodifiable(_body));
       _owner.requests.add(recorded);
-      _done.complete(_FakeResponse(_owner.responder(recorded)));
+      final Future<HttpClientResponse> reply;
+      if (_owner.offline) {
+        reply = Future.delayed(
+          _owner.latency,
+          () => throw SocketException(
+            'Offline (RecordingHttpOverrides)',
+            osError: const OSError('Network is unreachable', 101),
+          ),
+        );
+      } else if (_owner.latency > Duration.zero) {
+        reply = Future.delayed(
+          _owner.latency,
+          () => _FakeResponse(_owner.responder(recorded)),
+        );
+      } else {
+        reply = Future.value(_FakeResponse(_owner.responder(recorded)));
+      }
+      _done.complete(reply);
     }
     return _done.future;
   }
