@@ -238,6 +238,13 @@ REST_FRAMEWORK = {
         "login_burst": "10/minute",
     },
     "EXCEPTION_HANDLER": "apps.common.exception_handlers.firestore_exception_handler",
+    # JSON that isn't valid Unicode (a lone "\ud800") is refused here: see
+    # apps/common/parsers.py.
+    "DEFAULT_PARSER_CLASSES": (
+        "apps.common.parsers.StrictJSONParser",
+        "rest_framework.parsers.FormParser",
+        "rest_framework.parsers.MultiPartParser",
+    ),
     # How many proxies sit in front of Django: 1 on Cloud Run (its front end
     # appends the connecting address to X-Forwarded-For; infra/locals.tf sets
     # it), 0 when clients connect directly (dev). Throttles identify an anonymous

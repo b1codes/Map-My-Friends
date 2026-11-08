@@ -1,13 +1,14 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers, status, viewsets
 from rest_framework.exceptions import APIException
-from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
 from rest_framework.throttling import UserRateThrottle
 
 from apps.common.ownership import owner_key_for
+from apps.common.parsers import StrictJSONParser
 from apps.common.storage import save_upload
 
 from .repositories import ContactLogRepository, PersonRepository
@@ -29,7 +30,7 @@ class PersonViewSet(viewsets.ViewSet):
     create, update and delete require authentication.
     """
 
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    parser_classes = [MultiPartParser, FormParser, StrictJSONParser]
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:

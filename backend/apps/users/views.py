@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from rest_framework import generics, status
-from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.common.ownership import owner_key_for
+from apps.common.parsers import StrictJSONParser
 
 from .serializers import (
     PasswordResetConfirmSerializer,
@@ -31,7 +32,7 @@ class UserProfileView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    parser_classes = [MultiPartParser, FormParser, StrictJSONParser]
 
     @property
     def repository(self):
