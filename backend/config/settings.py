@@ -185,6 +185,35 @@ STORAGES = {
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Production keeps uploads in a Cloud Storage bucket (infra/storage.tf), since
+# a Cloud Run instance's disk goes with it. Unset, they go to MEDIA_ROOT, which
+# only the dev and test stacks use (and only DEBUG serves).
+#
+# Each object is public to anyone with its URL, and nobody can list the
+# bucket. The name is a random UUID (apps/common/storage.py), so the URL is
+# the secret: a deliberate choice over signed URLs, which on Cloud Run cost an
+# IAM signBlob call per photo per response. Names are never reused, so the
+# objects can be cached for good.
+GS_BUCKET_NAME = os.environ.get("GS_BUCKET_NAME", "")
+if GS_BUCKET_NAME:
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        "OPTIONS": {
+            "bucket_name": GS_BUCKET_NAME,
+            # Plain public URLs, not signed ones.
+            "querystring_auth": False,
+            # The bucket uses uniform access (no per-object ACLs); its IAM
+            # policy decides who reads.
+            "default_acl": None,
+            # A UUID name never collides, so don't spend a round trip asking
+            # whether it exists before writing.
+            "file_overwrite": True,
+            "object_parameters": {
+                "cache_control": "public, max-age=31536000, immutable"
+            },
+        },
+    }
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

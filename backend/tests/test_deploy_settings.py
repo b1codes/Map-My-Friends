@@ -37,6 +37,7 @@ DEPLOY_VARS = (
     "CORS_ALLOWED_ORIGINS",
     "CSRF_TRUSTED_ORIGINS",
     "SECURE_SSL_REDIRECT",
+    "GS_BUCKET_NAME",
 )
 
 # A key that isn't the committed default, as a real deployment would set.
@@ -151,6 +152,36 @@ class ProductionSettingsTests(SimpleTestCase):
 
         self.assertIsNone(getattr(loaded, "SECURE_PROXY_SSL_HEADER", None))
         self.assertTrue(loaded.CORS_ALLOW_ALL_ORIGINS)
+
+
+class UploadStorageTests(SimpleTestCase):
+    """Cloud Run's disk goes with the instance, so uploads need a bucket."""
+
+    def test_uploads_go_to_the_bucket_when_one_is_configured(self):
+        loaded = load_settings(**PRODUCTION_ENV, GS_BUCKET_NAME="mmf-media")
+
+        storage = loaded.STORAGES["default"]
+        self.assertEqual(
+            storage["BACKEND"], "storages.backends.gcloud.GoogleCloudStorage"
+        )
+        self.assertEqual(storage["OPTIONS"]["bucket_name"], "mmf-media")
+
+    def test_bucket_urls_are_plain_public_ones(self):
+        # Signed URLs would need an IAM signBlob call per photo per response.
+        options = load_settings(**PRODUCTION_ENV, GS_BUCKET_NAME="mmf-media").STORAGES[
+            "default"
+        ]["OPTIONS"]
+
+        self.assertFalse(options["querystring_auth"])
+        self.assertIsNone(options["default_acl"])
+
+    def test_without_a_bucket_uploads_go_to_disk(self):
+        loaded = load_settings(**PRODUCTION_ENV)
+
+        self.assertEqual(
+            loaded.STORAGES["default"]["BACKEND"],
+            "django.core.files.storage.FileSystemStorage",
+        )
 
 
 class DeployChecklistTests(SimpleTestCase):
