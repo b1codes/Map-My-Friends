@@ -30,8 +30,8 @@ HOST_PORT="${PROD_IMAGE_PORT:-8400}"
 NAME="mmf-prod-image-check-$$"
 BASE="http://127.0.0.1:$HOST_PORT"
 
-HADOLINT=hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d
-TRIVY=aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+# shellcheck source=scripts/tool-images.sh
+source "$ROOT/scripts/tool-images.sh"
 
 API_HOST=api.example.test
 APP_ORIGIN=https://app.example.test
@@ -49,7 +49,7 @@ trap cleanup EXIT
 
 echo "== Dockerfile lint (hadolint)"
 check "backend/Dockerfile passes hadolint" \
-  docker run --rm -i "$HADOLINT" hadolint - <"$ROOT/backend/Dockerfile"
+  docker run --rm -i "$HADOLINT_IMAGE" hadolint - <"$ROOT/backend/Dockerfile"
 
 if [ "${PROD_IMAGE_SKIP_BUILD:-0}" != 1 ]; then
   echo "== Building $IMAGE"
@@ -155,7 +155,7 @@ check "no fixable HIGH or CRITICAL CVE, and no secret in any layer" \
   docker run --rm \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v "$ROOT/build/trivy-cache:/root/.cache" \
-    "$TRIVY" image --quiet --scanners vuln,secret --table-mode detailed \
+    "$TRIVY_IMAGE" image --quiet --scanners vuln,secret --table-mode detailed \
     --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$IMAGE"
 
 if [ "$failures" -gt 0 ]; then

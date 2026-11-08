@@ -165,6 +165,14 @@ test-rules:
 
 .PHONY: test-rules
 
+# infra/ (the GCP Terraform): fmt, validate, terraform test with the
+# providers mocked, tflint and trivy config. No GCP credentials needed. See
+# scripts/infra.sh.
+check-infra:
+	scripts/infra.sh
+
+.PHONY: check-infra
+
 # Load test: perf/load.js in k6 against a throwaway stack shaped like one
 # Cloud Run instance (docker-compose.perf.yml), with Firestore latency
 # added. About 6 minutes; results in build/perf/. scripts/load.sh lists the

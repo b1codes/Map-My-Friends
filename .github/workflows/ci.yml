@@ -397,21 +397,21 @@ jobs:
   # -----------------------------------------------------------------
   # INFRASTRUCTURE VALIDATION
   # -----------------------------------------------------------------
+  # infra/ without a GCP project: fmt, validate, terraform test (providers
+  # mocked: cost caps, exposure, least privilege, who may deploy), tflint and
+  # trivy config. The same pinned images as `make check-infra`.
   validate-infra:
-    name: Validate Terraform Configuration
+    name: Validate Terraform
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: infra
     steps:
       - name: Checkout Code
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
 
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # ratchet:hashicorp/setup-terraform@v3
-
-      - name: Format Check
-        run: terraform fmt -check -recursive
+      - name: Check the Terraform
+        env:
+          # tflint downloads its Google ruleset from GitHub.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: make check-infra
 
   # -----------------------------------------------------------------
   # SINGLE REQUIRED CHECK
