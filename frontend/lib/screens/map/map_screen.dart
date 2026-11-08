@@ -34,6 +34,7 @@ import '../../l10n/app_localizations.dart';
 import '../../utils/app_theme.dart';
 import '../../utils/window_size.dart';
 import '../../components/shared/chromatic_pulse.dart';
+import '../../utils/initials.dart';
 
 // Spatial tokens per DESIGN.md §5: floating chrome lives at 20px inset; the
 // compass clears the settings button (~75px tall plus its inset) with a
@@ -196,15 +197,10 @@ class _MapScreenState extends State<MapScreen> {
                               (profileState.pinColor != null ||
                                   profileState.pinStyle != null ||
                                   profileState.pinIconType != null)) {
-                            String initials = '';
-                            if (profileState.firstName != null &&
-                                profileState.firstName!.isNotEmpty) {
-                              initials += profileState.firstName![0];
-                            }
-                            if (profileState.lastName != null &&
-                                profileState.lastName!.isNotEmpty) {
-                              initials += profileState.lastName![0];
-                            }
+                            final initials = initialsOf(
+                              profileState.firstName,
+                              profileState.lastName,
+                            );
 
                             markers.add(
                               Marker(

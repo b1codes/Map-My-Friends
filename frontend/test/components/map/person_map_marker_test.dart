@@ -88,6 +88,18 @@ void main() {
     );
   });
 
+  testWidgets('draws whole emoji initials without breaking the text', (
+    tester,
+  ) async {
+    await pumpMarker(tester, _person(firstName: '🦄✨', lastName: '👩🏽‍💻'));
+
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.widget<CustomMapMarker>(find.byType(CustomMapMarker)).initials,
+      '🦄👩🏽‍💻',
+    );
+  });
+
   testWidgets('announces itself as the friend it marks', (tester) async {
     final semantics = tester.ensureSemantics();
     await pumpMarker(tester, _person());

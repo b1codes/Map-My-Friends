@@ -247,6 +247,28 @@ void main() {
     // Regression: the avatar initial was `firstName[0]`, which threw a
     // RangeError for a traveller with no first name (the form requires one,
     // but server data doesn't).
+    testWidgets('a traveller with an emoji name gets the whole emoji', (
+      tester,
+    ) async {
+      await pumpPlanner(tester, [
+        TripStop(
+          location: const LatLng(0, 0),
+          sequenceOrder: 0,
+          airport: sfo,
+          people: [friend('🦄✨')],
+        ),
+      ]);
+
+      expect(tester.takeException(), isNull);
+      expect(
+        find.descendant(
+          of: find.byType(CircleAvatar),
+          matching: find.text('🦄'),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('a traveller without a first name gets a last-name initial', (
       tester,
     ) async {

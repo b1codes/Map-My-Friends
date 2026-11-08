@@ -151,6 +151,17 @@ void main() {
       expect(find.text('FRIEND'), findsOneWidget);
     });
 
+    testWidgets('draws whole emoji initials without breaking the text', (
+      tester,
+    ) async {
+      await openModal(tester, [
+        _ada.copyWith(firstName: '🦄✨', lastName: '👩🏽‍💻'),
+      ]);
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('🦄👩🏽‍💻'), findsOneWidget);
+    });
+
     testWidgets('adds the person as a new stop', (tester) async {
       await openModal(tester, [_ada]);
 

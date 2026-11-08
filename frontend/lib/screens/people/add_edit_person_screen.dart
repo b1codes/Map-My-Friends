@@ -24,6 +24,7 @@ import '../../components/shared/ambient_scaffold.dart';
 import '../../components/shared/chromatic_pulse.dart';
 import '../../components/shared/glass_surfaces.dart';
 import '../../components/shared/glass_header.dart';
+import '../../utils/initials.dart';
 
 class AddEditPersonScreen extends StatefulWidget {
   final Person? person;
@@ -832,14 +833,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
   }
 
   String _getInitials() {
-    String initials = '';
-    if (_firstNameController.text.isNotEmpty) {
-      initials += _firstNameController.text[0];
-    }
-    if (_lastNameController.text.isNotEmpty) {
-      initials += _lastNameController.text[0];
-    }
-    return initials;
+    return initialsOf(_firstNameController.text, _lastNameController.text);
   }
 
   Widget _buildHubSelection() {

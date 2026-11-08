@@ -12,6 +12,7 @@ import '../../utils/app_theme.dart';
 
 import '../../components/map/map_bottom_sheets.dart';
 import '../shared/glass_surfaces.dart';
+import '../../utils/initials.dart';
 
 class UnifiedClusterModal extends StatelessWidget {
   final List<dynamic> items;
@@ -86,8 +87,7 @@ class UnifiedClusterModal extends StatelessWidget {
                 : null,
             child: p.profileImageUrl == null
                 ? Text(
-                    (p.firstName.isNotEmpty ? p.firstName[0] : '') +
-                        (p.lastName.isNotEmpty ? p.lastName[0] : ''),
+                    initialsOf(p.firstName, p.lastName),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onPrimaryContainer,
                       fontWeight: FontWeight.bold,

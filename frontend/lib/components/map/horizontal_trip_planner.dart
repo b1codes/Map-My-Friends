@@ -11,6 +11,7 @@ import '../../utils/app_theme.dart';
 import '../shared/glass_container.dart';
 import '../shared/thermal_response.dart';
 import '../../utils/window_size.dart';
+import '../../utils/initials.dart';
 
 class HorizontalTripPlanner extends StatelessWidget {
   const HorizontalTripPlanner({super.key});
@@ -269,7 +270,6 @@ class _ActionGroup extends StatelessWidget {
 /// The avatar letter for [p]: their first initial, else their last, else
 /// nothing. Names come from the server, so either may be empty.
 String _initialOf(Person p) {
-  if (p.firstName.isNotEmpty) return p.firstName[0];
-  if (p.lastName.isNotEmpty) return p.lastName[0];
-  return '';
+  final first = initialOf(p.firstName);
+  return first.isNotEmpty ? first : initialOf(p.lastName);
 }

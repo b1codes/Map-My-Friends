@@ -285,6 +285,19 @@ void main() {
       expect(person.pinEmoji, isNull);
     });
 
+    testWidgets('the pin preview draws whole emoji initials', (tester) async {
+      await pumpForm(tester);
+      await tester.enterText(field('First Name'), '🦄✨');
+      await tester.enterText(field('Last Name'), '👩🏽‍💻');
+      await choose(tester, 'None', 'Initials');
+
+      expect(tester.takeException(), isNull);
+      expect(
+        tester.widget<CustomMapMarker>(find.byType(CustomMapMarker)).initials,
+        '🦄👩🏽‍💻',
+      );
+    });
+
     testWidgets('an emoji pin defaults to a smiley and keeps the emoji', (
       tester,
     ) async {

@@ -250,6 +250,25 @@ void main() {
       expect(find.text('2015550123'), findsOneWidget);
     });
 
+    testWidgets('draws whole emoji initials from the saved name', (
+      tester,
+    ) async {
+      await pumpWithProfile(
+        tester,
+        const ProfileLoaded(
+          firstName: '🦄✨',
+          lastName: '👩🏽‍💻',
+          pinIconType: 'initials',
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(
+        tester.widget<CustomMapMarker>(find.byType(CustomMapMarker)).initials,
+        '🦄👩🏽‍💻',
+      );
+    });
+
     testWidgets('applies the saved pin, unit and shape choices', (
       tester,
     ) async {

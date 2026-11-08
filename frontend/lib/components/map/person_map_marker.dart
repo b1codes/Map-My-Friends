@@ -3,6 +3,7 @@ import '../../models/person.dart';
 import '../../screens/people/person_details_screen.dart';
 import 'custom_map_marker.dart';
 import '../shared/glass_surfaces.dart';
+import '../../utils/initials.dart';
 
 class PersonMapMarker extends StatelessWidget {
   final Person person;
@@ -29,9 +30,7 @@ class PersonMapMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String initials = '';
-    if (person.firstName.isNotEmpty) initials += person.firstName[0];
-    if (person.lastName.isNotEmpty) initials += person.lastName[0];
+    final initials = initialsOf(person.firstName, person.lastName);
 
     final marker = CustomMapMarker(
       pinColorHex: person.pinColor,

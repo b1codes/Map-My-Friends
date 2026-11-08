@@ -79,6 +79,17 @@ void main() {
     expect(find.text('?'), findsOneWidget);
   });
 
+  testWidgets('draws whole emoji initials without breaking the text', (
+    tester,
+  ) async {
+    await pumpTile(
+      tester,
+      person: _person(firstName: '🦄✨', lastName: '👩🏽‍💻'),
+    );
+    expect(tester.takeException(), isNull);
+    expect(find.text('🦄👩🏽‍💻'), findsOneWidget);
+  });
+
   testWidgets('a recent contact reads as in touch', (tester) async {
     await pumpTile(tester, recency: _recency(3));
 

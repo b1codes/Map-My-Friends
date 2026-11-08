@@ -201,6 +201,25 @@ void main() {
       expect(find.byTooltip('Delete'), findsNothing);
     });
 
+    testWidgets('draws whole emoji initials without breaking the text', (
+      tester,
+    ) async {
+      whenListen(
+        peopleBloc,
+        const Stream<PeopleState>.empty(),
+        initialState: PeopleLoaded([
+          _ann.copyWith(firstName: '🦄✨', lastName: '👩🏽‍💻'),
+        ]),
+      );
+      await pumpDetails(tester, 'p1');
+
+      expect(tester.takeException(), isNull);
+      expect(
+        tester.widget<CustomMapMarker>(find.byType(CustomMapMarker)).initials,
+        '🦄👩🏽‍💻',
+      );
+    });
+
     testWidgets('switches to not-found when the person is deleted elsewhere', (
       tester,
     ) async {

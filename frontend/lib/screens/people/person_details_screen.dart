@@ -21,6 +21,7 @@ import '../../components/shared/thermal_response.dart';
 import '../../components/shared/glass_surfaces.dart';
 import '../../components/shared/glass_header.dart';
 import '../../components/shared/thermal_button.dart';
+import '../../utils/initials.dart';
 
 class PersonDetailsScreen extends StatelessWidget {
   final String personId;
@@ -315,10 +316,7 @@ class PersonDetailsScreen extends StatelessWidget {
   }
 
   String _getInitials(Person person) {
-    String initials = '';
-    if (person.firstName.isNotEmpty) initials += person.firstName[0];
-    if (person.lastName.isNotEmpty) initials += person.lastName[0];
-    return initials;
+    return initialsOf(person.firstName, person.lastName);
   }
 
   Widget _buildSectionTitle(BuildContext context, String title) {

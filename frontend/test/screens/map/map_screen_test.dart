@@ -276,6 +276,32 @@ void main() {
       expect(find.text('JD'), findsOneWidget);
     });
 
+    testWidgets('draws whole emoji initials on the user marker', (
+      tester,
+    ) async {
+      when(
+        () => locationBloc.state,
+      ).thenReturn(LocationLoaded(position: _position(51.5, -0.12)));
+      when(() => profileBloc.state).thenReturn(
+        const ProfileLoaded(
+          firstName: '🦄✨',
+          lastName: '👩🏽‍💻',
+          pinColor: '#00FF00',
+          pinStyle: 'circle',
+          pinIconType: 'initials',
+        ),
+      );
+      await pumpMap(tester);
+
+      expect(tester.takeException(), isNull);
+      final pin = tester.widget<CustomMapMarker>(
+        find.byWidgetPredicate(
+          (w) => w is CustomMapMarker && w.pinColorHex == '#00FF00',
+        ),
+      );
+      expect(pin.initials, '🦄👩🏽‍💻');
+    });
+
     testWidgets('fills in defaults for a profile with only some pin fields', (
       tester,
     ) async {
