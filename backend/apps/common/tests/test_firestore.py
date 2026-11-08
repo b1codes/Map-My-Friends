@@ -170,3 +170,27 @@ class RunTransactionTests(FirestoreTestMixin, SimpleTestCase):
         with self.rounds(), self.assertRaisesRegex(ValueError, "own code"):
             fs.run_transaction(broken)
         self.sleep.assert_not_called()
+
+
+class DocumentIdTests(SimpleTestCase):
+    def test_ids_firestore_can_address(self):
+        for doc_id in ("abc", "Pp5ltxR4W9tpvZTZUlY7", "a.b", "é", "x" * 1500):
+            with self.subTest(doc_id=doc_id[:20]):
+                self.assertTrue(fs.is_valid_doc_id(doc_id))
+
+    def test_ids_firestore_rejects(self):
+        for doc_id in ("", "x/y", ".", "..", "__x__", None, 7):
+            with self.subTest(doc_id=doc_id):
+                self.assertFalse(fs.is_valid_doc_id(doc_id))
+
+    # Firestore caps an id at 1,500 bytes. A longer one used to reach the
+    # client, which sends it in a request header: the emulator dropped the
+    # connection over the header's size and the client retried for five
+    # minutes before a 500. Found by the nightly API fuzz test.
+    def test_ids_over_1500_bytes_are_rejected(self):
+        for doc_id in ("x" * 1501, "é" * 751, "🦄" * 376, "x" * 10_000):
+            with self.subTest(length=len(doc_id)):
+                self.assertFalse(fs.is_valid_doc_id(doc_id))
+
+    def test_an_id_that_is_not_valid_unicode_is_rejected(self):
+        self.assertFalse(fs.is_valid_doc_id("a\ud800b"))

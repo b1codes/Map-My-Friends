@@ -75,18 +75,29 @@ def is_valid_doc_id(doc_id) -> bool:
     """Whether doc_id can name a document directly in a collection.
 
     Ids reach the repositories from URLs, request bodies and query strings.
-    Firestore rejects an empty id, "." / "..", and reserved __names__ outright
-    (a 500 if it reached the client), and a "/" would address a different,
-    deeper path. Such ids can never name a real record, so callers treat them
-    as not found.
+    Firestore rejects an empty id, "." / "..", reserved __names__, and an id
+    over 1,500 bytes of UTF-8 outright (a 500 if it reached the client; an
+    over-long id went out in a request header and the client retried it for
+    five minutes first), and a "/" would address a different, deeper path.
+    Such ids can never name a real record, so callers treat them as not
+    found.
     """
+    if not isinstance(doc_id, str) or not doc_id:
+        return False
+    try:
+        size = len(doc_id.encode("utf-8"))
+    except UnicodeEncodeError:
+        return False  # a lone surrogate: not UTF-8, so not storable
     return (
-        isinstance(doc_id, str)
-        and bool(doc_id)
+        size <= MAX_DOC_ID_BYTES
         and "/" not in doc_id
         and doc_id not in {".", ".."}
         and re.fullmatch(r"__.*__", doc_id) is None
     )
+
+
+# Firestore's limit on a document id.
+MAX_DOC_ID_BYTES = 1500
 
 
 # Firestore's limit on the writes in one commit.

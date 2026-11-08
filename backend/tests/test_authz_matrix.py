@@ -733,6 +733,27 @@ class ReservedIdTests(MatrixBase):
         self.assertEqual(stops.status_code, 200)
         self.assertEqual(stops.data, [])
 
+    # Over Firestore's 1,500-byte limit. These reached the client, which
+    # retried for five minutes before a 500 (found by the API fuzz test).
+    def test_ids_too_long_for_firestore_are_not_found(self):
+        long_id = "x" * 1501
+        for name, method in (
+            ("person-detail", "get"),
+            ("person-detail", "delete"),
+            ("contactlog-detail", "get"),
+            ("contactlog-detail", "delete"),
+            ("trip-detail", "get"),
+            ("trip-detail", "delete"),
+            ("tripleg-detail", "get"),
+            ("tripleg-smart-lookup", "post"),
+        ):
+            with self.subTest(route=name, method=method):
+                url = reverse(name, args=[long_id])
+                response = getattr(self.client, method)(url, {}, format="json")
+                self.assertEqual(response.status_code, 404)
+        stops = self.client.get(reverse("trip-stops", args=[long_id]))
+        self.assertEqual(stops.data, [])
+
 
 class DatasetVisibilityTests(MatrixBase):
     """Who sees which people. Anonymous callers get the public (unowned)
