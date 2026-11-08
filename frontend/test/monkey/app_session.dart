@@ -52,13 +52,14 @@ class AppSession {
     bool located = false,
     bool signedIn = true,
     int seed = 0,
+    Duration latency = Duration.zero,
   }) async {
     final session = AppSession._(FakeApi(random: Random(seed)));
     appNetwork
       ..responder = session.api.respond
       ..requests.clear()
       ..offline = false
-      ..latency = Duration.zero;
+      ..latency = latency;
     session._installPlugins();
     GeolocatorPlatform.instance = _Location(granted: located);
 
@@ -82,6 +83,8 @@ class AppSession {
       ..devicePixelRatio = 1
       ..physicalSize = window;
     await tester.pumpWidget(MyApp(prefs: prefs));
+    // The auth check reads storage, not the network, so the shell is up
+    // after a second whatever the latency. Its data may still be on the way.
     for (var i = 0; i < 10; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
