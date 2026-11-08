@@ -1,0 +1,199 @@
+name: Nightly Monkey & Fuzz
+
+# The long, random-seed runs of what CI runs briefly with fixed seeds on
+# every PR. docs/testing.md (Monkey and fuzz tests) covers how to read and
+# replay a failure.
+#
+# - Widget monkey: the real app over an in-memory API (frontend/test/monkey)
+#   for 25 minutes, a new seed per app launch.
+# - Web monkey: the same engine on the real web engine in Chrome, against
+#   the E2E stack (frontend/integration_test/monkey_test.dart).
+# - API fuzz: Hypothesis's nightly profile, 5,000 requests per route
+#   (backend/tests/test_fuzz_api.py).
+#
+# Each job draws its seed here and writes it to the run's summary before it
+# starts, so a failing seed is on the page even if the job times out. Replay
+# one with the `make ...` line in the summary. A manual run takes a seed, to
+# replay one on CI.
+on:
+  schedule:
+    - cron: '43 6 * * *'
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: 'Seed for all three jobs (blank for random ones)'
+        required: false
+        default: ''
+  pull_request:
+    paths:
+      - .github/workflows/monkey.yml
+
+permissions:
+  contents: read
+
+jobs:
+  widget-monkey:
+    name: Widget Monkey
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # ratchet:subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version-file: ${{ github.workspace }}/.fvmrc
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Choose the Seed
+        id: seed
+        env:
+          INPUT_SEED: ${{ inputs.seed }}
+          # A PR that only edits this workflow gets a short run.
+          MINUTES: ${{ github.event_name == 'pull_request' && '2' || '25' }}
+        run: |
+          seed="${INPUT_SEED:-$(( (RANDOM << 15) | RANDOM ))}"
+          echo "seed=$seed" >> "$GITHUB_OUTPUT"
+          echo "minutes=$MINUTES" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Widget monkey"
+            echo "Base seed **$seed**, $MINUTES minutes. Session N uses seed $seed + N."
+            echo "Replay one session: \`make monkey MONKEY_SEED=<seed> MONKEY_SESSIONS=1\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run the Monkey
+        env:
+          SEED: ${{ steps.seed.outputs.seed }}
+          MINUTES: ${{ steps.seed.outputs.minutes }}
+        run: >-
+          flutter test test/monkey
+          --dart-define=MONKEY=true
+          --dart-define=MONKEY_SEED="$SEED"
+          --dart-define=MONKEY_MINUTES="$MINUTES"
+
+      - name: Upload Action Logs and Screenshots
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: widget-monkey-failure
+          path: frontend/build/monkey/
+          if-no-files-found: ignore
+
+  web-monkey:
+    name: Web Monkey
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Set up Chrome and chromedriver
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # ratchet:browser-actions/setup-chrome@v2
+        with:
+          install-chromedriver: true
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # ratchet:subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version-file: ${{ github.workspace }}/.fvmrc
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: frontend
+        run: flutter pub get
+
+      - name: Choose the Seed
+        id: seed
+        env:
+          INPUT_SEED: ${{ inputs.seed }}
+          MINUTES: ${{ github.event_name == 'pull_request' && '2' || '20' }}
+        run: |
+          seed="${INPUT_SEED:-$(( (RANDOM << 15) | RANDOM ))}"
+          echo "seed=$seed" >> "$GITHUB_OUTPUT"
+          echo "minutes=$MINUTES" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Web monkey"
+            echo "Seed **$seed**, $MINUTES minutes."
+            echo "Replay: \`make monkey-web MONKEY_SEED=$seed MONKEY_MINUTES=$MINUTES\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run the Monkey
+        env:
+          CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
+          CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
+          MONKEY_SEED: ${{ steps.seed.outputs.seed }}
+          MONKEY_MINUTES: ${{ steps.seed.outputs.minutes }}
+        run: scripts/e2e.sh integration_test/monkey_test.dart
+
+      - name: Upload Failure Screenshots and Stack Logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: web-monkey-failure
+          path: |
+            frontend/build/e2e/screenshots/
+            frontend/build/e2e/stack.log
+          if-no-files-found: ignore
+
+  api-fuzz:
+    name: API Fuzz
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # ratchet:docker/setup-buildx-action@v3
+
+      - name: Start Docker Compose Services
+        run: docker compose up -d --build
+
+      - name: Wait for the Firestore emulator to be ready
+        run: |
+          for i in $(seq 1 60); do
+            if docker compose exec -T api python -c "import socket,sys; s=socket.create_connection(('firestore',8080),2); s.close()" 2>/dev/null; then
+              exit 0
+            fi
+            echo "Waiting for the Firestore emulator... ($i/60)"
+            sleep 2
+          done
+          docker compose logs firestore
+          exit 1
+
+      - name: Choose the Seed
+        id: seed
+        env:
+          INPUT_SEED: ${{ inputs.seed }}
+          PROFILE: ${{ github.event_name == 'pull_request' && 'pr' || 'nightly' }}
+        run: |
+          seed="${INPUT_SEED:-$(( (RANDOM << 15) | RANDOM ))}"
+          echo "seed=$seed" >> "$GITHUB_OUTPUT"
+          echo "profile=$PROFILE" >> "$GITHUB_OUTPUT"
+          {
+            echo "### API fuzz"
+            echo "Profile **$PROFILE**, seed **$seed**."
+            echo "Replay: \`make fuzz FUZZ_PROFILE=$PROFILE FUZZ_SEED=$seed\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # A failure prints the smallest request that still fails, and a
+      # @reproduce_failure line that replays exactly that one.
+      - name: Run the Fuzz Test
+        env:
+          FUZZ_PROFILE: ${{ steps.seed.outputs.profile }}
+          FUZZ_SEED: ${{ steps.seed.outputs.seed }}
+        run: make fuzz
+
+      - name: Stop Docker Compose Services
+        if: always()
+        run: docker compose down -v

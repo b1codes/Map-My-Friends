@@ -306,6 +306,49 @@ jobs:
           if-no-files-found: ignore
 
   # -----------------------------------------------------------------
+  # MONKEY
+  # -----------------------------------------------------------------
+  # The real app (as main.dart wires it) over an in-memory API, under
+  # seeded random taps, gestures, typing, rotations, lifecycle changes and
+  # network failures (frontend/test/monkey). A fixed seed, so a PR gets the
+  # same run every time; .github/workflows/monkey.yml runs random seeds
+  # nightly. `make monkey` locally. The API's own fuzz test runs inside
+  # Test Backend.
+  monkey:
+    name: Monkey
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # ratchet:subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version-file: ${{ github.workspace }}/.fvmrc
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Run the Monkey
+        # A failure prints the seed, the `make monkey ...` that replays it and
+        # the last actions; the full log and a screenshot are uploaded below.
+        run: flutter test test/monkey --dart-define=MONKEY=true
+
+      - name: Upload Action Logs and Screenshots
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: monkey-failure
+          path: frontend/build/monkey/
+          if-no-files-found: ignore
+
+  # -----------------------------------------------------------------
   # WORKFLOW VALIDATION
   # -----------------------------------------------------------------
   # actionlint checks every workflow's syntax, expressions, action inputs and
@@ -455,6 +498,7 @@ jobs:
       - validate-frontend
       - validate-widgetbook
       - e2e
+      - monkey
       - lint-workflows
       - scan-deps
       - scan-secrets

@@ -18,9 +18,9 @@ must hold to three properties:
 
 Profiles (FUZZ_PROFILE): "pr" (the default) is derandomized, the same 50
 requests per route on every run, about 15 seconds in all. "nightly" draws
-1,000 per route from a random seed; set FUZZ_SEED to replay one, and a failure prints
-the minimal falsifying request either way. See docs/testing.md (Monkey and
-fuzz tests).
+5,000 per route from a random seed, about 15 minutes. Set FUZZ_SEED to
+replay one. Either way, a failure prints the minimal falsifying request.
+See docs/testing.md (Monkey and fuzz tests).
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ settings.register_profile(
 )
 settings.register_profile(
     "nightly",
-    max_examples=1000,
+    max_examples=5000,
     database=None,
     deadline=None,
     print_blob=True,
