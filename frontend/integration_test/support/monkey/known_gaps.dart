@@ -1,4 +1,4 @@
-// Problems the monkey finds that are already filed. A match is logged and
+// Problems the monkey (and the edge-case tests) find that are already filed. A match is logged and
 // counted, not failed, so the run stays useful for finding new ones; every
 // other problem fails. When a task is fixed, delete its entry here: if the
 // fix is incomplete, the monkey says so.

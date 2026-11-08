@@ -126,7 +126,7 @@ monkey:
 
 # Property-based fuzzing of every API route (backend/tests/test_fuzz_api.py)
 # on the dev stack. The PR profile also runs inside `make test`.
-# FUZZ_PROFILE=nightly draws 1,000 requests per route (about 18 minutes);
+# FUZZ_PROFILE=nightly draws 5,000 requests per route (about 15 minutes);
 # FUZZ_SEED=<n> replays a nightly seed.
 FUZZ_PROFILE ?= pr
 fuzz:
@@ -134,7 +134,15 @@ fuzz:
 		-e FUZZ_PROFILE=$(FUZZ_PROFILE) $(if $(FUZZ_SEED),-e FUZZ_SEED=$(FUZZ_SEED)) \
 		api python manage.py test tests.test_fuzz_api
 
-.PHONY: monkey fuzz
+# The device-level monkey (frontend/integration_test/monkey_test.dart): the
+# same engine on the real web engine in Chrome, against a fresh E2E stack,
+# as `make e2e` builds it. MONKEY_SEED, MONKEY_STEPS and MONKEY_MINUTES pass
+# through; nightly runs it with a random seed.
+monkey-web:
+	MONKEY_SEED=$(MONKEY_SEED) MONKEY_STEPS=$(MONKEY_STEPS) \
+		MONKEY_MINUTES=$(MONKEY_MINUTES) scripts/e2e.sh integration_test/monkey_test.dart
+
+.PHONY: monkey monkey-web fuzz
 
 # Security scans; docs/testing.md (Security scans) covers triage. CI runs
 # these same targets.

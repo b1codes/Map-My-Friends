@@ -6,8 +6,9 @@
 /// monkey's in-memory API ([AppSession]), so a double tap is checked by
 /// counting the requests that reached the API, and a slow or missing
 /// network is the real app's real Dio timing out or failing. Filed layout
-/// problems are known gaps, as in the monkey (test/monkey/known_gaps.dart);
-/// anything else the app reports fails the test.
+/// problems are known gaps, as in the monkey
+/// (integration_test/support/monkey/known_gaps.dart); anything else the app
+/// reports fails the test.
 library;
 
 import 'dart:convert';
@@ -18,8 +19,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:map_my_friends/components/people/person_card.dart';
 
 import '../monkey/app_session.dart';
-import '../monkey/known_gaps.dart';
-import '../monkey/monkey.dart';
+import '../../integration_test/support/monkey/known_gaps.dart';
+import '../../integration_test/support/monkey/monkey.dart';
 
 const _phone = Size(390, 844);
 const _phoneLandscape = Size(844, 390);

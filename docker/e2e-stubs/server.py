@@ -115,6 +115,14 @@ class Handler(BaseHTTPRequestHandler):
             with _requests_lock:
                 self._json(200, list(_requests))
             return
+        if url.path == "/_stub/monkey":
+            # The web monkey's action log (frontend/integration_test/
+            # monkey_test.dart), one line per action, into the stack's log.
+            # A web test's own prints don't reach the drive output, so this is
+            # how a hang shows which action it was.
+            print(f"monkey: {query.get('entry', '')}", flush=True)
+            self._json(200, {"ok": True})
+            return
 
         with _requests_lock:
             _requests.append({"path": url.path, "query": query})

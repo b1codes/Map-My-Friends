@@ -34,8 +34,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/recording_http_overrides.dart';
 import 'app_session.dart';
-import 'known_gaps.dart';
-import 'monkey.dart';
+import '../../integration_test/support/monkey/known_gaps.dart';
+import '../../integration_test/support/monkey/monkey.dart';
 
 /// The seed the PR run uses, so it's the same run every time. 'random'
 /// draws one (the nightly run); either way it's printed.

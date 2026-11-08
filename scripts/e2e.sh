@@ -22,6 +22,9 @@
 #   E2E_KEEP_STACK=1  leave the stack running afterwards (for debugging)
 #   E2E_WINDOW        browser window size      (default 1280,1000; journeys
 #                     always see 1280x720, see journeyWindow in support/e2e.dart)
+#   MONKEY_SEED, MONKEY_STEPS, MONKEY_MINUTES
+#                     passed to the app as dart-defines, for the device-level
+#                     monkey (integration_test/monkey_test.dart, `make monkey-web`)
 #
 # Distinct ports and project names let several runs share one machine.
 set -euo pipefail
@@ -125,6 +128,15 @@ DRIVER_PID=$!
 sleep 1
 
 # --- 3. Journeys ----------------------------------------------------------
+# The monkey's settings, for integration_test/monkey_test.dart. Only the ones
+# set, so the journeys' build is unchanged.
+MONKEY_DEFINES=()
+for var in MONKEY_SEED MONKEY_STEPS MONKEY_MINUTES; do
+  if [[ -n "${!var:-}" ]]; then
+    MONKEY_DEFINES+=("--dart-define=$var=${!var}")
+  fi
+done
+
 HEADLESS=(--headless)
 [[ "${E2E_HEADED:-}" == "1" ]] && HEADLESS=(--no-headless)
 
@@ -155,4 +167,5 @@ fi
   --dart-define=E2E_STUBS_URL="$STUBS_URL" \
   --dart-define=OSRM_BASE_URL="$STUBS_URL/route/v1/driving" \
   --dart-define=TILE_URL_TEMPLATE="$STUBS_URL/tiles/{z}/{x}/{y}.png" \
-  --dart-define=DEV_LOGIN=false
+  --dart-define=DEV_LOGIN=false \
+  ${MONKEY_DEFINES[@]+"${MONKEY_DEFINES[@]}"}

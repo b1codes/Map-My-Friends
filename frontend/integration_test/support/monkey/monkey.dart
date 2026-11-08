@@ -3,10 +3,12 @@
 // exception, layout overflow or broken frame.
 //
 // Shared by the widget-test monkey (test/monkey/app_monkey_test.dart), which
-// runs the real app over an in-memory API, and the device-level monkey
-// (integration_test/journeys/monkey_test.dart), which runs it on the real
-// web engine against the E2E stack. So this file sticks to flutter_test and
-// never imports dart:io.
+// runs the real app over an in-memory API, the edge-case tests
+// (test/edge_cases), and the device-level monkey
+// (integration_test/monkey_test.dart), which runs it on the real web engine
+// against the E2E stack. It lives here because a web build can only import
+// what's under integration_test/, and it sticks to flutter_test, never
+// dart:io, so it compiles for the web.
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -98,6 +100,8 @@ class Monkey {
     this.knownGaps = const [],
     this.survey = false,
     this.recover,
+    this.actionTimeout = const Duration(seconds: 60),
+    this.onRecord,
   }) : random = Random(seed),
        errors = ErrorWatch(knownGaps);
 
@@ -165,6 +169,14 @@ class Monkey {
   /// did, for the log. Returns null otherwise.
   final Future<String?> Function(Monkey monkey)? recover;
 
+  /// Called with each log entry as it's written, e.g. to send it somewhere
+  /// that survives a hang.
+  final void Function(String entry)? onRecord;
+
+  /// How long one action (and the frames after it) may take before the app
+  /// counts as hung. The slowest action waits about 5 seconds.
+  final Duration actionTimeout;
+
   /// Every action so far, numbered: the reproduction.
   final List<String> log = [];
 
@@ -221,25 +233,39 @@ class Monkey {
   /// One action, then the checks.
   Future<void> act() async {
     _step++;
-    final recovered = await recover?.call(this);
+    final recovered = await _guard(
+      'recovering',
+      () async => recover?.call(this),
+    );
     if (recovered != null) {
       _record('recover: $recovered');
-      await _frames();
+      await _guard('settling after recovery', _frames);
       _check();
     }
     for (var attempt = 0; attempt < 10; attempt++) {
       final action = _pick();
-      final did = await action.run(this);
+      onRecord?.call('$_step. (starting: ${action.name})');
+      final did = await _guard(action.name, () => action.run(this));
       if (did == null) continue;
       _record(did);
-      await _frames();
+      await _guard('settling after "$did"', _frames);
       _check();
       return;
     }
     _record('nothing to do');
-    await _frames();
+    await _guard('settling', _frames);
     _check();
   }
+
+  /// Runs [body], failing as a hang if it takes longer than [actionTimeout].
+  /// A hung app otherwise just stalls the run until the job's timeout, with
+  /// nothing to say which action it was.
+  Future<T> _guard<T>(String what, Future<T> Function() body) => body().timeout(
+    actionTimeout,
+    onTimeout: () => _fail(
+      'hung: "$what" did not finish within ${actionTimeout.inSeconds} s',
+    ),
+  );
 
   MonkeyAction _pick() {
     var roll = random.nextInt(_totalWeight);
@@ -249,7 +275,11 @@ class Monkey {
     return actions.last;
   }
 
-  void _record(String entry) => log.add('$_step. $entry');
+  void _record(String entry) {
+    final line = '$_step. $entry';
+    log.add(line);
+    onRecord?.call(line);
+  }
 
   /// Lets the action's consequences play out: a random wait, so taps land
   /// at every point of a request, a route transition or an animation.
@@ -510,6 +540,7 @@ class Monkey {
     final center = box.localToGlobal(box.size.center(Offset.zero));
     if (_avoided(center)) return null;
     final text = _randomText();
+    if (!tester.testTextInput.isRegistered) return null;
     final finder = find.byElementPredicate((e) => e == element);
     await tester.showKeyboard(finder);
     tester.testTextInput.enterText(text);
@@ -527,7 +558,8 @@ class Monkey {
   /// The keyboard's action key (Done, Next, Search) in whatever field has
   /// focus.
   Future<String?> _submit(Monkey _) async {
-    if (!tester.testTextInput.isVisible) return null;
+    final input = tester.testTextInput;
+    if (!input.isRegistered || !input.isVisible) return null;
     final action = _any(const [
       TextInputAction.done,
       TextInputAction.next,
@@ -541,6 +573,16 @@ class Monkey {
   /// The system back button (Android's, the browser's): it pops whatever
   /// is on top, or asks to leave the app.
   Future<String?> _back(Monkey _) async {
+    // On the web, back with nothing left to pop is the browser's Back button:
+    // it navigates the page away from the app, which ends the run (the test
+    // dies with the page, so nothing reports). Leaving the app isn't the
+    // monkey's job, so there it only goes back while a route can pop.
+    if (kIsWeb &&
+        !tester
+            .stateList<NavigatorState>(find.byType(Navigator))
+            .any((navigator) => navigator.canPop())) {
+      return null;
+    }
     // The message the engine sends for the back button, through the same
     // channel, so the app handles it exactly as on a device.
     await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
@@ -578,22 +620,30 @@ class Monkey {
   /// them, with a random time away.
   Future<String?> _lifecycle(Monkey _) async {
     final binding = tester.binding;
-    const away = [
+    // On a live binding (the web monkey), hidden and paused stop the engine
+    // scheduling frames, so a pump while away would wait for a frame that
+    // never comes. There, time away passes in real time and frames resume
+    // with the app. The widget-test binding forces frames either way.
+    final live = binding is LiveTestWidgetsFlutterBinding;
+    Future<void> away(Duration time) =>
+        live ? Future<void>.delayed(time) : tester.pump(time);
+    const leaving = [
       AppLifecycleState.inactive,
       AppLifecycleState.hidden,
       AppLifecycleState.paused,
     ];
-    for (final state in away) {
+    for (final state in leaving) {
       binding.handleAppLifecycleStateChanged(state);
-      await tester.pump();
+      await away(Duration.zero);
     }
     final ms = random.nextInt(5000);
-    await tester.pump(Duration(milliseconds: ms));
-    for (final state in away.reversed.skip(1)) {
+    await away(Duration(milliseconds: ms));
+    for (final state in leaving.reversed.skip(1)) {
       binding.handleAppLifecycleStateChanged(state);
-      await tester.pump();
+      await away(Duration.zero);
     }
     binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
     return 'background for ${ms}ms, then resume';
   }
 
@@ -616,7 +666,7 @@ class Monkey {
     errors.stop();
     tester.platformDispatcher.clearTextScaleFactorTestValue();
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    tester.testTextInput.hide();
+    if (tester.testTextInput.isRegistered) tester.testTextInput.hide();
   }
 }
 
