@@ -75,8 +75,8 @@ ACTIONLINT_IMAGE := rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47e
 lint: lint-backend lint-frontend lint-workflows
 
 lint-backend:
-	uvx ruff@$(RUFF_VERSION) format --check backend/
-	uvx ruff@$(RUFF_VERSION) check backend/
+	uvx ruff@$(RUFF_VERSION) format --check backend/ smoke/
+	uvx ruff@$(RUFF_VERSION) check backend/ smoke/
 
 lint-frontend:
 	cd frontend && $(DART) format --set-exit-if-changed .
@@ -172,6 +172,16 @@ check-infra:
 	scripts/infra.sh
 
 .PHONY: check-infra
+
+# The post-deploy smoke test (smoke/smoke.py), its own tests, then the test
+# itself against the production image on a throwaway stack. The release runs
+# smoke.py against each new revision before it takes traffic; smoke.yml runs
+# it hourly against production.
+smoke:
+	python3 -m unittest discover -s smoke
+	scripts/smoke.sh
+
+.PHONY: smoke
 
 # Load test: perf/load.js in k6 against a throwaway stack shaped like one
 # Cloud Run instance (docker-compose.perf.yml), with Firestore latency

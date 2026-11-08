@@ -1,0 +1,83 @@
+name: Production Smoke Test
+
+# smoke/smoke.py against the live API: hourly, by hand, and from the release
+# after a deploy (workflow_call). It does nothing until the SMOKE_BASE_URL
+# repository variable is set (infra/README.md).
+#
+# A failure opens an issue labelled smoke-failure (or comments on the open
+# one), and the next pass closes it, so a broken production shows up without
+# anyone watching the Actions tab.
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: production-smoke
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Smoke Test Production
+    if: vars.SMOKE_BASE_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Run the Smoke Test
+        id: smoke
+        env:
+          SMOKE_BASE_URL: ${{ vars.SMOKE_BASE_URL }}
+          SMOKE_WEB_ORIGIN: ${{ vars.SMOKE_WEB_ORIGIN }}
+        # tee's status would otherwise be the step's, and a failed smoke
+        # test would pass.
+        run: |
+          set -o pipefail
+          python3 smoke/smoke.py | tee smoke-output.txt
+          {
+            echo '```'
+            cat smoke-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open or Update the Failure Issue
+        if: failure() && steps.smoke.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create smoke-failure --color B60205 \
+            --description "The production smoke test is failing" --force
+          {
+            echo "The production smoke test failed: $RUN_URL"
+            echo
+            echo '```'
+            cat smoke-output.txt
+            echo '```'
+          } > issue-body.md
+          open="$(gh issue list --label smoke-failure --state open --json number --jq '.[0].number')"
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body-file issue-body.md
+          else
+            gh issue create --title "Production smoke test failing" \
+              --label smoke-failure --body-file issue-body.md
+          fi
+
+      - name: Close the Failure Issue
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          for number in $(gh issue list --label smoke-failure --state open --json number --jq '.[].number'); do
+            gh issue close "$number" --comment "Passing again: $RUN_URL"
+          done

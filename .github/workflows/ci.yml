@@ -38,10 +38,10 @@ jobs:
           pip install "ruff${version}"
 
       - name: Run Ruff Format Check
-        run: ruff format --check backend/
+        run: ruff format --check backend/ smoke/
 
       - name: Run Ruff Lint Check
-        run: ruff check backend/
+        run: ruff check backend/ smoke/
 
   test-backend:
     name: Test Backend
@@ -379,6 +379,33 @@ jobs:
         run: make prod-image
 
   # -----------------------------------------------------------------
+  # SMOKE TEST
+  # -----------------------------------------------------------------
+  # The post-deploy smoke test's own tests, then the smoke test against the
+  # production image on a throwaway stack: what a release checks on each new
+  # revision before moving traffic to it.
+  smoke:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # ratchet:docker/setup-buildx-action@v3
+
+      - name: Run the Smoke Test
+        run: make smoke
+
+      - name: Upload the Stack's Logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: smoke-stack-logs
+          path: build/smoke/stack.log
+          if-no-files-found: ignore
+
+  # -----------------------------------------------------------------
   # FIRESTORE RULES
   # -----------------------------------------------------------------
   # firestore.rules in the emulator: every get, list, query, write, batch
@@ -432,6 +459,7 @@ jobs:
       - scan-deps
       - scan-secrets
       - prod-image
+      - smoke
       - test-rules
       - validate-infra
     runs-on: ubuntu-latest
