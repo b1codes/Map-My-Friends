@@ -7,6 +7,7 @@ from rest_framework.test import APIRequestFactory
 from rest_framework.views import APIView
 
 from apps.common.exception_handlers import firestore_exception_handler
+from apps.common.firestore import TransactionContention
 
 
 class FirestoreExceptionHandlerTests(SimpleTestCase):
@@ -27,6 +28,26 @@ class FirestoreExceptionHandlerTests(SimpleTestCase):
             gcloud_exceptions.DeadlineExceeded("rpc timed out"), {}
         )
         self.assertEqual(response.status_code, 503)
+
+    # A transaction that lost to other writers every time it was retried is
+    # worth retrying again a moment later, not a server fault.
+    def test_transaction_contention_maps_to_503_with_retry_after(self):
+        response = firestore_exception_handler(
+            TransactionContention("gave up after 6 rounds"), {}
+        )
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.data,
+            {"error": "Too many changes to this data at once. Please retry."},
+        )
+        self.assertEqual(response["Retry-After"], "1")
+
+    def test_aborted_outside_a_transaction_maps_to_503(self):
+        response = firestore_exception_handler(
+            gcloud_exceptions.Aborted("projects/secret-project/... contention"), {}
+        )
+        self.assertEqual(response.status_code, 503)
+        self.assertNotIn("secret-project", str(response.data))
 
     def test_gcloud_not_found_maps_to_404(self):
         response = firestore_exception_handler(
@@ -91,6 +112,10 @@ class ExceptionHandlerWiringTests(SimpleTestCase):
 
     def test_view_raising_service_unavailable_returns_503(self):
         response = self._get(gcloud_exceptions.ServiceUnavailable("down"))
+        self.assertEqual(response.status_code, 503)
+
+    def test_view_raising_transaction_contention_returns_503(self):
+        response = self._get(TransactionContention("gave up"))
         self.assertEqual(response.status_code, 503)
 
     def test_view_raising_gcloud_not_found_returns_404(self):

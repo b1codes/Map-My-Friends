@@ -159,8 +159,38 @@ class RunTransactionTests(FirestoreTestMixin, SimpleTestCase):
         def always_lose(_transaction):
             raise self.contention()
 
-        with self.rounds(), self.assertRaises(ValueError):
+        with self.rounds(), self.assertRaises(fs.TransactionContention):
             fs.run_transaction(always_lose)
+        self.assertEqual(self.sleep.call_count, fs.TRANSACTION_ROUNDS - 1)
+
+    # The client only retries an abort at commit. A read inside the
+    # transaction can be aborted too when writers contend for the same
+    # document (two logs for one person, two stops added to one trip); that
+    # Aborted came straight out, and the API answered it with a 500.
+    def test_a_read_aborted_by_contention_is_retried_in_a_fresh_transaction(self):
+        ref = fs.collection("run_transaction_tests").document("doc")
+        transactions = []
+
+        def read_then_write(transaction):
+            transactions.append(transaction)
+            ref.get(transaction=transaction)
+            if len(transactions) == 1:
+                raise exceptions.Aborted("read lost to a concurrent writer")
+            transaction.set(ref, {"written": True})
+            return "done"
+
+        self.assertEqual(fs.run_transaction(read_then_write), "done")
+        self.assertTrue(ref.get().to_dict()["written"])
+        self.assertIsNot(transactions[0], transactions[1])
+        self.assertEqual(self.sleep.call_count, 1)
+
+    def test_gives_up_on_reads_that_keep_aborting(self):
+        def always_aborted(_transaction):
+            raise exceptions.Aborted("read lost to a concurrent writer")
+
+        with self.assertRaises(fs.TransactionContention) as raised:
+            fs.run_transaction(always_aborted)
+        self.assertIsInstance(raised.exception.__cause__, exceptions.Aborted)
         self.assertEqual(self.sleep.call_count, fs.TRANSACTION_ROUNDS - 1)
 
     def test_other_errors_are_not_retried(self):

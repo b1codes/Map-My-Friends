@@ -126,24 +126,46 @@ BACKOFF_BASE_S = 0.05
 BACKOFF_MAX_S = 1.0
 
 
-def _gave_up_on_contention(exc: ValueError) -> bool:
-    """Whether the client gave up retrying a transaction that kept aborting,
-    as opposed to the transaction's own code raising ValueError."""
-    return isinstance(exc.__cause__, exceptions.Aborted)
+class TransactionContention(Exception):
+    """A transaction kept losing to concurrent writers through every round.
+
+    Retrying later can succeed, so the API answers it with a 503 rather than
+    a 500 (see apps.common.exception_handlers)."""
+
+
+def _contention_cause(exc: Exception) -> exceptions.Aborted | None:
+    """The Aborted behind exc if the transaction lost to other writers, as
+    opposed to the transaction's own code raising an error.
+
+    The client retries an abort at commit itself and, once out of attempts,
+    raises a ValueError caused by the last Aborted. An abort anywhere else
+    (beginning the transaction, or a read inside it) comes out as is."""
+    if isinstance(exc, exceptions.Aborted):
+        return exc
+    if isinstance(exc, ValueError) and isinstance(exc.__cause__, exceptions.Aborted):
+        return exc.__cause__
+    return None
 
 
 def run_transaction(fn):
     """Run fn(transaction) in a transaction and return its result, retrying
-    on contention. fn may run more than once, so it must only read and write
-    through the transaction it is given."""
+    on contention, each round in a fresh transaction. fn may run more than
+    once, so it must only read and write through the transaction it is given.
+
+    Raises TransactionContention if every round lost to other writers."""
     transactional_fn = gcloud_transactional(fn)
-    for round_ in range(TRANSACTION_ROUNDS - 1):
+    for round_ in range(TRANSACTION_ROUNDS):
+        if round_:
+            wait = min(BACKOFF_MAX_S, BACKOFF_BASE_S * 2 ** (round_ - 1))
+            time.sleep(random.uniform(0, wait))
         try:
             return transactional_fn(
                 get_client().transaction(max_attempts=ATTEMPTS_PER_ROUND)
             )
-        except ValueError as exc:
-            if not _gave_up_on_contention(exc):
+        except (exceptions.Aborted, ValueError) as exc:
+            aborted = _contention_cause(exc)
+            if aborted is None:
                 raise
-        time.sleep(random.uniform(0, min(BACKOFF_MAX_S, BACKOFF_BASE_S * 2**round_)))
-    return transactional_fn(get_client().transaction(max_attempts=ATTEMPTS_PER_ROUND))
+    raise TransactionContention(
+        f"Transaction lost to concurrent writers in {TRANSACTION_ROUNDS} rounds."
+    ) from aborted
