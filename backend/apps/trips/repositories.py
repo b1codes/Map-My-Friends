@@ -22,6 +22,7 @@ import itertools
 from dataclasses import dataclass, field, fields, replace
 from datetime import UTC, datetime
 
+from google.api_core import exceptions as gcloud_exceptions
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 from apps.airports import reference as airport_reference
@@ -37,9 +38,20 @@ STATUS_BOOKED = "BOOKED"
 
 _TRIP_WRITABLE = {"name", "date", "start_date", "end_date", "status"}
 
+# The most stops a trip may have. A trip's writes go in one commit, and
+# Firestore refuses a commit of more than fs.MAX_WRITES_PER_COMMIT (500)
+# writes. The largest is a save that replaces a full trip's stops while
+# booking it: delete 100 stops and their 99 legs, set 100 stops (snapshot
+# included) and 99 legs, and update the trip, which is 399.
+MAX_STOPS_PER_TRIP = 100
+
 
 class DuplicateSequenceOrder(Exception):
     """Raised when a stop would reuse an existing sequence_order on a trip."""
+
+
+class TooManyStops(Exception):
+    """Raised when a stop would take a trip past MAX_STOPS_PER_TRIP."""
 
 
 @dataclass
@@ -145,60 +157,89 @@ def _parent_id(doc) -> str:
 
 
 class _TripWrite:
-    """The writes for one trip, gathered so they go in a single commit and
-    the result can be returned without reading it back."""
+    """The writes for one trip, gathered on one writer so they go in a single
+    commit and the result can be returned without reading it back.
 
-    def __init__(self, trip_ref, owner_key: str, stops: list, legs: list):
+    The writer is a batch, which the caller commits, or a transaction, which
+    commits when its function returns; this never commits it."""
+
+    def __init__(self, writer, trip_ref, owner_key: str, stops: list, legs: list):
+        self.writer = writer
         self.trip_ref = trip_ref
         self.owner_key = owner_key
         self.stops = stops
         self.legs = legs
-        self.batch = fs.get_client().batch()
 
-    def replace_stops(self, stops_data: list) -> None:
+    def replace_stops(self, stops_data: list, snapshot=None) -> None:
         """Replace every stop, and every leg (they name the old stops' ids),
-        then add a leg between each consecutive pair of new stops."""
+        then add a leg between each consecutive pair of new stops.
+
+        snapshot, if given, maps the new stops to each one's snapshot (see
+        TripRepository._stop_snapshots), which is written with the stop
+        rather than as a second write to it."""
         for record in self.stops:
-            self.batch.delete(self.trip_ref.collection(STOPS).document(record.id))
+            self.writer.delete(self.trip_ref.collection(STOPS).document(record.id))
         for record in self.legs:
-            self.batch.delete(self.trip_ref.collection(LEGS).document(record.id))
+            self.writer.delete(self.trip_ref.collection(LEGS).document(record.id))
         self.stops, self.legs = [], []
-        for index, data in enumerate(stops_data):
-            ref = self.trip_ref.collection(STOPS).document()
-            payload = _stop_payload(data, index, self.owner_key)
-            self.batch.set(ref, payload)
+        new = [
+            (
+                self.trip_ref.collection(STOPS).document(),
+                _stop_payload(data, i, self.owner_key),
+            )
+            for i, data in enumerate(stops_data)
+        ]
+        if snapshot is not None:
+            changes = snapshot(
+                [_hydrate_stop(ref.id, self.trip_ref.id, p) for ref, p in new]
+            )
+            for ref, payload in new:
+                payload.update(changes[ref.id])
+        for ref, payload in new:
+            self.writer.set(ref, payload)
             self.stops.append(_hydrate_stop(ref.id, self.trip_ref.id, payload))
         self.stops.sort(key=lambda s: s.sequence_order)
-        self.add_missing_legs()
+        self.sync_legs()
 
-    def add_missing_legs(self) -> None:
-        """Ensure a leg exists between each consecutive pair of stops.
+    def sync_legs(self) -> None:
+        """Leave a leg between each consecutive pair of stops, and no other.
 
-        Existing pairs are left alone rather than recreated, so booking data
-        on them survives."""
-        existing = {(leg.departure_stop_id, leg.arrival_stop_id) for leg in self.legs}
-        for departure, arrival in itertools.pairwise(self.stops):
-            if (departure.id, arrival.id) in existing:
+        A leg whose stops are no longer next to each other (a stop was put
+        between them) is deleted. A leg still between neighbours is left
+        alone rather than recreated, so booking data on it survives."""
+        pairs = [(d.id, a.id) for d, a in itertools.pairwise(self.stops)]
+        kept = []
+        for leg in self.legs:
+            if (leg.departure_stop_id, leg.arrival_stop_id) in pairs:
+                kept.append(leg)
+            else:
+                self.writer.delete(self.trip_ref.collection(LEGS).document(leg.id))
+        self.legs = kept
+        existing = {(leg.departure_stop_id, leg.arrival_stop_id) for leg in kept}
+        for departure_id, arrival_id in pairs:
+            if (departure_id, arrival_id) in existing:
                 continue
             ref = self.trip_ref.collection(LEGS).document()
             payload = {
                 "owner_key": self.owner_key,
                 "leg_id": ref.id,
-                "departure_stop_id": departure.id,
-                "arrival_stop_id": arrival.id,
+                "departure_stop_id": departure_id,
+                "arrival_stop_id": arrival_id,
                 "departure_time": None,
                 "arrival_time": None,
                 "transport_type": "CAR",
                 "booking_reference": "",
                 "ticket_data": {},
             }
-            self.batch.set(ref, payload)
+            self.writer.set(ref, payload)
             self.legs.append(_hydrate_leg(ref.id, self.trip_ref.id, payload))
 
     def patch_leg(self, leg_id: str, data: dict) -> TripLegRecord | None:
         for index, leg in enumerate(self.legs):
             if leg.id == leg_id:
-                self.batch.update(self.trip_ref.collection(LEGS).document(leg_id), data)
+                self.writer.update(
+                    self.trip_ref.collection(LEGS).document(leg_id), data
+                )
                 self.legs[index] = _patched(leg, data)
                 return self.legs[index]
         return None
@@ -207,11 +248,10 @@ class _TripWrite:
         """Apply each stop's snapshot, from a dict holding one per stop."""
         for index, stop in enumerate(self.stops):
             change = snapshots[stop.id]
-            self.batch.update(self.trip_ref.collection(STOPS).document(stop.id), change)
+            self.writer.update(
+                self.trip_ref.collection(STOPS).document(stop.id), change
+            )
             self.stops[index] = replace(stop, **change)
-
-    def commit(self) -> None:
-        self.batch.commit()
 
 
 class TripRepository:
@@ -267,13 +307,6 @@ class TripRepository:
             .where(filter=FieldFilter("owner_key", "==", owner_key))
         )
 
-    def _start_write(self, trip_id: str, owner_key: str) -> tuple | None:
-        doc = self._owned_doc(trip_id, owner_key)
-        if doc is None:
-            return None
-        stops, legs = self._children(doc.reference, owner_key)
-        return doc, _TripWrite(doc.reference, owner_key, stops, legs)
-
     def list_for_owner(self, owner_key: str) -> list[TripRecord]:
         trips = list(
             self._collection()
@@ -323,11 +356,12 @@ class TripRepository:
             "status": data.get("status", STATUS_DRAFT),
             "created_at": _now_iso(),
         }
-        write = _TripWrite(self._collection().document(), owner_key, [], [])
-        write.batch.set(write.trip_ref, payload)
+        batch = fs.get_client().batch()
+        write = _TripWrite(batch, self._collection().document(), owner_key, [], [])
+        batch.set(write.trip_ref, payload)
         if stops:
             write.replace_stops(stops)
-        write.commit()
+        batch.commit()
         return self._record(write.trip_ref.id, payload, write.stops, write.legs)
 
     def update(
@@ -339,40 +373,80 @@ class TripRepository:
         legs). legs is a list of (leg id, fields) patches, applied to the legs
         as they are after that, so a patch naming a replaced leg is dropped.
         """
-        started = self._start_write(trip_id, owner_key)
-        if started is None:
+        doc = self._owned_doc(trip_id, owner_key)
+        if doc is None:
             return None
-        doc, write = started
+        batch = fs.get_client().batch()
+        write = _TripWrite(
+            batch, doc.reference, owner_key, *self._children(doc.reference, owner_key)
+        )
 
         current = doc.to_dict() or {}
         payload = {k: v for k, v in data.items() if k in _TRIP_WRITABLE}
         payload["updated_at"] = _now_iso()
-        write.batch.update(doc.reference, payload)
-        if stops is not None:
-            write.replace_stops(stops)
-        for leg_id, changes in legs or ():
-            write.patch_leg(leg_id, changes)
+        # Always written, even with no field changed: a concurrent delete
+        # relies on it (see delete).
+        batch.update(doc.reference, payload)
 
         # Freeze stop snapshots on the DRAFT -> BOOKED transition.
         previous_status = current.get("status", STATUS_DRAFT)
-        if previous_status == STATUS_DRAFT and payload.get("status") == STATUS_BOOKED:
-            write.snapshot(self._stop_snapshots(write.stops, owner_key))
+        booking = (
+            previous_status == STATUS_DRAFT and payload.get("status") == STATUS_BOOKED
+        )
 
-        write.commit()
+        def snapshots(stops):
+            return self._stop_snapshots(stops, owner_key)
+
+        if stops is not None:
+            write.replace_stops(stops, snapshot=snapshots if booking else None)
+        elif booking:
+            write.snapshot(snapshots(write.stops))
+        for leg_id, changes in legs or ():
+            write.patch_leg(leg_id, changes)
+
+        batch.commit()
         return self._record(doc.id, {**current, **payload}, write.stops, write.legs)
 
     def delete(self, trip_id: str, owner_key: str) -> bool:
-        doc = self._owned_doc(trip_id, owner_key)
-        if doc is None:
-            return False
-        # Firestore leaves subcollections behind when a parent is deleted.
-        children = [
-            d.reference
-            for sub in (STOPS, LEGS)
-            for d in doc.reference.collection(sub).stream()
-        ]
-        fs.delete_all([*children, doc.reference])
-        return True
+        """Delete a trip with its stops and legs.
+
+        Firestore leaves subcollections behind when a parent is deleted, and
+        legs are listed and found by owner alone (list_all_legs, find_leg),
+        so one left behind would still be served. The children are read
+        first and deleted with the trip, which goes last and only if it is
+        unchanged since it was read. Every write that adds a stop or leg
+        also writes the trip, so one that lands in between fails that
+        precondition, and the delete starts over and reads them again.
+        """
+        client = fs.get_client()
+        for _ in range(fs.TRANSACTION_ROUNDS):
+            doc = self._owned_doc(trip_id, owner_key)
+            if doc is None:
+                return False
+            children = [
+                d.reference
+                for sub in (STOPS, LEGS)
+                for d in doc.reference.collection(sub).stream()
+            ]
+            # Room for the trip in the last commit; with MAX_STOPS_PER_TRIP
+            # everything fits in that one.
+            split = max(0, len(children) - (fs.MAX_WRITES_PER_COMMIT - 1))
+            fs.delete_all(children[:split])
+            batch = client.batch()
+            for ref in children[split:]:
+                batch.delete(ref)
+            batch.delete(
+                doc.reference,
+                option=client.write_option(last_update_time=doc.update_time),
+            )
+            try:
+                batch.commit()
+            except gcloud_exceptions.FailedPrecondition:
+                continue
+            return True
+        raise fs.TransactionContention(
+            f"Trip {trip_id} kept changing while it was being deleted."
+        )
 
     def list_stops(self, trip_id: str, owner_key: str) -> list[TripStopRecord]:
         """The trip's stops in order, or [] if owner_key doesn't own it.
@@ -390,6 +464,10 @@ class TripRepository:
         return stops
 
     def list_legs(self, trip_id: str, owner_key: str) -> list[TripLegRecord]:
+        """The trip's legs, or [] if owner_key doesn't own it.
+
+        No view calls this; tests use it, here and outside this app.
+        """
         if not fs.is_valid_doc_id(trip_id):
             return []
         trip_ref = self._collection().document(trip_id)
@@ -441,18 +519,24 @@ class TripRepository:
                 raise DuplicateSequenceOrder(
                     f"sequence_order {sequence_order} already exists on trip {trip_id}"
                 )
+            if len(stops) >= MAX_STOPS_PER_TRIP:
+                raise TooManyStops(
+                    f"A trip can have at most {MAX_STOPS_PER_TRIP} stops."
+                )
             legs = [
                 _hydrate_leg(d.id, trip_id, d.to_dict() or {})
                 for d in trip_ref.collection(LEGS).stream(transaction=transaction)
             ]
             stop = _hydrate_stop(new_ref.id, trip_id, payload)
-            write = _TripWrite(trip_ref, owner_key, [*stops, stop], legs)
-            write.stops.sort(key=lambda s: s.sequence_order)
-            # The transaction's writes, not a batch: they commit with it, and
+            stops.append(stop)
+            stops.sort(key=lambda s: s.sequence_order)
+            # Written through the transaction, so they commit with it, and
             # only if nothing it read has changed.
-            write.batch = transaction
+            write = _TripWrite(transaction, trip_ref, owner_key, stops, legs)
             transaction.set(new_ref, payload)
-            write.add_missing_legs()
+            # Written so that a delete running now starts over (see delete).
+            transaction.update(trip_ref, {"updated_at": _now_iso()})
+            write.sync_legs()
             return stop
 
         return fs.run_transaction(create)
@@ -460,34 +544,20 @@ class TripRepository:
     def replace_stops(self, trip_id: str, owner_key: str, stops_data: list) -> bool:
         """Replace a trip's stops wholesale, and so its legs, in one commit.
 
-        One commit, so a failure mid-way cannot leave the trip with its old
-        stops deleted and the new ones unwritten.
+        No view calls this; test fixtures outside this app use it to seed
+        a trip's stops (tests/contracts, the authz matrix, the round-trip
+        budgets).
         """
-        started = self._start_write(trip_id, owner_key)
-        if started is None:
-            return False
-        _doc, write = started
-        write.replace_stops(stops_data)
-        write.commit()
-        return True
-
-    def generate_legs(self, trip_id: str, owner_key: str) -> list[TripLegRecord]:
-        """Ensure a leg exists between each consecutive pair of stops.
-
-        Idempotent: existing pairs are left alone rather than recreated, so
-        repeated calls do not duplicate legs or lose booking data.
-        """
-        started = self._start_write(trip_id, owner_key)
-        if started is None:
-            return []
-        _doc, write = started
-        write.add_missing_legs()
-        write.commit()
-        return write.legs
+        return self.update(trip_id, owner_key, {}, stops=stops_data) is not None
 
     def update_leg(
         self, trip_id: str, leg_id: str, owner_key: str, data: dict
     ) -> TripLegRecord | None:
+        """Write data to the owner's leg on this trip, and return it.
+
+        No view calls this (they find a leg with find_leg, then patch_leg);
+        tests use it, here and outside this app.
+        """
         if not fs.is_valid_doc_id(trip_id) or not fs.is_valid_doc_id(leg_id):
             return None
         leg_ref = self._collection().document(trip_id).collection(LEGS).document(leg_id)
@@ -504,15 +574,6 @@ class TripRepository:
             leg.id
         ).update(data)
         return _patched(leg, data)
-
-    def snapshot_stops(self, trip_id: str, owner_key: str) -> None:
-        """Freeze human-readable stop details now, as booking does."""
-        started = self._start_write(trip_id, owner_key)
-        if started is None:
-            return
-        _doc, write = started
-        write.snapshot(self._stop_snapshots(write.stops, owner_key))
-        write.commit()
 
     @staticmethod
     def _stop_snapshots(stops, owner_key: str) -> dict[str, dict]:

@@ -3,6 +3,7 @@ import threading
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
+from google.cloud.firestore_v1.batch import WriteBatch
 
 from apps.common.testing import FirestoreTestMixin
 from apps.people.repositories import PersonRepository
@@ -46,7 +47,6 @@ class TripRepositoryOwnershipTests(TripRepositoryTestCase):
         self.add_stops({"lat": 1.0, "lng": 2.0}, {"lat": 3.0, "lng": 4.0})
         self.assertEqual(self.trips.list_stops(self.trip.id, "owner-b"), [])
         self.assertEqual(self.trips.list_legs(self.trip.id, "owner-b"), [])
-        self.assertEqual(self.trips.generate_legs(self.trip.id, "owner-b"), [])
 
     def test_replace_stops_by_wrong_owner_is_refused(self):
         self.add_stops({"lat": 1.0, "lng": 2.0})
@@ -71,9 +71,9 @@ class TripRepositoryOwnershipTests(TripRepositoryTestCase):
             self.trips.list_legs(self.trip.id, "owner-a")[0].booking_reference, ""
         )
 
-    def test_snapshot_by_wrong_owner_is_a_no_op(self):
+    def test_booking_by_wrong_owner_does_not_snapshot(self):
         self.add_stops({"lat": 1.0, "lng": 2.0, "airport_id": HEATHROW_ID})
-        self.trips.snapshot_stops(self.trip.id, "owner-b")
+        self.trips.update(self.trip.id, "owner-b", {"status": "BOOKED"})
         self.assertEqual(
             self.trips.list_stops(self.trip.id, "owner-a")[0].snapshot_address, ""
         )
@@ -127,17 +127,40 @@ class TripRepositoryStopTests(TripRepositoryTestCase):
             self.assertIn(leg.departure_stop_id, stop_ids)
             self.assertIn(leg.arrival_stop_id, stop_ids)
 
-    def test_generate_legs_preserves_existing_booking_data(self):
-        self.add_stops({"lat": 1.0, "lng": 2.0}, {"lat": 3.0, "lng": 4.0})
-        booked = self.trips.list_legs(self.trip.id, "owner-a")[0]
+    def test_inserting_a_stop_replaces_the_leg_it_splits(self):
+        first = self.trips.add_stop(
+            self.trip.id, "owner-a", {"sequence_order": 0, "lat": 1.0, "lng": 1.0}
+        )
+        last = self.trips.add_stop(
+            self.trip.id, "owner-a", {"sequence_order": 2, "lat": 3.0, "lng": 3.0}
+        )
+        middle = self.trips.add_stop(
+            self.trip.id, "owner-a", {"sequence_order": 1, "lat": 2.0, "lng": 2.0}
+        )
+
+        legs = self.trips.list_legs(self.trip.id, "owner-a")
+        self.assertEqual(
+            sorted((leg.departure_stop_id, leg.arrival_stop_id) for leg in legs),
+            sorted([(first.id, middle.id), (middle.id, last.id)]),
+        )
+
+    def test_adding_a_stop_keeps_the_legs_still_between_neighbours(self):
+        self.add_stops(
+            {"sequence_order": 0, "lat": 1.0, "lng": 2.0},
+            {"sequence_order": 1, "lat": 3.0, "lng": 4.0},
+        )
+        (booked,) = self.trips.list_legs(self.trip.id, "owner-a")
         self.trips.update_leg(
             self.trip.id, booked.id, "owner-a", {"booking_reference": "BA123"}
         )
 
-        legs = self.trips.generate_legs(self.trip.id, "owner-a")
-        self.assertEqual(
-            [(leg.id, leg.booking_reference) for leg in legs], [(booked.id, "BA123")]
+        self.trips.add_stop(
+            self.trip.id, "owner-a", {"sequence_order": 2, "lat": 5.0, "lng": 6.0}
         )
+
+        legs = {leg.id: leg for leg in self.trips.list_legs(self.trip.id, "owner-a")}
+        self.assertEqual(len(legs), 2)
+        self.assertEqual(legs[booked.id].booking_reference, "BA123")
 
     def test_stop_without_coordinates_hydrates_with_none(self):
         self.trips.add_stop(self.trip.id, "owner-a", {"sequence_order": 0})
@@ -183,8 +206,9 @@ class TripRepositorySnapshotTests(TripRepositoryTestCase):
         self.people = PersonRepository()
 
     def snapshot(self, *stops):
+        """Book a trip with these stops, which freezes their snapshots."""
         self.add_stops(*stops)
-        self.trips.snapshot_stops(self.trip.id, "owner-a")
+        self.trips.update(self.trip.id, "owner-a", {"status": "BOOKED"})
         return self.trips.list_stops(self.trip.id, "owner-a")
 
     def test_people_and_airport_build_address_and_metadata(self):
@@ -430,6 +454,63 @@ class TripRepositoryAtomicWriteTests(TripRepositoryTestCase):
 
         self.assertEqual(sorted(outcomes), ["added"] + ["duplicate"] * 4)
         self.assertEqual(len(self.trips.list_stops(self.trip.id, "owner-a")), 1)
+
+
+class TripRepositoryDeleteRaceTests(TripRepositoryTestCase):
+    """Legs are listed and found by a collection-group query on their
+    owner, which does not look at their trip, so a trip delete must never
+    leave a stop or leg behind. These write to the trip while delete is
+    between reading its children and committing."""
+
+    def delete_racing(self, write):
+        real_commit = WriteBatch.commit
+        raced = []
+
+        def commit(batch, *args, **kwargs):
+            if not raced:
+                raced.append(True)
+                write()
+            return real_commit(batch, *args, **kwargs)
+
+        with patch.object(WriteBatch, "commit", commit):
+            deleted = self.trips.delete(self.trip.id, "owner-a")
+        self.assertEqual(raced, [True])
+        return deleted
+
+    def assert_nothing_left(self):
+        self.assertIsNone(self.trips.get_for_owner(self.trip.id, "owner-a"))
+        self.assertEqual(self.trips.list_all_legs("owner-a"), [])
+        self.assertEqual(self.trips.list_stops(self.trip.id, "owner-a"), [])
+        self.assertEqual(self.trips.list_legs(self.trip.id, "owner-a"), [])
+
+    def test_a_stop_added_during_a_delete_is_deleted_too(self):
+        self.add_stops({"lat": 1.0, "lng": 2.0}, {"lat": 3.0, "lng": 4.0})
+
+        self.assertTrue(
+            self.delete_racing(
+                lambda: self.trips.add_stop(
+                    self.trip.id,
+                    "owner-a",
+                    {"sequence_order": 5, "lat": 5.0, "lng": 6.0},
+                )
+            )
+        )
+        self.assert_nothing_left()
+
+    def test_stops_replaced_during_a_delete_are_deleted_too(self):
+        self.add_stops({"lat": 1.0, "lng": 2.0}, {"lat": 3.0, "lng": 4.0})
+
+        self.assertTrue(
+            self.delete_racing(
+                lambda: self.trips.update(
+                    self.trip.id,
+                    "owner-a",
+                    {},
+                    stops=[{"lat": 5.0, "lng": 6.0}, {"lat": 7.0, "lng": 8.0}],
+                )
+            )
+        )
+        self.assert_nothing_left()
 
 
 class TripRepositoryInvalidIdTests(TripRepositoryTestCase):

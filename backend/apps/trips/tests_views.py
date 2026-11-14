@@ -8,7 +8,8 @@ from rest_framework.test import APITestCase
 from apps.common import firestore as fs
 from apps.common.testing import FirestoreTestMixin, ThrottleIsolationMixin
 from apps.people.repositories import PersonRepository
-from apps.trips.repositories import TripRepository
+from apps.trips.repositories import MAX_STOPS_PER_TRIP, TripRepository
+from apps.trips.serializers import MAX_TICKET_DATA_DEPTH
 
 TRIPS_URL = "/api/trips/"
 LEGS_URL = "/api/trips/legs/"
@@ -534,6 +535,86 @@ class TripUpdateTests(TripViewTestCase):
         self.assertEqual(created["stops"][0]["snapshot_metadata"], {})
 
 
+class TripStopLimitTests(TripViewTestCase):
+    """A trip's writes go in one commit, which Firestore caps at 500 writes,
+    so a trip holds at most MAX_STOPS_PER_TRIP stops and a request past
+    that is a 400, not a commit Firestore refuses (a 500)."""
+
+    @staticmethod
+    def stops(count, start=0.0):
+        return [stop(i, start + i / 1000, 0.0) for i in range(count)]
+
+    def test_create_with_too_many_stops_is_400(self):
+        response = self.client.post(
+            TRIPS_URL,
+            {
+                "name": "Long trip",
+                "date": "2026-08-01",
+                "stops": self.stops(MAX_STOPS_PER_TRIP + 1),
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("stops", response.data)
+        self.assertEqual(self.trips.list_for_owner("owner-a"), [])
+
+    def test_patch_with_too_many_stops_is_400_and_keeps_the_stops(self):
+        created = self.create_trip_with_stops(CHICAGO, LONDON)
+
+        response = self.client.patch(
+            f"{TRIPS_URL}{created['id']}/",
+            {"stops": self.stops(MAX_STOPS_PER_TRIP + 26)},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("stops", response.data)
+        self.assertEqual(len(self.trips.list_stops(created["id"], "owner-a")), 2)
+
+    def test_patch_with_too_many_legs_is_400(self):
+        created = self.create_trip_with_stops(CHICAGO, LONDON)
+        leg_id = created["legs"][0]["id"]
+
+        response = self.client.patch(
+            f"{TRIPS_URL}{created['id']}/",
+            {"legs": [{"id": leg_id, "booking_reference": "X"}] * 501},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("legs", response.data)
+
+    def test_replacing_a_full_trip_while_booking_it_fits_one_commit(self):
+        """The largest write there is: every stop and leg of a full trip
+        deleted, as many set, each new stop snapshotted, and the trip
+        updated."""
+        created = self.create_trip(stops=self.stops(MAX_STOPS_PER_TRIP))
+        self.assertEqual(len(created["legs"]), MAX_STOPS_PER_TRIP - 1)
+
+        response = self.client.patch(
+            f"{TRIPS_URL}{created['id']}/",
+            {"status": "BOOKED", "stops": self.stops(MAX_STOPS_PER_TRIP, 1.0)},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        trip = self.trips.get_for_owner(created["id"], "owner-a")
+        self.assertEqual(len(trip.stops), MAX_STOPS_PER_TRIP)
+        self.assertEqual(len(trip.legs), MAX_STOPS_PER_TRIP - 1)
+        self.assertEqual(trip.status, "BOOKED")
+
+    def test_adding_a_stop_to_a_full_trip_is_400(self):
+        created = self.create_trip(stops=self.stops(MAX_STOPS_PER_TRIP))
+
+        response = self.client.post(
+            f"{TRIPS_URL}{created['id']}/stops/",
+            stop(MAX_STOPS_PER_TRIP, *PARIS),
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("stops", response.data)
+        self.assertEqual(
+            len(self.trips.list_stops(created["id"], "owner-a")), MAX_STOPS_PER_TRIP
+        )
+
+
 class TripDestroyTests(TripViewTestCase):
     def test_delete_removes_trip_and_subcollections(self):
         created = self.create_trip_with_stops(CHICAGO, LONDON)
@@ -883,6 +964,71 @@ class TripLegPartialUpdateTests(TripViewTestCase):
         # Untouched fields keep their generated values.
         self.assertEqual(leg.departure_stop_id, self.trip["stops"][0]["id"])
         self.assertIsNone(leg.departure_time)
+
+    @staticmethod
+    def nested(depth, lists=False):
+        """ticket_data nested depth deep, counting its own map as the first:
+        maps in maps, or with lists=True, lists and maps by turns."""
+        value = "deep"
+        for level in range(depth - 1, 0, -1):
+            value = [value] if lists and level % 2 else {"a": value}
+        return {"a": value}
+
+    def test_ticket_data_nested_too_deep_for_firestore_is_400(self):
+        """Firestore stores maps and arrays at most 20 deep from the
+        document, so deeper ticket_data, which the JSON parser lets through,
+        would fail at the write."""
+        for depth, lists in (
+            (MAX_TICKET_DATA_DEPTH + 1, False),
+            (MAX_TICKET_DATA_DEPTH + 1, True),
+            (30, False),
+        ):
+            with self.subTest(depth=depth, lists=lists):
+                response = self.client.patch(
+                    self.leg_url,
+                    {"ticket_data": self.nested(depth, lists)},
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("ticket_data", response.data)
+
+                response = self.client.patch(
+                    f"{TRIPS_URL}{self.trip['id']}/",
+                    {
+                        "legs": [
+                            {
+                                "id": self.leg_id,
+                                "ticket_data": self.nested(depth, lists),
+                            }
+                        ]
+                    },
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("ticket_data", response.data["legs"][0])
+        self.assertEqual(self.raw_leg(self.trip["id"], self.leg_id)["ticket_data"], {})
+
+    def test_ticket_data_at_the_depth_limit_is_stored(self):
+        for lists in (False, True):
+            with self.subTest(lists=lists):
+                ticket_data = self.nested(MAX_TICKET_DATA_DEPTH, lists)
+                response = self.client.patch(
+                    self.leg_url, {"ticket_data": ticket_data}, format="json"
+                )
+                self.assertEqual(response.status_code, 200, response.data)
+                self.assertEqual(
+                    self.raw_leg(self.trip["id"], self.leg_id)["ticket_data"],
+                    ticket_data,
+                )
+
+    def test_ticket_data_with_a_list_directly_in_a_list_is_400(self):
+        """Firestore cannot store an array as an element of an array."""
+        response = self.client.patch(
+            self.leg_url, {"ticket_data": {"seats": [["12A", "12B"]]}}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("ticket_data", response.data)
+        self.assertEqual(self.raw_leg(self.trip["id"], self.leg_id)["ticket_data"], {})
 
     def test_patch_can_clear_a_time(self):
         self.client.patch(

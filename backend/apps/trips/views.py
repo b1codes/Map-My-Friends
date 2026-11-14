@@ -5,7 +5,7 @@ from rest_framework.response import Response
 
 from apps.common.ownership import owner_key_for
 
-from .repositories import DuplicateSequenceOrder, TripRepository
+from .repositories import DuplicateSequenceOrder, TooManyStops, TripRepository
 from .serializers import (
     TripLegSerializer,
     TripSerializer,
@@ -126,6 +126,8 @@ class TripViewSet(viewsets.ViewSet):
             return Response(
                 {"sequence_order": [str(exc)]}, status=status.HTTP_400_BAD_REQUEST
             )
+        except TooManyStops as exc:
+            return Response({"stops": [str(exc)]}, status=status.HTTP_400_BAD_REQUEST)
         if stop is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         return Response(
