@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, override_settings
@@ -291,6 +292,45 @@ class PersonPhotoLifecycleTests(
         self.assertEqual(response.status_code, 404)
         self.assertEqual(self.stored_files(), before)
         geocode.assert_not_called()
+
+    def test_a_create_with_a_bad_photo_is_refused_before_geocoding(self, geocode):
+        response = self.client.post(
+            "/api/people/",
+            {**PERSON, "profile_image": upload("x.svg", SVG, "image/svg+xml")},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("profile_image", response.data)
+        self.assertEqual(self.stored_files(), [])
+        geocode.assert_not_called()
+
+    def test_an_update_with_a_bad_photo_is_refused_before_geocoding(self, geocode):
+        person_id, first = self.create_with_photo()
+        geocode.reset_mock()
+
+        response = self.client.patch(
+            f"/api/people/{person_id}/",
+            {"city": "Paris", "profile_image": upload("x.html", HTML, "text/html")},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("profile_image", response.data)
+        self.assertEqual(self.stored_files(), [first])
+        geocode.assert_not_called()
+
+    def test_a_bad_address_stores_no_photo(self, geocode):
+        geocode.side_effect = DjangoValidationError("Could not geocode address")
+
+        response = self.client.post(
+            "/api/people/",
+            {**PERSON, "profile_image": self.photo()},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.stored_files(), [])
 
     def test_a_failed_create_removes_the_photo_it_stored(self, _geocode):
         with patch(

@@ -13,7 +13,7 @@ from rest_framework.throttling import UserRateThrottle
 
 from apps.common.ownership import owner_key_for
 from apps.common.parsers import StrictJSONParser
-from apps.common.storage import delete_upload, save_upload
+from apps.common.storage import clean_image, delete_upload, store_image
 
 from .repositories import ContactLogRepository, PersonRepository
 from .serializers import ContactLogSerializer, PersonSerializer
@@ -98,8 +98,10 @@ class PersonViewSet(viewsets.ViewSet):
             if earlier is not None:
                 return self._created(request, earlier)
         payload = self._serialize_dates(dict(serializer.validated_data))
+        # Checked before the geocoder lookup, so a bad photo costs none.
+        image = self._clean_upload(request)
         payload = self._apply_geocoding(payload)
-        photo = self._apply_upload(request, payload)
+        photo = self._store_upload(image, payload)
 
         try:
             person = self.repository.create(owner_key, payload, person_id=person_id)
@@ -147,9 +149,10 @@ class PersonViewSet(viewsets.ViewSet):
         current = self.repository.get_for_owner(pk, owner_key)
         if current is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
+        image = self._clean_upload(request)
         if any(k in payload for k in ADDRESS_FIELDS):
             payload = self._apply_geocoding(payload, current)
-        photo = self._apply_upload(request, payload)
+        photo = self._store_upload(image, payload)
 
         try:
             person = self.repository.update(pk, owner_key, payload, current=current)
@@ -210,13 +213,21 @@ class PersonViewSet(viewsets.ViewSet):
         payload["timezone"] = timezone
         return payload
 
-    def _apply_upload(self, request, payload):
-        """Store the uploaded photo, if any, and point payload at it. Returns
-        the stored name, for the caller to delete if the write fails."""
+    @staticmethod
+    def _clean_upload(request):
+        """The uploaded photo as clean_image re-encodes it, (bytes,
+        extension), or None without one. A bad upload is a 400."""
         uploaded = request.FILES.get("profile_image")
-        if uploaded is None:
+        return clean_image(uploaded) if uploaded is not None else None
+
+    @staticmethod
+    def _store_upload(image, payload):
+        """Store the photo _clean_upload returned, if any, and point payload
+        at it. Returns the stored name, for the caller to delete if the write
+        fails."""
+        if image is None:
             return None
-        payload["profile_image"] = save_upload(uploaded, prefix=PHOTO_PREFIX)
+        payload["profile_image"] = store_image(*image, prefix=PHOTO_PREFIX)
         return payload["profile_image"]
 
 
