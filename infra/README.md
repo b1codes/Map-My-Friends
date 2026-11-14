@@ -72,5 +72,5 @@ What a release does with them is in [docs/deploy.md](../docs/deploy.md).
 
 - **The image or traffic:** don't, from Terraform. It ignores both, and the release owns them.
 - **Settings the API reads:** `locals.tf` (`api_env`). A changed value deploys a new revision with the current image on the next `terraform apply`.
-- **Rotating `DJANGO_SECRET_KEY`:** bump `secret_data_wo_version` in `secrets.tf` and apply, then redeploy (or `gcloud run services update`) so instances pick up the new version. This signs everyone out.
+- **Rotating `DJANGO_SECRET_KEY`:** bump `secret_key_version` (set it in `terraform.tfvars`, e.g. from 1 to 2) and apply, which writes a newly generated key as a new Secret Manager version. The service reads `latest`, but only when an instance starts, so then redeploy (or `gcloud run services update`) to restart it on the new key. This signs everyone out.
 - **Cost:** `max_instances` caps the API. Firestore and Storage bill by use, past their free tiers.

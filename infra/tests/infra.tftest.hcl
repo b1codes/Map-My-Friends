@@ -154,6 +154,23 @@ run "the_secret_key_comes_from_secret_manager_only" {
     condition     = google_secret_manager_secret_version.django_secret_key.secret_data == null
     error_message = "The key is written write-only, so it's never in Terraform's state."
   }
+  assert {
+    condition     = google_secret_manager_secret_version.django_secret_key.secret_data_wo_version == "1"
+    error_message = "The key starts at version 1 (secret_key_version's default)."
+  }
+}
+
+run "bumping_secret_key_version_rotates_the_key" {
+  # A write-only value isn't compared with what's stored, so changing
+  # secret_data_wo_version is the only thing that writes a new key.
+  variables {
+    secret_key_version = 2
+  }
+
+  assert {
+    condition     = google_secret_manager_secret_version.django_secret_key.secret_data_wo_version == "2"
+    error_message = "secret_key_version must reach secret_data_wo_version, or bumping it rotates nothing."
+  }
 }
 
 run "terraform_leaves_the_image_and_traffic_to_the_release" {
@@ -307,4 +324,12 @@ run "a_service_name_too_long_for_the_candidate_url_is_refused" {
     service_name = "map-my-friends-api-with-a-very-long-name"
   }
   expect_failures = [var.service_name]
+}
+
+run "a_secret_key_version_below_one_is_refused" {
+  command = plan
+  variables {
+    secret_key_version = 0
+  }
+  expect_failures = [var.secret_key_version]
 }

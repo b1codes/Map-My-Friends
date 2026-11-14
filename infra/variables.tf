@@ -76,3 +76,19 @@ variable "initial_image" {
   type        = string
   default     = "us-docker.pkg.dev/cloudrun/container/hello"
 }
+
+variable "secret_key_version" {
+  description = <<-EOT
+    The DJANGO_SECRET_KEY generation. Bumping it (to any higher number) makes
+    the next apply write a freshly generated key to Secret Manager: the key is
+    write-only, so Terraform can't see a change in it any other way. A new key
+    invalidates every session and token, so it signs everyone out.
+  EOT
+  type        = number
+  default     = 1
+
+  validation {
+    condition     = var.secret_key_version >= 1
+    error_message = "1 or higher. Bump it to rotate the key."
+  }
+}

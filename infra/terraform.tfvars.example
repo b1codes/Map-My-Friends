@@ -5,3 +5,6 @@ project_id = "your-gcp-project-id"
 # max_instances = 3
 # api_domain    = "api.mapmyfriends.com"
 # web_domain    = "mapmyfriends.com"
+
+# Bump to rotate DJANGO_SECRET_KEY (signs everyone out). README, Changing things.
+# secret_key_version = 1
