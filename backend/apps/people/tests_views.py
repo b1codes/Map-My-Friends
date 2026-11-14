@@ -9,6 +9,7 @@ because it is a Nominatim network call.
 import io
 import shutil
 import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -20,7 +21,11 @@ from PIL import Image
 from rest_framework.test import APITestCase
 
 from apps.common import firestore as fs
-from apps.common.testing import FirestoreTestMixin, ThrottleIsolationMixin
+from apps.common.testing import (
+    FirestoreTestMixin,
+    ThrottleIsolationMixin,
+    count_firestore_rpcs,
+)
 from apps.people.repositories import ContactLogRepository, PersonRepository
 from apps.people.services import GeocodingUnavailable
 
@@ -280,6 +285,121 @@ class PersonCreateTests(PersonTestCase):
         )
         self.assertEqual(response.data["preferred_airport"], ["Unknown airport id."])
         self.assertEqual(response.data["preferred_station"], ["Unknown station id."])
+
+
+@patch("apps.people.views.geocode_address", return_value=LONDON)
+class PersonIdempotentCreateTests(PersonTestCase):
+    """An Idempotency-Key makes a retried create return the person the first
+    attempt stored. The client gives up on a save after a few seconds, which
+    a geocoded create can outlast; its retry used to create the person
+    twice."""
+
+    KEY = "0b8f6c1e-6a0d-4c43-9f0e-2f4c6b9d1a77"
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_authenticate(user=self.user)
+
+    def post(self, key=KEY, payload=PERSON_PAYLOAD, **extra):
+        if key is not None:
+            extra["HTTP_IDEMPOTENCY_KEY"] = key
+        return self.client.post("/api/people/", payload, format="json", **extra)
+
+    def test_the_same_key_twice_creates_one_person(self, geocode):
+        first = self.post()
+        second = self.post()
+
+        self.assertEqual((first.status_code, second.status_code), (201, 201))
+        self.assertEqual(second.data, first.data)
+        self.assertEqual(len(self.people.list_for_owner("owner-a")), 1)
+        # The replay is answered from the stored person, so it is quick.
+        geocode.assert_called_once()
+
+    def test_a_replay_returns_the_person_as_first_stored(self, _geocode):
+        first = self.post()
+
+        # A retry carries the same form, but whatever it says, the person
+        # stored the first time is the answer.
+        second = self.post(payload={**PERSON_PAYLOAD, "first_name": "Augusta"})
+
+        self.assertEqual(second.data["id"], first.data["id"])
+        self.assertEqual(second.data["properties"]["first_name"], "Ada")
+        self.assertEqual(stored(first.data["id"]).to_dict()["first_name"], "Ada")
+
+    def test_different_owners_with_the_same_key_create_two_people(self, _geocode):
+        mine = self.post()
+        self.client.force_authenticate(user=self.other)
+        theirs = self.post()
+
+        self.assertEqual((mine.status_code, theirs.status_code), (201, 201))
+        self.assertNotEqual(mine.data["id"], theirs.data["id"])
+        self.assertEqual(stored(theirs.data["id"]).to_dict()["owner_key"], "owner-b")
+        self.assertEqual(stored(mine.data["id"]).to_dict()["owner_key"], "owner-a")
+
+    def test_different_keys_create_two_people(self, _geocode):
+        self.post(key="first-attempt")
+        self.post(key="second-attempt")
+
+        self.assertEqual(len(self.people.list_for_owner("owner-a")), 2)
+
+    def test_a_malformed_key_is_400_and_writes_nothing(self, geocode):
+        for key in ("", "x" * 129, "has space", "a/b", "a.b", "ключ"):
+            with self.subTest(key=key):
+                response = self.post(key=key)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("Idempotency-Key", response.data["error"])
+
+        geocode.assert_not_called()
+        self.assertEqual(self.people.list_for_owner("owner-a"), [])
+
+    def test_the_longest_key_is_accepted(self, _geocode):
+        key = "A-z_9" * 25 + "abc"
+        self.assertEqual(len(key), 128)
+
+        self.assertEqual(self.post(key=key).status_code, 201)
+        self.assertEqual(self.post(key=key).status_code, 201)
+        self.assertEqual(len(self.people.list_for_owner("owner-a")), 1)
+
+    def test_without_a_key_every_post_creates_a_person(self, _geocode):
+        first = self.post(key=None)
+        second = self.post(key=None)
+
+        self.assertEqual((first.status_code, second.status_code), (201, 201))
+        self.assertNotEqual(first.data["id"], second.data["id"])
+        self.assertEqual(len(self.people.list_for_owner("owner-a")), 2)
+
+    def test_a_create_that_loses_a_race_returns_the_winner(self, geocode):
+        # The first attempt is still geocoding when the retry looks, so the
+        # retry finds nothing, and the first create lands before the retry's.
+        winner = self.post()
+        real_get = PersonRepository.get_for_owner
+        missed = []
+
+        def get_for_owner(repo, person_id, owner_key):
+            if not missed:
+                missed.append(person_id)
+                return None
+            return real_get(repo, person_id, owner_key)
+
+        with patch.object(PersonRepository, "get_for_owner", get_for_owner):
+            loser = self.post()
+
+        self.assertEqual(loser.status_code, 201)
+        self.assertEqual(loser.data, winner.data)
+        self.assertEqual(len(self.people.list_for_owner("owner-a")), 1)
+
+    def test_round_trips(self, _geocode):
+        with count_firestore_rpcs() as first:
+            self.post()
+        with count_firestore_rpcs() as replay:
+            self.post()
+        with count_firestore_rpcs() as unkeyed:
+            self.post(key=None)
+
+        # A key costs one read before the write; its replay is that read alone.
+        self.assertEqual(sum(first.values()), 2)
+        self.assertEqual(sum(replay.values()), 1)
+        self.assertEqual(sum(unkeyed.values()), 1)
 
 
 @patch("apps.people.views.geocode_address", return_value=PARIS)
@@ -610,6 +730,46 @@ class PersonProfileImageTests(PersonTestCase):
         # The extension is the image's real format, in lower case.
         self.assertTrue(second.endswith(".jpg"))
         self.assertTrue(response.data["properties"]["profile_image"].endswith(second))
+
+    def stored_files(self):
+        return [p for p in Path(self.media_root).rglob("*") if p.is_file()]
+
+    def keyed_create(self):
+        return self.client.post(
+            "/api/people/",
+            {**PERSON_PAYLOAD, "profile_image": self.image()},
+            format="multipart",
+            HTTP_IDEMPOTENCY_KEY="photo-key",
+        )
+
+    def test_a_replayed_create_stores_no_second_photo(self, _geocode):
+        first = self.keyed_create()
+        [photo] = self.stored_files()
+
+        second = self.keyed_create()
+
+        self.assertEqual(second.status_code, 201)
+        self.assertEqual(second.data, first.data)
+        self.assertEqual(self.stored_files(), [photo])
+
+    def test_a_create_that_loses_a_race_deletes_its_photo(self, _geocode):
+        first = self.keyed_create()
+        [photo] = self.stored_files()
+        real_get = PersonRepository.get_for_owner
+        missed = []
+
+        def get_for_owner(repo, person_id, owner_key):
+            if not missed:
+                missed.append(person_id)
+                return None
+            return real_get(repo, person_id, owner_key)
+
+        with patch.object(PersonRepository, "get_for_owner", get_for_owner):
+            second = self.keyed_create()
+
+        self.assertEqual(second.status_code, 201)
+        self.assertEqual(second.data, first.data)
+        self.assertEqual(self.stored_files(), [photo])
 
     def test_multipart_create_without_image_leaves_it_unset(self, _geocode):
         response = self.client.post("/api/people/", PERSON_PAYLOAD, format="multipart")

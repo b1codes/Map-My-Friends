@@ -156,13 +156,21 @@ class PersonRepository:
             found[doc.id] = self._record(doc.id, data)
         return found
 
-    def create(self, owner_key: str | None, data: dict) -> PersonRecord:
+    def create(
+        self, owner_key: str | None, data: dict, person_id: str | None = None
+    ) -> PersonRecord:
+        """Store a new person. With person_id, under that id and only if no
+        document has it yet: AlreadyExists is raised otherwise."""
         payload = {k: v for k, v in data.items() if k in _PERSON_WRITABLE_FIELDS}
         payload["owner_key"] = owner_key
         payload["created_at"] = _now_iso()
         payload["updated_at"] = _now_iso()
-        ref = self._collection().document()
-        ref.set(payload)
+        if person_id is None:
+            ref = self._collection().document()
+            ref.set(payload)
+        else:
+            ref = self._collection().document(person_id)
+            ref.create(payload)
         return self._record(ref.id, payload)
 
     def update(

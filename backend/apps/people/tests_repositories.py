@@ -2,7 +2,7 @@ import threading
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
-from google.api_core.exceptions import FailedPrecondition
+from google.api_core.exceptions import AlreadyExists, FailedPrecondition
 from google.cloud.firestore_v1.collection import CollectionReference
 
 from apps.common import firestore as fs
@@ -40,6 +40,16 @@ class PersonRepositoryTests(FirestoreTestMixin, SimpleTestCase):
     def test_create_sets_owner_key(self):
         person = self.people.create("owner-a", PERSON_DATA)
         self.assertEqual(person.owner_key, "owner-a")
+
+    def test_create_with_an_id_stores_it_only_once(self):
+        person = self.people.create("owner-a", PERSON_DATA, person_id="fixed-id")
+        self.assertEqual(person.id, "fixed-id")
+
+        with self.assertRaises(AlreadyExists):
+            self.people.create(
+                "owner-a", {**PERSON_DATA, "first_name": "Augusta"}, "fixed-id"
+            )
+        self.assertEqual(self.people.get_for_owner("fixed-id", "owner-a"), person)
 
     def test_list_returns_only_own_people(self):
         self.people.create("owner-a", PERSON_DATA)

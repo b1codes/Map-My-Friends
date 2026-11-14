@@ -1,4 +1,8 @@
+import hashlib
+import re
+
 from django.core.exceptions import ValidationError as DjangoValidationError
+from google.api_core.exceptions import AlreadyExists
 from rest_framework import serializers, status, viewsets
 from rest_framework.exceptions import APIException
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -17,6 +21,10 @@ from .services import GeocodingUnavailable, geocode_address
 
 ADDRESS_FIELDS = ("city", "state", "country", "street")
 PHOTO_PREFIX = "profile_images"
+# A client sends a UUID, and the same one again when it retries the same
+# form submission.
+IDEMPOTENCY_HEADER = "Idempotency-Key"
+IDEMPOTENCY_KEY = re.compile(r"[A-Za-z0-9_-]{1,128}")
 
 
 class GeocoderUnavailable(APIException):
@@ -64,17 +72,58 @@ class PersonViewSet(viewsets.ViewSet):
         return Response(PersonSerializer(person, context={"request": request}).data)
 
     def create(self, request):
+        """Create a person. A retry that sends the same Idempotency-Key as an
+        earlier create is answered with the person that create stored, and
+        stores nothing itself.
+
+        The client gives up waiting after a few seconds, which a geocoded
+        save can outlast, so the first attempt may land after its retry was
+        sent. With a key, the person's id comes from the owner and the key,
+        and is written only if no document has it yet.
+        """
+        key = request.headers.get(IDEMPOTENCY_HEADER)
+        if key is not None and not IDEMPOTENCY_KEY.fullmatch(key):
+            return Response(
+                {"error": f"{IDEMPOTENCY_HEADER} must be 1-128 of A-Z a-z 0-9 _ -."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         serializer = PersonSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
+        owner_key = owner_key_for(request)
+        person_id = None
+        if key is not None:
+            person_id = self._idempotent_id(owner_key, key)
+            # A replay costs this one read and no geocoder lookup or upload.
+            earlier = self.repository.get_for_owner(person_id, owner_key)
+            if earlier is not None:
+                return self._created(request, earlier)
         payload = self._serialize_dates(dict(serializer.validated_data))
         payload = self._apply_geocoding(payload)
         photo = self._apply_upload(request, payload)
 
         try:
-            person = self.repository.create(owner_key_for(request), payload)
+            person = self.repository.create(owner_key, payload, person_id=person_id)
+        except AlreadyExists:
+            # The first attempt landed while this one geocoded.
+            delete_upload(photo, PHOTO_PREFIX)
+            earlier = self.repository.get_for_owner(person_id, owner_key)
+            if earlier is None:
+                # Deleted again since.
+                return Response(status=status.HTTP_409_CONFLICT)
+            return self._created(request, earlier)
         except Exception:
             delete_upload(photo, PHOTO_PREFIX)
             raise
+        return self._created(request, person)
+
+    @staticmethod
+    def _idempotent_id(owner_key, key):
+        """The id a create with this key stores its person under. The key
+        comes last and holds no ":", so no two (owner, key) pairs share it."""
+        return hashlib.sha256(f"{owner_key}:{key}".encode()).hexdigest()[:32]
+
+    @staticmethod
+    def _created(request, person):
         return Response(
             PersonSerializer(person, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
