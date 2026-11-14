@@ -19,18 +19,6 @@ TESTING = (
 )
 
 
-# The username an Auth0 sign-in maps to is its sub with "|" made "_", so it
-# starts with the connection's name: "auth0_", "google-oauth2_", "apple_".
-# Local sign-up refuses these prefixes, or anyone could register a real
-# Auth0 user's username first and lock that user out (see has_usable_password
-# below).
-AUTH0_USERNAME_PREFIXES = ("auth0_", "google-oauth2_", "apple_")
-
-
-def is_auth0_username(username: str) -> bool:
-    return username.lower().startswith(AUTH0_USERNAME_PREFIXES)
-
-
 class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
     """
     Custom DRF authentication class for Auth0 JWT tokens.
@@ -137,15 +125,20 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
         if not sub:
             raise exceptions.AuthenticationFailed(_("Missing sub claim in token."))
 
-        # Convert sub to a valid Django username (e.g. auth0_123456 instead of auth0|123456)
-        username = sub.replace("|", "_")
+        # The username is the sub as Auth0 sends it, "|" and all. Every sub
+        # has one ("github|123", "oauth2|corp|7"), and local sign-up can't
+        # produce one: Django's username validator allows only letters,
+        # digits and @.+-_. So no local account can ever take an Auth0
+        # user's username, whichever connection signed them in, and lock
+        # them out through the has_usable_password refusal below.
+        username = sub
 
         try:
             user = User.objects.get(username=username)
             # Accounts this backend creates have no password. One that has
-            # a password came from local sign-up, which lets anyone pick any
-            # free username, including the one this sub maps to: it isn't
-            # this login's account, whoever registered it.
+            # a password was made some other way (local sign-up can't make
+            # this username, but an admin or a shell can): it isn't this
+            # login's account, whoever made it.
             if user.has_usable_password():
                 raise exceptions.AuthenticationFailed(
                     _("This sign-in's username belongs to another account.")
@@ -179,7 +172,7 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
                     logger.warning("Auth0 userinfo lookup failed", exc_info=True)
 
             if not email:
-                email = f"{username}@temporary.auth0.com"
+                email = f"{sub.replace('|', '_')}@temporary.auth0.com"
 
             # Always a new account, never one found by email: local sign-up
             # doesn't verify addresses, so an existing account with this

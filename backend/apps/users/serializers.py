@@ -10,8 +10,6 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.common.fields import PinColorField
 
-from .auth import is_auth0_username
-
 
 def validate_password_for(password, user):
     """Django's password validators, run against `user`, as a DRF error.
@@ -110,11 +108,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             "last_name",
             "first_name_hp",
         )
-
-    def validate_username(self, value):
-        if is_auth0_username(value):
-            raise serializers.ValidationError("This username is reserved.")
-        return value
 
     def validate(self, attrs):
         if attrs.get("first_name_hp"):

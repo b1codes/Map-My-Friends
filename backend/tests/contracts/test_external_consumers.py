@@ -124,7 +124,7 @@ class Auth0ConsumerContractTests(TestCase):
         user, _ = self._authenticate(
             self._token(email="grace@example.com", email_verified=True)
         )
-        self.assertEqual(user.username, "google-oauth2_104807611830372981423")
+        self.assertEqual(user.username, "google-oauth2|104807611830372981423")
         self.assertEqual(user.email, "grace@example.com")
 
     def test_keys_come_from_the_contract_jwks_url(self):

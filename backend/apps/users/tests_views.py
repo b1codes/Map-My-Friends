@@ -223,9 +223,11 @@ class RegisterTests(ThrottleIsolationMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("access", response.data)
 
-    def test_usernames_an_auth0_sign_in_maps_to_are_reserved(self):
-        # Taken first, one would lock the real Auth0 user out for good.
-        for username in ("auth0_abc123", "google-oauth2_987", "Apple_001.x"):
+    def test_usernames_an_auth0_sign_in_maps_to_are_refused(self):
+        # An Auth0 user's username is their sub, "|" and all. Taken first by
+        # local sign-up, one would lock that user out for good, so the "|"
+        # must stay refused, whatever the connection.
+        for username in ("auth0|abc123", "github|12345", "samlp|corp|x"):
             with self.subTest(username=username):
                 response = self.client.post(
                     REGISTER_URL,

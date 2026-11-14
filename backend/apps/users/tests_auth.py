@@ -19,6 +19,7 @@ from rest_framework.test import APIRequestFactory, APITestCase
 
 from apps.common.testing import FirestoreTestMixin
 from apps.users.auth import Auth0JSONWebTokenAuthentication
+from apps.users.serializers import RegisterSerializer
 
 AUTH0_DOMAIN = "tenant.test.auth0.com"
 AUTH0_AUDIENCE = "https://api.test.example/"
@@ -188,7 +189,7 @@ class Auth0VerificationTests(TestCase):
         self.assertEqual(client.uri, f"https://{AUTH0_DOMAIN}/.well-known/jwks.json")
 
     def test_valid_token_resolves_existing_user_by_sub(self):
-        existing = User.objects.create_user(username="auth0_abc123")
+        existing = User.objects.create_user(username="auth0|abc123")
         token = auth0_token()
 
         user, returned_token = self.authenticate(token)
@@ -207,8 +208,8 @@ class Auth0VerificationTests(TestCase):
             )
         )
 
-        # "|" is not a valid username character, so it is swapped for "_".
-        self.assertEqual(user.username, "google-oauth2_987")
+        # The sub itself: local sign-up can't make a username with "|".
+        self.assertEqual(user.username, "google-oauth2|987")
         self.assertEqual(user.email, "ada@example.com")
         self.assertEqual(user.first_name, "Ada")
         self.assertEqual(user.last_name, "Lovelace")
@@ -342,16 +343,39 @@ class Auth0VerificationTests(TestCase):
         )
 
         self.assertNotEqual(user.pk, squatter.pk)
-        self.assertEqual(user.username, "auth0_abc123")
+        self.assertEqual(user.username, "auth0|abc123")
         self.assertFalse(user.has_usable_password())
 
     def test_a_password_account_holding_the_sub_username_is_refused(self):
-        # Local sign-up can pick any free username, including the one an
-        # Auth0 sub maps to. Signing that sub in must not resolve to it.
-        User.objects.create_user(username="auth0_abc123", password="pw12345!")
+        # Local sign-up can't make this username, but an admin or a shell
+        # can. Signing that sub in must not resolve to it.
+        User.objects.create_user(username="auth0|abc123", password="pw12345!")
 
         with self.assertRaisesMessage(exceptions.AuthenticationFailed, "username"):
             self.authenticate(auth0_token(email="ada@example.com"))
+
+    def test_no_local_sign_up_can_take_an_auth0_users_username(self):
+        # The refusal above would lock the Auth0 user out for good if local
+        # sign-up could produce their username. It must not be able to for
+        # any connection, not only the ones this app shows buttons for.
+        for sub in ("github|12345", "windowslive|abc", "oauth2|corp|7", "email|9f"):
+            with self.subTest(sub=sub):
+                local = sub.replace("|", "_")
+                sign_up = RegisterSerializer(
+                    data={
+                        "username": local,
+                        "email": f"{local}@example.com",
+                        "password": "Tr1cky-Horse-Battery",
+                        "password_confirm": "Tr1cky-Horse-Battery",
+                    }
+                )
+                if sign_up.is_valid():
+                    sign_up.save()
+
+                user, _token = self.authenticate(auth0_token(sub=sub))
+
+                self.assertFalse(user.has_usable_password())
+                self.assertEqual(user.username, sub)
 
     def test_unverified_email_does_not_take_over_existing_account(self):
         # Anyone can claim an address at an IdP; without verification the
@@ -363,7 +387,7 @@ class Auth0VerificationTests(TestCase):
         user, _token = self.authenticate(auth0_token(email="ada@example.com"))
 
         self.assertNotEqual(user.pk, existing.pk)
-        self.assertEqual(user.username, "auth0_abc123")
+        self.assertEqual(user.username, "auth0|abc123")
 
 
 @override_settings(AUTH0_DOMAIN=AUTH0_DOMAIN, AUTH0_AUDIENCE=AUTH0_AUDIENCE)
@@ -380,7 +404,7 @@ class Auth0EndpointTests(FirestoreTestMixin, APITestCase):
         response = self.client.get("/api/user/profile/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["username"], "auth0_abc123")
+        self.assertEqual(response.data["username"], "auth0|abc123")
         self.assertEqual(response.data["email"], "ada@example.com")
 
     def test_expired_auth0_token_is_401_with_reason(self, _fetch):
