@@ -60,3 +60,14 @@ condition = "AND"
 paths = ['''^\.zap/extra-operations\.json$''']
 regexTarget = "secret"
 regexes = ['''^cyx3pa-0123456789abcdef0123456789abcdef$''']
+
+# The Idempotency-Key the backend's idempotent person-create tests send: a
+# made-up UUID. The server only uses it to recognise a retried create; it
+# grants nothing.
+[[allowlists]]
+description = "Example Idempotency-Key in the backend people tests"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^backend/apps/people/tests_views\.py$''']
+regexTarget = "secret"
+regexes = ['''^0b8f6c1e-6a0d-4c43-9f0e-2f4c6b9d1a77$''']
