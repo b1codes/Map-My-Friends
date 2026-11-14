@@ -37,18 +37,7 @@ class StationService {
           ),
         );
 
-    // Add auth interceptor
-    _dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) async {
-          final token = await _authService.getAccessToken();
-          if (token != null) {
-            options.headers['Authorization'] = 'Bearer $token';
-          }
-          return handler.next(options);
-        },
-      ),
-    );
+    _dio.interceptors.add(_authService.authInterceptor(_dio));
   }
 
   /// Load all stations from the bundled JSON asset (for map layer).

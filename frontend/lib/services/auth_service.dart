@@ -302,14 +302,27 @@ class AuthService {
   /// Marks a request already retried with a refreshed token.
   static const String _retriedAfterRefresh = 'retriedAfterRefresh';
 
-  /// The 401 handling the API interceptors share: refresh the token and
-  /// retry the request on [dio], once.
+  /// The interceptor every API service adds to its [dio]: it attaches the
+  /// stored access token and, on a 401, refreshes it and retries the request
+  /// on [dio], once.
+  Interceptor authInterceptor(Dio dio) => InterceptorsWrapper(
+    onRequest: (options, handler) async {
+      final token = await getAccessToken();
+      if (token != null) {
+        options.headers['Authorization'] = 'Bearer $token';
+      }
+      return handler.next(options);
+    },
+    onError: (error, handler) => _retryUnauthorized(error, handler, dio),
+  );
+
+  /// Refreshes the token and retries the request on [dio], once.
   ///
   /// A retry that still gets a 401 signs out rather than refreshing again.
   /// Otherwise a server that keeps issuing tokens it then refuses (a refresh
   /// token minted before a claim change, say) turns every call into an
   /// endless refresh-and-retry loop that rotates a token on each turn.
-  Future<void> retryUnauthorized(
+  Future<void> _retryUnauthorized(
     DioException error,
     ErrorInterceptorHandler handler,
     Dio dio,

@@ -141,6 +141,42 @@ void main() {
       );
     });
 
+    test(
+      'on a 401, refreshes the token and retries with the new one',
+      () async {
+        final authBackend = FakeHttpAdapter();
+        service = StationService.forTesting(
+          dio: fakeDio(api),
+          authService: authServiceOn(authBackend),
+        );
+        final sentHeaders = <String?>[];
+        api.on('GET', 'stations/nearest/', (r) {
+          sentHeaders.add(authHeaderOf(r));
+          return const FakeResponse(401);
+        });
+        api.on('GET', 'stations/nearest/', (r) {
+          sentHeaders.add(authHeaderOf(r));
+          return FakeResponse(200, [stationFeature(1, 'Penn')]);
+        });
+        authBackend.reply('POST', 'user/auth/token/refresh/', 200, {
+          'access': 'fresh',
+        });
+
+        final stations = await service.getNearestStations(1, 2);
+
+        expect(stations.single.name, 'Penn');
+        expect(sentHeaders, ['Bearer tok', 'Bearer fresh']);
+        expect(
+          authBackend
+              .requestsTo('POST', 'user/auth/token/refresh/')
+              .single
+              .data,
+          {'refresh': 'ref'},
+        );
+        expect((await storedValues())[accessKey], 'fresh');
+      },
+    );
+
     test('wraps an HTTP error', () async {
       api.reply('GET', 'stations/nearest/', 500);
 

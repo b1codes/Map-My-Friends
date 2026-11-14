@@ -43,21 +43,7 @@ class ApiService {
           ),
         );
 
-    // Add auth interceptor
-    _dio.interceptors.add(
-      InterceptorsWrapper(
-        onRequest: (options, handler) async {
-          final token = await _authService.getAccessToken();
-          if (token != null) {
-            options.headers['Authorization'] = 'Bearer $token';
-          }
-          return handler.next(options);
-        },
-        // On a 401, refresh the token and retry once.
-        onError: (error, handler) =>
-            _authService.retryUnauthorized(error, handler, _dio),
-      ),
-    );
+    _dio.interceptors.add(_authService.authInterceptor(_dio));
   }
 
   Future<List<Person>> getPeople() async {
