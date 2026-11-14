@@ -1,4 +1,5 @@
 import threading
+from unittest.mock import patch
 
 from django.test import SimpleTestCase
 
@@ -289,6 +290,35 @@ class LastContactTests(FirestoreTestMixin, SimpleTestCase):
 
         self.assertEqual(len(self.logs.list_for_owner("owner-a")), len(days))
         self.assert_last_contact(25, "CALL-25")
+
+    def test_a_channel_edit_racing_a_date_edit_keeps_the_new_date(self):
+        """Two PATCHes of one log: the channel-only one found the log before
+        the other moved it to the 20th, and commits after it."""
+        log = self.log(5, "CALL")
+        found_before = self.logs._find(log.id, "owner-a")
+        self.logs.update(
+            log.id, "owner-a", {"contacted_at": "2026-07-20T12:00:00+00:00"}
+        )
+
+        with patch.object(self.logs, "_find", return_value=found_before):
+            self.logs.update(log.id, "owner-a", {"channel": "VIDEO"})
+
+        self.assert_last_contact(20, "VIDEO")
+
+    def test_a_date_edit_racing_a_channel_edit_keeps_the_new_channel(self):
+        # The log isn't among the two most recent until this edit moves it.
+        log = self.log(2, "CALL")
+        self.log(5, "CALL")
+        self.log(6, "CALL")
+        found_before = self.logs._find(log.id, "owner-a")
+        self.logs.update(log.id, "owner-a", {"channel": "VIDEO"})
+
+        with patch.object(self.logs, "_find", return_value=found_before):
+            self.logs.update(
+                log.id, "owner-a", {"contacted_at": "2026-07-20T12:00:00+00:00"}
+            )
+
+        self.assert_last_contact(20, "VIDEO")
 
     def test_a_person_write_cannot_set_it(self):
         self.log(5, "CALL")

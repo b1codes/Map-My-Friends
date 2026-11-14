@@ -310,9 +310,13 @@ class ContactLogRepository:
             return None
         return self._record(ref.id, person_id, payload)
 
-    def _write_and_refresh_last_contact(self, doc, change: dict | None) -> None:
+    def _write_and_refresh_last_contact(self, doc, change: dict | None) -> bool:
         """Apply change to the log doc (None deletes it), and set its person's
-        last contact from the logs as they will be afterwards."""
+        last contact from the logs as they will be afterwards.
+
+        False, writing nothing, when a change finds the log deleted since doc
+        was read.
+        """
         log_ref = doc.reference
         person_ref = log_ref.parent.parent
         latest_two = (
@@ -321,24 +325,33 @@ class ContactLogRepository:
             .limit(2)
         )
 
-        def write(transaction):
+        def write(transaction) -> bool:
             # The two most recent logs are enough: whether or not this log is
             # one of them, the other is the most recent of the rest.
-            others = [
-                d.to_dict()
-                for d in latest_two.stream(transaction=transaction)
-                if d.id != log_ref.id
-            ][:1]
-            candidates = list(others)
+            latest_logs = list(latest_two.stream(transaction=transaction))
+            candidates = [d.to_dict() for d in latest_logs if d.id != log_ref.id][:1]
             if change is None:
                 transaction.delete(log_ref)
             else:
+                # The log as this transaction reads it, not as doc does: an
+                # edit committed since doc was read would otherwise be undone
+                # on the person.
+                edited = next(
+                    (d.to_dict() for d in latest_logs if d.id == log_ref.id), None
+                )
+                if edited is None and not {"channel", "contacted_at"} <= change.keys():
+                    # Not among the two most recent, and the change keeps one
+                    # of the fields the person mirrors from it.
+                    edited = log_ref.get(transaction=transaction).to_dict()
+                    if edited is None:
+                        return False
                 transaction.update(log_ref, change)
-                candidates.append({**(doc.to_dict() or {}), **change})
+                candidates.append({**(edited or {}), **change})
             latest = max(candidates, key=lambda log: log["contacted_at"], default=None)
             transaction.update(person_ref, _last_contact(latest))
+            return True
 
-        fs.run_transaction(write)
+        return fs.run_transaction(write)
 
     def update(
         self, log_id: str, owner_key: str | None, data: dict
@@ -351,7 +364,8 @@ class ContactLogRepository:
             k: v for k, v in data.items() if k in {"channel", "contacted_at", "note"}
         }
         if {"channel", "contacted_at"} & payload.keys():
-            self._write_and_refresh_last_contact(doc, payload)
+            if not self._write_and_refresh_last_contact(doc, payload):
+                return None
         elif payload:
             # Firestore raises "Cannot update with an empty document" rather
             # than no-opping, and a PATCH with none of these fields filters to
