@@ -29,6 +29,12 @@ MAX_IMAGE_SIDE = 4096
 # picture: no SVG (it runs scripts), and nothing exotic for Pillow to parse.
 IMAGE_FORMATS = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp"}
 
+# Pillow formats that are one of the above under another name. A phone JPEG
+# carrying a depth map or an HDR gain map has an MPF segment, and Pillow calls
+# that MPO; it is still a JPEG, and its first picture is the photo. Saved as
+# JPEG it becomes a plain one-picture JPEG, so the extra pictures are dropped.
+FORMAT_ALIASES = {"MPO": "JPEG"}
+
 
 def _invalid(message: str) -> serializers.ValidationError:
     return serializers.ValidationError({"profile_image": [message]})
@@ -53,7 +59,7 @@ def clean_image(uploaded_file) -> tuple[bytes, str]:
     )
     try:
         with Image.open(io.BytesIO(data)) as probe:
-            fmt = probe.format
+            fmt = FORMAT_ALIASES.get(probe.format, probe.format)
             width, height = probe.size
         if fmt not in IMAGE_FORMATS:
             raise _invalid("Upload a PNG, JPEG or WebP image.")
@@ -93,6 +99,15 @@ def save_upload(uploaded_file, prefix: str) -> str:
     type /media/ serves it with.
     """
     content, extension = clean_image(uploaded_file)
+    return store_image(content, extension, prefix)
+
+
+def store_image(content: bytes, extension: str, prefix: str) -> str:
+    """Persist bytes clean_image returned under `prefix/`; returns the name.
+
+    The second half of save_upload, for a caller that validates the upload
+    first and stores it only once other checks have passed.
+    """
     name = f"{prefix}/{uuid.uuid4().hex}{extension}"
     return default_storage.save(name, ContentFile(content))
 

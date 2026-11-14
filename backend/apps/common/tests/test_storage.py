@@ -3,18 +3,127 @@ import shutil
 import tempfile
 from unittest import mock
 
+from django.contrib.auth.models import User
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from PIL import Image
+from rest_framework import serializers
+from rest_framework.test import APITestCase
 
-from apps.common.storage import delete_upload, save_upload, upload_url
+from apps.common.storage import (
+    MAX_IMAGE_SIDE,
+    clean_image,
+    delete_upload,
+    save_upload,
+    store_image,
+    upload_url,
+)
+from apps.common.testing import FirestoreTestMixin, ThrottleIsolationMixin
 
 
 def png(name="avatar.png", color="red"):
     buffer = io.BytesIO()
     Image.new("RGB", (2, 2), color=color).save(buffer, format="PNG")
     return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
+
+
+def mpo(name="photo.jpg", size=(4, 4)):
+    """A multi-picture JPEG, as phones write for depth maps and HDR gain maps.
+
+    Pillow opens it as format "MPO", not "JPEG".
+    """
+    buffer = io.BytesIO()
+    first = Image.new("RGB", size, color="blue")
+    second = Image.new("RGB", size, color="yellow")
+    first.save(buffer, format="MPO", save_all=True, append_images=[second])
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/jpeg")
+
+
+class TempMediaMixin:
+    def setUp(self):
+        super().setUp()
+        media_root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, media_root, ignore_errors=True)
+        media = override_settings(MEDIA_ROOT=media_root)
+        media.enable()
+        self.addCleanup(media.disable)
+
+
+class MultiPictureJpegTests(TempMediaMixin, SimpleTestCase):
+    """A phone JPEG with an MPF segment is a JPEG, and is stored as a plain one."""
+
+    def test_the_test_image_really_is_an_mpo(self):
+        with Image.open(mpo()) as image:
+            self.assertEqual(image.format, "MPO")
+            self.assertEqual(image.n_frames, 2)
+
+    def test_clean_image_accepts_it_as_a_jpeg(self):
+        content, extension = clean_image(mpo())
+
+        self.assertEqual(extension, ".jpg")
+        with Image.open(io.BytesIO(content)) as image:
+            self.assertEqual(image.format, "JPEG")
+
+    def test_it_is_stored_as_a_single_frame_jpeg_of_the_first_picture(self):
+        name = save_upload(mpo(), prefix="profile_images")
+
+        self.assertRegex(name, r"^profile_images/[0-9a-f]{32}\.jpg$")
+        with default_storage.open(name) as handle:
+            data = handle.read()
+        # No MPF (APP2 "MPF\0") segment survives, so nothing reads it as MPO.
+        self.assertNotIn(b"MPF\x00", data)
+        with Image.open(io.BytesIO(data)) as image:
+            self.assertEqual(image.format, "JPEG")
+            self.assertEqual(getattr(image, "n_frames", 1), 1)
+            red, green, blue = image.convert("RGB").getpixel((0, 0))
+            self.assertGreater(blue, 200)
+            self.assertLess(red + green, 60)
+
+    def test_delete_upload_removes_it(self):
+        name = save_upload(mpo(), prefix="profile_images")
+
+        delete_upload(name, prefix="profile_images")
+
+        self.assertFalse(default_storage.exists(name))
+
+    def test_store_image_names_it_so_delete_upload_can_remove_it(self):
+        # clean_image then store_image, as a caller that validates before
+        # other checks and stores after them does.
+        content, extension = clean_image(mpo())
+        name = store_image(content, extension, prefix="profile_images")
+
+        self.assertRegex(name, r"^profile_images/[0-9a-f]{32}\.jpg$")
+        with default_storage.open(name) as handle:
+            self.assertEqual(handle.read(), content)
+        delete_upload(name, prefix="profile_images")
+        self.assertFalse(default_storage.exists(name))
+
+    def test_the_side_limit_still_applies(self):
+        with self.assertRaises(serializers.ValidationError):
+            clean_image(mpo(size=(MAX_IMAGE_SIDE + 1, 1)))
+
+
+class MultiPictureJpegEndpointTests(
+    TempMediaMixin, ThrottleIsolationMixin, FirestoreTestMixin, APITestCase
+):
+    collections_to_purge = ["user_profiles"]
+
+    def test_a_profile_photo_from_a_phone_is_accepted(self):
+        user = User.objects.create_user(username="phone", password="pw")
+        self.client.force_authenticate(user=user)
+
+        response = self.client.patch(
+            "/api/user/profile/",
+            {"profile_image": mpo("IMG_0001.JPG")},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertRegex(
+            response.data["profile_image"],
+            r"/media/user_profiles/[0-9a-f]{32}\.jpg$",
+        )
 
 
 class StorageTests(SimpleTestCase):
