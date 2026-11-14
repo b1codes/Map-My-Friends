@@ -9,6 +9,8 @@ from django.utils.translation import gettext_lazy as _
 from jwt import PyJWKClient
 from rest_framework import authentication, exceptions
 
+from apps.common import firestore as fs
+
 logger = logging.getLogger(__name__)
 
 # Determine if we are running unit tests
@@ -17,6 +19,14 @@ TESTING = (
     or "test_coverage" in sys.argv
     or getattr(settings, "TESTING", False)
 )
+
+
+def _refuse_unstorable(username):
+    """Refuse a sign-in whose username can't name its profile document."""
+    if not fs.is_valid_doc_id(username):
+        raise exceptions.AuthenticationFailed(
+            _("This sign-in's username can't be used for an account.")
+        )
 
 
 class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
@@ -68,6 +78,7 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
             # Format: mock_auth0_jwt_token_{username}_{timestamp}
             username = parts[4] if len(parts) >= 5 else "mock_auth0_user"
 
+            _refuse_unstorable(username)
             email = f"{username}@example.com"
             user, _created = User.objects.get_or_create(
                 username=username,
@@ -132,6 +143,10 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
         # user's username, whichever connection signed them in, and lock
         # them out through the has_usable_password refusal below.
         username = sub
+        # A sub Firestore can't take as a document id ("__corp|x__") would
+        # make an account whose profile 500s. No connection issues one, but
+        # if one ever arrives, it's a failed sign-in, not a broken account.
+        _refuse_unstorable(username)
 
         try:
             user = User.objects.get(username=username)

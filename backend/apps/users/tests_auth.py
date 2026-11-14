@@ -165,6 +165,12 @@ class MockTokenTests(TestCase):
         self.assertIsNone(result)
         self.assertFalse(User.objects.filter(username="intruder").exists())
 
+    def test_mock_token_for_a_username_firestore_cannot_store_is_refused(self):
+        with self.assertRaisesMessage(exceptions.AuthenticationFailed, "username"):
+            self.backend.authenticate(request_with("Bearer mock_auth0_jwt_token_.._1"))
+
+        self.assertFalse(User.objects.filter(username="..").exists())
+
 
 @override_settings(AUTH0_DOMAIN=AUTH0_DOMAIN, AUTH0_AUDIENCE=AUTH0_AUDIENCE)
 class Auth0VerificationTests(TestCase):
@@ -215,6 +221,16 @@ class Auth0VerificationTests(TestCase):
         self.assertEqual(user.last_name, "Lovelace")
         self.assertFalse(user.has_usable_password())
         self.userinfo.assert_not_called()
+
+    def test_a_sub_firestore_cannot_store_is_refused(self):
+        # The username names the profile document, so a sub Firestore refuses
+        # as an id would make an account that 500s on its profile. No real
+        # connection issues one; refusing it keeps that a 401.
+        sub = "__corp|x__"
+        with self.assertRaisesMessage(exceptions.AuthenticationFailed, "username"):
+            self.authenticate(auth0_token(sub=sub, email="ada@example.com"))
+
+        self.assertFalse(User.objects.filter(username=sub).exists())
 
     def test_second_login_does_not_create_another_user(self):
         token = auth0_token(email="ada@example.com")

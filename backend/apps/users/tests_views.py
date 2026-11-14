@@ -134,6 +134,39 @@ class ProfileUpdateTests(FirestoreTestMixin, APITestCase):
         self.assertEqual(response.data["username"], "owner-b")
 
 
+class UnstorableUsernameProfileTests(FirestoreTestMixin, APITestCase):
+    """An account whose username Firestore can't take as a document id.
+
+    Sign-up refuses these names now, but Django's validator allows them, so
+    an older account, an admin or a shell can still hold one.
+    """
+
+    collections_to_purge = ["user_profiles"]
+
+    def setUp(self):
+        super().setUp()
+        self.user = User.objects.create_user(
+            username="..", email="dots@example.com", first_name="Old"
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_get_is_400_not_500(self):
+        response = self.client.get(PROFILE_URL)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("username", response.data["detail"])
+
+    def test_patch_is_400_and_saves_nothing(self):
+        response = self.client.patch(
+            PROFILE_URL, {"city": "Chicago", "first_name": "New"}, format="json"
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("username", response.data["detail"])
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, "Old")
+
+
 class ProfileImageUploadTests(FirestoreTestMixin, APITestCase):
     collections_to_purge = ["user_profiles"]
 
@@ -386,6 +419,33 @@ class RegisterTests(ThrottleIsolationMixin, APITestCase):
                 self.assertEqual(response.status_code, 400)
                 self.assertIn("username", response.data)
                 self.assertFalse(User.objects.filter(username=username).exists())
+
+    def test_usernames_firestore_cannot_store_are_refused(self):
+        # Django's validator allows these, but the username names the
+        # account's profile document, and Firestore refuses them as ids: the
+        # account could never load its profile.
+        for i, username in enumerate((".", "..", "__x__", "____")):
+            with self.subTest(username=username):
+                response = self.client.post(
+                    REGISTER_URL,
+                    self.payload(username=username, email=f"u{i}@example.com"),
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("username", response.data)
+                self.assertFalse(User.objects.filter(username=username).exists())
+
+    def test_usernames_with_dots_and_underscores_are_still_allowed(self):
+        for i, username in enumerate(("a.b", "...", "__x", "x__", "_x_")):
+            with self.subTest(username=username):
+                response = self.client.post(
+                    REGISTER_URL,
+                    self.payload(username=username, email=f"u{i}@example.com"),
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, 201, response.data)
 
     def test_names_are_optional(self):
         payload = self.payload()

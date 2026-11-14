@@ -8,6 +8,7 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.common import firestore as fs
 from apps.common.fields import PinColorField
 
 
@@ -108,6 +109,17 @@ class RegisterSerializer(serializers.ModelSerializer):
             "last_name",
             "first_name_hp",
         )
+
+    def validate_username(self, value):
+        # The username names the account's profile document. Django's
+        # validator allows ".", ".." and "__x__", which Firestore refuses as
+        # document ids, so such an account could never load its profile.
+        if not fs.is_valid_doc_id(value):
+            raise serializers.ValidationError(
+                'This username can\'t be used. Usernames can\'t be "." or "..", '
+                'or begin and end with "__".'
+            )
+        return value
 
     def validate(self, attrs):
         if attrs.get("first_name_hp"):

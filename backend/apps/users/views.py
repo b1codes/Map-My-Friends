@@ -28,6 +28,13 @@ from .throttles import (
 
 PHOTO_PREFIX = "user_profiles"
 
+# Sign-up refuses these usernames now (RegisterSerializer.validate_username),
+# but an account made before that, or by an admin, can still hold one.
+UNSTORABLE_USERNAME = (
+    "This account's username can't hold a profile. Usernames can't be "
+    '"." or "..", or begin and end with "__".'
+)
+
 
 class UserProfileView(APIView):
     """Get and update the current user's profile.
@@ -43,6 +50,17 @@ class UserProfileView(APIView):
         from .repositories import UserProfileRepository
 
         return UserProfileRepository()
+
+    def handle_exception(self, exc):
+        from .repositories import UnstorableOwnerKey
+
+        # Raised before anything is read or written, so a 400 leaves the
+        # profile, the name and storage as they were.
+        if isinstance(exc, UnstorableOwnerKey):
+            return Response(
+                {"detail": UNSTORABLE_USERNAME}, status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().handle_exception(exc)
 
     def get(self, request):
         profile = self.repository.get_or_create(owner_key_for(request))

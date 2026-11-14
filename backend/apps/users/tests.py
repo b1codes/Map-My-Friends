@@ -58,6 +58,17 @@ class UserProfileRepositoryTests(FirestoreTestMixin, APITestCase):
         self.assertEqual(profile.city, "Chicago")
         self.assertFalse(hasattr(profile, "legacy_field"))
 
+    def test_an_owner_key_firestore_cannot_store_is_refused(self):
+        # The owner key names the document, and Firestore refuses these ids
+        # outright. The repository must say so, not let the client raise.
+        repo = UserProfileRepository()
+        for owner_key in (".", "..", "__x__"):
+            with self.subTest(owner_key=owner_key):
+                with self.assertRaises(ValueError):
+                    repo.get_or_create(owner_key)
+                with self.assertRaises(ValueError):
+                    repo.update(owner_key, {"city": "Chicago"})
+
 
 class UserProfileEndpointTests(FirestoreTestMixin, APITestCase):
     collections_to_purge = ["user_profiles"]
