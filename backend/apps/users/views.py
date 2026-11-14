@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
+from django.db import transaction
 from rest_framework import generics, status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -66,15 +67,13 @@ class UserProfileView(APIView):
         # via source='user.*'; with a plain Serializer that has to be explicit,
         # or name-only edits silently no-op (and used to 500 on an empty
         # Firestore update).
+        # They're saved last, with the Firestore write, so a rejected photo
+        # or a failed write leaves the name as it was.
         user_fields = {
             field: payload.pop(field)
             for field in ("first_name", "last_name")
             if field in payload
         }
-        if user_fields:
-            for field, value in user_fields.items():
-                setattr(request.user, field, value)
-            request.user.save(update_fields=list(user_fields))
 
         owner_key = owner_key_for(request)
         # Read first, so a Firestore outage stores no photo, and so the photo
@@ -87,8 +86,16 @@ class UserProfileView(APIView):
             payload["profile_image"] = photo
 
         try:
-            profile = self.repository.update(owner_key, payload, current=current)
+            # If the Firestore write fails, the name change rolls back with it.
+            with transaction.atomic():
+                if user_fields:
+                    for field, value in user_fields.items():
+                        setattr(request.user, field, value)
+                    request.user.save(update_fields=list(user_fields))
+                profile = self.repository.update(owner_key, payload, current=current)
         except Exception:
+            if user_fields:
+                request.user.refresh_from_db(fields=list(user_fields))
             delete_upload(photo, PHOTO_PREFIX)
             raise
         if photo is not None:

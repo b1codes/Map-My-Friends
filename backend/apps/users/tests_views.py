@@ -283,6 +283,52 @@ class ProfilePhotoLifecycleTests(
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.data["profile_image"].endswith(first.name))
 
+    def stored_name(self):
+        self.user.refresh_from_db()
+        return (self.user.first_name, self.user.last_name)
+
+    def test_a_rejected_photo_leaves_the_name_as_it_was(self):
+        response = self.client.patch(
+            PROFILE_URL,
+            {
+                "first_name": "New",
+                "last_name": "Name",
+                "profile_image": SimpleUploadedFile(
+                    "avatar.png", b"<html></html>", content_type="image/png"
+                ),
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("profile_image", response.data)
+        self.assertEqual(self.stored_name(), ("", ""))
+
+    def test_a_failed_profile_write_leaves_the_name_as_it_was(self):
+        with patch.object(
+            UserProfileRepository,
+            "update",
+            side_effect=gcloud_exceptions.ServiceUnavailable("down"),
+        ):
+            response = self.client.patch(
+                PROFILE_URL, {"first_name": "New", "city": "Leeds"}, format="json"
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(self.stored_name(), ("", ""))
+
+    def test_a_name_change_with_a_photo_saves_both(self):
+        response = self.client.patch(
+            PROFILE_URL,
+            {"first_name": "New", "profile_image": png_upload()},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["first_name"], "New")
+        self.assertEqual(self.stored_name(), ("New", ""))
+        self.assertEqual(len(self.stored_files()), 1)
+
 
 class RegisterTests(ThrottleIsolationMixin, APITestCase):
     def payload(self, **overrides):
