@@ -141,6 +141,22 @@ void main() {
       expect(p.contactCadenceDays, isNull);
       expect(p.lastContactedAt, isNull);
     });
+
+    test('a legacy pin colour the API now refuses reads as the default', () {
+      // Every update sends the whole person back, so keeping "red" would make
+      // each one (a cadence change, a preferred hub) fail with a 400.
+      final p = Person.fromJson({
+        'id': 'p3',
+        'first_name': 'Cy',
+        'last_name': 'Oh',
+        'tag': 'FRIEND',
+        'city': 'LA',
+        'state': 'CA',
+        'country': 'USA',
+        'pin_color': 'red',
+      });
+      expect(p.pinColor, '#F44336');
+    });
   });
 
   group('Person.fromGeoJson', () {
@@ -228,6 +244,22 @@ void main() {
       expect(p.birthday, isNull);
       expect(p.preferredAirport, isNull);
       expect(p.lastContactedAt, isNull);
+    });
+
+    test('a legacy pin colour the API now refuses reads as the default', () {
+      final p = Person.fromGeoJson({
+        'id': 'x',
+        'properties': {
+          'first_name': 'A',
+          'last_name': 'B',
+          'tag': 'FRIEND',
+          'city': 'C',
+          'state': 'S',
+          'country': 'X',
+          'pin_color': '7',
+        },
+      });
+      expect(p.pinColor, '#F44336');
     });
   });
 

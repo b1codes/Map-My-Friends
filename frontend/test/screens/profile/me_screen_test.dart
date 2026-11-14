@@ -377,6 +377,44 @@ void main() {
       );
     });
 
+    testWidgets('a legacy pin colour like "red" shows and saves the default', (
+      tester,
+    ) async {
+      await pumpWithProfile(
+        tester,
+        const ProfileLoaded(
+          city: 'Oslo',
+          state: 'Oslo',
+          country: 'Norway',
+          pinColor: 'red',
+        ),
+      );
+
+      expect(tester.takeException(), isNull);
+      final swatch = tester.widget<Container>(
+        find
+            .descendant(
+              of: find.widgetWithText(ListTile, 'Pin Color'),
+              matching: find.byType(Container),
+            )
+            .last,
+      );
+      expect(
+        (swatch.decoration! as BoxDecoration).color,
+        const Color(0xFF3F51B5),
+      );
+      expect(
+        tester
+            .widget<CustomMapMarker>(find.byType(CustomMapMarker))
+            .pinColorHex,
+        '#3F51B5',
+      );
+
+      await tapVisible(tester, saveButton);
+
+      expect(capturedUpdate().pinColor, '#3F51B5');
+    });
+
     testWidgets('sends the edits the user made', (tester) async {
       await pumpWithProfile(tester);
 

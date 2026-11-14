@@ -1,3 +1,4 @@
+import '../utils/pin_color.dart';
 import 'airport.dart';
 import 'station.dart';
 
@@ -89,7 +90,7 @@ class Person {
       longitude: (json['longitude'] as num?)?.toDouble(),
       profileImageUrl: json['profile_image'] as String?,
       timezone: json['timezone'] as String?,
-      pinColor: json['pin_color'] as String? ?? '#F44336',
+      pinColor: pinColorHexOrDefault(json['pin_color'] as String?, '#F44336'),
       pinStyle: json['pin_style'] as String? ?? 'teardrop',
       pinIconType: json['pin_icon_type'] as String? ?? 'none',
       pinEmoji: json['pin_emoji'] as String?,
@@ -136,7 +137,10 @@ class Person {
           : null,
       profileImageUrl: properties['profile_image'] as String?,
       timezone: properties['timezone'] as String?,
-      pinColor: properties['pin_color'] as String? ?? '#F44336',
+      pinColor: pinColorHexOrDefault(
+        properties['pin_color'] as String?,
+        '#F44336',
+      ),
       pinStyle: properties['pin_style'] as String? ?? 'teardrop',
       pinIconType: properties['pin_icon_type'] as String? ?? 'none',
       pinEmoji: properties['pin_emoji'] as String?,

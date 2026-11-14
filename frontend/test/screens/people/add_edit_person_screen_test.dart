@@ -20,6 +20,7 @@ import 'package:map_my_friends/models/person.dart';
 import 'package:map_my_friends/models/station.dart';
 import 'package:map_my_friends/screens/people/add_edit_person_screen.dart';
 import 'package:map_my_friends/services/api_service.dart';
+import 'package:map_my_friends/utils/pin_color.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
@@ -639,6 +640,34 @@ void main() {
       expect(person.preferredStationId, '10');
       expect(event.imageBytes, isNull);
       expect(find.byType(AddEditPersonScreen), findsNothing);
+    });
+
+    testWidgets('a legacy pin colour like "red" opens on the default and '
+        'saves as one the API accepts', (tester) async {
+      await pumpForm(tester, person: _existing.copyWith(pinColor: 'red'));
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Edit Person'), findsOneWidget);
+      final swatch = tester.widget<Container>(
+        find
+            .descendant(
+              of: find.widgetWithText(ListTile, 'Pin Color'),
+              matching: find.byType(Container),
+            )
+            .last,
+      );
+      expect((swatch.decoration! as BoxDecoration).color, defaultPinColor);
+      expect(
+        tester
+            .widget<CustomMapMarker>(find.byType(CustomMapMarker))
+            .pinColorHex,
+        '#F44336',
+      );
+
+      await tester.enterText(field('First Name'), 'Annie');
+      await save(tester);
+
+      expect(dispatchedUpdate().person.pinColor, '#F44336');
     });
 
     testWidgets('an unknown timezone hides the local time', (tester) async {

@@ -186,7 +186,9 @@ class _MeScreenState extends State<MeScreen> {
     }
     // Populate pin fields only once from server
     if (!_pinFieldsPopulated) {
-      if (state.pinColor != null) _pinColor = state.pinColor!;
+      if (state.pinColor != null) {
+        _pinColor = pinColorHexOrDefault(state.pinColor, _pinColor);
+      }
       if (state.pinStyle != null) _pinStyle = state.pinStyle!;
       if (state.pinIconType != null) _pinIconType = state.pinIconType!;
       _pinEmoji = state.pinEmoji ?? '😀';
@@ -560,14 +562,7 @@ class _MeScreenState extends State<MeScreen> {
                                         width: 40,
                                         height: 40,
                                         decoration: BoxDecoration(
-                                          color: Color(
-                                            int.parse(
-                                              _pinColor.replaceFirst(
-                                                '#',
-                                                '0xFF',
-                                              ),
-                                            ),
-                                          ),
+                                          color: parsePinColor(_pinColor),
                                           shape: BoxShape.circle,
                                           border: Border.all(
                                             color: Colors.grey,

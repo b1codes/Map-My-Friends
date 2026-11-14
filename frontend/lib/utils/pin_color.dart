@@ -18,3 +18,18 @@ Color parsePinColor(String? hex, {Color fallback = defaultPinColor}) {
   final digits = match.group(1)!;
   return Color(int.parse(digits.length == 6 ? 'FF$digits' : digits, radix: 16));
 }
+
+final _apiHex = RegExp(r'^#[0-9A-Fa-f]{6}$');
+
+/// [hex] in the "#RRGGBB" form the API accepts, or [fallback].
+///
+/// Forms send the pin colour they were loaded with back on save, and the
+/// API now refuses anything else. Without this, a person or profile still
+/// holding a legacy colour like "red" couldn't be saved at all.
+String pinColorHexOrDefault(String? hex, String fallback) {
+  if (hex != null && _apiHex.hasMatch(hex)) return hex;
+  final match = _hex.firstMatch(hex ?? '');
+  if (match == null) return fallback;
+  final digits = match.group(1)!;
+  return '#${digits.substring(digits.length - 6)}';
+}

@@ -100,7 +100,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
     _preferredAirport = widget.person?.preferredAirport;
     _preferredStation = widget.person?.preferredStation;
 
-    _pinColor = widget.person?.pinColor ?? '#F44336';
+    _pinColor = pinColorHexOrDefault(widget.person?.pinColor, '#F44336');
     _pinStyle = widget.person?.pinStyle ?? 'teardrop';
     _pinIconType = widget.person?.pinIconType ?? 'none';
     _pinEmoji = widget.person?.pinEmoji ?? '😀';
@@ -703,11 +703,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  color: Color(
-                                    int.parse(
-                                      _pinColor.replaceFirst('#', '0xFF'),
-                                    ),
-                                  ),
+                                  color: parsePinColor(_pinColor),
                                   shape: BoxShape.circle,
                                   border: Border.all(color: Colors.grey),
                                 ),
