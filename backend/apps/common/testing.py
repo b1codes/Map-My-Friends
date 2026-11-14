@@ -83,24 +83,27 @@ def count_firestore_rpcs():
 def _delete_document(reference, batch_size: int) -> None:
     """Delete a document reference after recursively purging its subcollections."""
     for sub in reference.collections():
-        while True:
-            sub_docs = list(sub.limit(batch_size).stream())
-            if not sub_docs:
-                break
-            for sub_doc in sub_docs:
-                _delete_document(sub_doc.reference, batch_size)
+        for child in _documents(sub, batch_size):
+            _delete_document(child, batch_size)
     reference.delete()
 
 
+def _documents(collection, batch_size: int) -> list:
+    """Every document in a collection, including missing ones: a document
+    that was deleted, or never written, but still has subcollection
+    documents under it. Firestore keeps those when their parent goes, and
+    a collection-group query (a trip's legs, a person's contact logs) still
+    finds them, so a test that failed part-way through a delete would
+    otherwise leave them for later tests to see. list_documents asks for
+    missing documents too (show_missing), where a query would skip them."""
+    return list(collection.list_documents(page_size=batch_size))
+
+
 def purge_collection(name: str, batch_size: int = 200) -> None:
-    """Recursively delete every document in a collection, including subcollections."""
-    collection = fs.collection(name)
-    while True:
-        docs = list(collection.limit(batch_size).stream())
-        if not docs:
-            return
-        for doc in docs:
-            _delete_document(doc.reference, batch_size)
+    """Recursively delete every document in a collection, including
+    subcollections and documents left under a missing parent."""
+    for doc in _documents(fs.collection(name), batch_size):
+        _delete_document(doc, batch_size)
 
 
 class FirestoreTestMixin:
