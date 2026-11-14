@@ -3,12 +3,15 @@
 import io
 import shutil
 import tempfile
+from pathlib import Path
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
+from google.api_core import exceptions as gcloud_exceptions
 from PIL import Image
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -180,6 +183,105 @@ class ProfileImageUploadTests(FirestoreTestMixin, APITestCase):
         response = self.client.patch(PROFILE_URL, {"city": "Chicago"}, format="json")
 
         self.assertEqual(response.data["profile_image"], uploaded.data["profile_image"])
+
+
+class ProfilePhotoLifecycleTests(
+    ThrottleIsolationMixin, FirestoreTestMixin, APITestCase
+):
+    """The bucket serves every object to anyone with its URL, cached for a
+    year, so the user's photo is stored only once the profile it belongs to
+    has been read, and goes when it stops being theirs."""
+
+    collections_to_purge = ["user_profiles"]
+
+    def setUp(self):
+        super().setUp()
+        media_root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, media_root, ignore_errors=True)
+        media = override_settings(MEDIA_ROOT=media_root)
+        media.enable()
+        self.addCleanup(media.disable)
+        self.media_root = media_root
+
+        self.user = User.objects.create_user(username="owner-a", password="pw12345!")
+        self.client.force_authenticate(user=self.user)
+
+    def stored_files(self):
+        return [p for p in Path(self.media_root).rglob("*") if p.is_file()]
+
+    def upload_photo(self):
+        response = self.client.patch(
+            PROFILE_URL, {"profile_image": png_upload()}, format="multipart"
+        )
+        self.assertEqual(response.status_code, 200)
+        [stored] = self.stored_files()
+        return stored
+
+    def test_a_failed_profile_read_stores_nothing(self):
+        with patch.object(
+            UserProfileRepository,
+            "get_or_create",
+            side_effect=gcloud_exceptions.ServiceUnavailable("down"),
+        ):
+            response = self.client.patch(
+                PROFILE_URL, {"profile_image": png_upload()}, format="multipart"
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(self.stored_files(), [])
+
+    def test_a_failed_update_removes_the_photo_it_stored(self):
+        first = self.upload_photo()
+
+        with patch.object(
+            UserProfileRepository,
+            "update",
+            side_effect=gcloud_exceptions.ServiceUnavailable("down"),
+        ):
+            response = self.client.patch(
+                PROFILE_URL, {"profile_image": png_upload()}, format="multipart"
+            )
+
+        self.assertEqual(response.status_code, 503)
+        # The old photo is still the user's, so it stays.
+        self.assertEqual(self.stored_files(), [first])
+
+    def test_replacing_a_photo_deletes_the_old_one(self):
+        first = self.upload_photo()
+
+        response = self.client.patch(
+            PROFILE_URL, {"profile_image": png_upload()}, format="multipart"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        [second] = self.stored_files()
+        self.assertNotEqual(second, first)
+        self.assertTrue(response.data["profile_image"].endswith(second.name))
+
+    def test_a_patch_without_a_photo_keeps_it(self):
+        first = self.upload_photo()
+
+        response = self.client.patch(PROFILE_URL, {"city": "Leeds"}, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.stored_files(), [first])
+
+    def test_a_storage_failure_does_not_fail_the_replace(self):
+        first = self.upload_photo()
+
+        with (
+            patch(
+                "django.core.files.storage.FileSystemStorage.delete",
+                side_effect=OSError("down"),
+            ),
+            self.assertLogs("apps.common.storage", level="ERROR"),
+        ):
+            response = self.client.patch(
+                PROFILE_URL, {"profile_image": png_upload()}, format="multipart"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["profile_image"].endswith(first.name))
 
 
 class RegisterTests(ThrottleIsolationMixin, APITestCase):

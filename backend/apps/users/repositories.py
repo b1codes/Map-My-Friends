@@ -57,8 +57,21 @@ class UserProfileRepository:
         ref.set(payload)
         return record
 
-    def update(self, owner_key: str, data: dict) -> UserProfileRecord:
-        self.get_or_create(owner_key)
+    def update(
+        self,
+        owner_key: str,
+        data: dict,
+        current: UserProfileRecord | None = None,
+    ) -> UserProfileRecord:
+        """Apply data to the profile, and return it as it is afterwards.
+
+        current is the profile as get_or_create returned it, which saves
+        reading (or creating) it again.
+        """
+        if current is None:
+            self.get_or_create(owner_key)
+        elif current.owner_key != owner_key:
+            raise ValueError("current is not this owner's profile")
         payload = {k: v for k, v in data.items() if k in _EDITABLE}
         ref = self._document(owner_key)
         # Firestore raises "Cannot update with an empty document" rather than

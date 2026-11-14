@@ -10,6 +10,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.common.ownership import owner_key_for
 from apps.common.parsers import StrictJSONParser
+from apps.common.storage import delete_upload, save_upload
 
 from .serializers import (
     PasswordResetConfirmSerializer,
@@ -23,6 +24,8 @@ from .throttles import (
     LoginBurstRateThrottle,
     SustainedAnonRateThrottle,
 )
+
+PHOTO_PREFIX = "user_profiles"
 
 
 class UserProfileView(APIView):
@@ -73,13 +76,23 @@ class UserProfileView(APIView):
                 setattr(request.user, field, value)
             request.user.save(update_fields=list(user_fields))
 
+        owner_key = owner_key_for(request)
+        # Read first, so a Firestore outage stores no photo, and so the photo
+        # a new one replaces is known.
+        current = self.repository.get_or_create(owner_key)
+        photo = None
         uploaded = request.FILES.get("profile_image")
         if uploaded is not None:
-            from apps.common.storage import save_upload
+            photo = save_upload(uploaded, prefix=PHOTO_PREFIX)
+            payload["profile_image"] = photo
 
-            payload["profile_image"] = save_upload(uploaded, prefix="user_profiles")
-
-        profile = self.repository.update(owner_key_for(request), payload)
+        try:
+            profile = self.repository.update(owner_key, payload, current=current)
+        except Exception:
+            delete_upload(photo, PHOTO_PREFIX)
+            raise
+        if photo is not None:
+            delete_upload(current.profile_image, PHOTO_PREFIX)
         return Response(
             UserProfileSerializer(profile, context={"request": request}).data
         )
