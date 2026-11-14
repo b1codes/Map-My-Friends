@@ -256,6 +256,17 @@ REST_FRAMEWORK = {
 
 # Simple JWT Configuration
 SIMPLE_JWT = {
+    # Tokens name the user by username, not by primary key. Django's users
+    # are in SQLite on each Cloud Run instance, so primary keys restart at 1
+    # on every instance and cold start: a token naming user 1 would sign in
+    # whoever is user 1 on the instance that serves the request. A username
+    # can still belong to someone else on another instance (docs/deploy.md);
+    # GCIP (ClickUp 86bb3eu64) removes the per-instance users entirely.
+    "USER_ID_FIELD": "username",
+    "USER_ID_CLAIM": "username",
+    "TOKEN_REFRESH_SERIALIZER": (
+        "apps.users.serializers.MissingUserTokenRefreshSerializer"
+    ),
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,

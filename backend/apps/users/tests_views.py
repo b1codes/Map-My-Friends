@@ -222,6 +222,20 @@ class RegisterTests(ThrottleIsolationMixin, APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("access", response.data)
 
+    def test_usernames_an_auth0_sign_in_maps_to_are_reserved(self):
+        # Taken first, one would lock the real Auth0 user out for good.
+        for username in ("auth0_abc123", "google-oauth2_987", "Apple_001.x"):
+            with self.subTest(username=username):
+                response = self.client.post(
+                    REGISTER_URL,
+                    self.payload(username=username, email=f"{username}@example.com"),
+                    format="json",
+                )
+
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("username", response.data)
+                self.assertFalse(User.objects.filter(username=username).exists())
+
     def test_names_are_optional(self):
         payload = self.payload()
         del payload["first_name"], payload["last_name"]
@@ -399,6 +413,30 @@ class TokenTests(ThrottleIsolationMixin, FirestoreTestMixin, APITestCase):
         self.assertEqual(
             self.client.post(REFRESH_URL, {"refresh": new_refresh}).status_code, 200
         )
+
+    def hand_pk_to_someone_else(self):
+        """What another Cloud Run instance looks like: its users are in its
+        own SQLite, so this user's primary key there is another person's."""
+        pk = self.user.pk
+        self.user.delete()
+        User.objects.create_user(pk=pk, username="someone-else")
+
+    def test_access_token_follows_the_username_not_the_primary_key(self):
+        access = self.obtain()["access"]
+        self.hand_pk_to_someone_else()
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+        response = self.client.get(PROFILE_URL)
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_refresh_token_follows_the_username_not_the_primary_key(self):
+        refresh = self.obtain()["refresh"]
+        self.hand_pk_to_someone_else()
+
+        response = self.client.post(REFRESH_URL, {"refresh": refresh})
+
+        self.assertEqual(response.status_code, 401)
 
     def test_access_token_cannot_be_used_as_refresh(self):
         tokens = self.obtain()

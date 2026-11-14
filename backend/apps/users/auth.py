@@ -19,6 +19,18 @@ TESTING = (
 )
 
 
+# The username an Auth0 sign-in maps to is its sub with "|" made "_", so it
+# starts with the connection's name: "auth0_", "google-oauth2_", "apple_".
+# Local sign-up refuses these prefixes, or anyone could register a real
+# Auth0 user's username first and lock that user out (see has_usable_password
+# below).
+AUTH0_USERNAME_PREFIXES = ("auth0_", "google-oauth2_", "apple_")
+
+
+def is_auth0_username(username: str) -> bool:
+    return username.lower().startswith(AUTH0_USERNAME_PREFIXES)
+
+
 class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
     """
     Custom DRF authentication class for Auth0 JWT tokens.

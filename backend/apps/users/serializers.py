@@ -2,8 +2,12 @@ from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 
 from apps.common.fields import PinColorField
+
+from .auth import is_auth0_username
 
 
 def validate_password_for(password, user):
@@ -104,6 +108,11 @@ class RegisterSerializer(serializers.ModelSerializer):
             "first_name_hp",
         )
 
+    def validate_username(self, value):
+        if is_auth0_username(value):
+            raise serializers.ValidationError("This username is reserved.")
+        return value
+
     def validate(self, attrs):
         if attrs.get("first_name_hp"):
             # If honeypot is filled, it's a bot.
@@ -156,3 +165,20 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         if attrs["password"] != attrs["password_confirm"]:
             raise serializers.ValidationError({"password": "Passwords do not match."})
         return attrs
+
+
+class MissingUserTokenRefreshSerializer(TokenRefreshSerializer):
+    """SimpleJWT's refresh, with a 401 when the token's user isn't here.
+
+    SimpleJWT looks the user up with objects.get() and lets DoesNotExist
+    escape as a 500. Until GCIP, that is every refresh served by an instance
+    other than the one the user signed up on.
+    """
+
+    def validate(self, attrs):
+        try:
+            return super().validate(attrs)
+        except User.DoesNotExist as e:
+            raise AuthenticationFailed(
+                self.error_messages["no_active_account"], "no_active_account"
+            ) from e

@@ -3,6 +3,8 @@
 Production runs on Google Cloud: the API on Cloud Run, data in Firestore, photos in Cloud Storage, and the web app on Firebase Hosting. [infra/README.md](../infra/README.md) covers creating it with Terraform and connecting the release to it. This page covers what a release does, how to tell it worked, and how to undo one.
 
 > **Not ready for real users yet.** Django's users and refresh-token blacklist are in SQLite on each instance, so accounts disappear whenever an instance stops. The GCIP migration (ClickUp 86bb3eu64) fixes that. Until then, keep the repository variables unset, so the release deploys nothing, or treat production as a demo.
+>
+> It also means one account's data isn't safe from another. A username is unique only on one instance, and Firestore data belongs to a username. Anyone who signs up as `alice` on an instance where `alice` doesn't exist yet gets the real alice's people, trips and profile. Tokens name the user by username rather than by SQLite id, so at least a token can't resolve to a different user who has the same id on another instance. Don't put data in production that matters to anyone.
 
 ## What a release does
 
