@@ -463,19 +463,6 @@ class TripRepository:
         stops.sort(key=lambda s: s.sequence_order)
         return stops
 
-    def list_legs(self, trip_id: str, owner_key: str) -> list[TripLegRecord]:
-        """The trip's legs, or [] if owner_key doesn't own it.
-
-        No view calls this; tests use it, here and outside this app.
-        """
-        if not fs.is_valid_doc_id(trip_id):
-            return []
-        trip_ref = self._collection().document(trip_id)
-        return [
-            _hydrate_leg(d.id, trip_id, d.to_dict() or {})
-            for d in self._owned(trip_ref, LEGS, owner_key).stream()
-        ]
-
     def list_all_legs(self, owner_key: str) -> list[TripLegRecord]:
         """Every leg of every trip owner_key owns, in one query."""
         return [
@@ -540,32 +527,6 @@ class TripRepository:
             return stop
 
         return fs.run_transaction(create)
-
-    def replace_stops(self, trip_id: str, owner_key: str, stops_data: list) -> bool:
-        """Replace a trip's stops wholesale, and so its legs, in one commit.
-
-        No view calls this; test fixtures outside this app use it to seed
-        a trip's stops (tests/contracts, the authz matrix, the round-trip
-        budgets).
-        """
-        return self.update(trip_id, owner_key, {}, stops=stops_data) is not None
-
-    def update_leg(
-        self, trip_id: str, leg_id: str, owner_key: str, data: dict
-    ) -> TripLegRecord | None:
-        """Write data to the owner's leg on this trip, and return it.
-
-        No view calls this (they find a leg with find_leg, then patch_leg);
-        tests use it, here and outside this app.
-        """
-        if not fs.is_valid_doc_id(trip_id) or not fs.is_valid_doc_id(leg_id):
-            return None
-        leg_ref = self._collection().document(trip_id).collection(LEGS).document(leg_id)
-        doc = leg_ref.get()
-        if not doc.exists or (doc.to_dict() or {}).get("owner_key") != owner_key:
-            return None
-        leg = _hydrate_leg(leg_id, trip_id, doc.to_dict() or {})
-        return self.patch_leg(leg, data)
 
     def patch_leg(self, leg: TripLegRecord, data: dict) -> TripLegRecord:
         """Write data to a leg the caller has already found as its owner's,

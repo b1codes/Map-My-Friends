@@ -503,10 +503,11 @@ class MatrixBase(ThrottleIsolationMixin, FirestoreTestMixin, APITestCase):
 
         def trip(owner, name, person_id):
             trip_id = trips.create(owner, {"name": name, "date": "2026-08-01"}).id
-            trips.replace_stops(
+            trips.update(
                 trip_id,
                 owner,
-                [
+                {},
+                stops=[
                     {"sequence_order": 0, "lat": 51.5, "lng": -0.12},
                     {
                         "sequence_order": 1,
@@ -522,13 +523,10 @@ class MatrixBase(ThrottleIsolationMixin, FirestoreTestMixin, APITestCase):
         person_b = person("owner-b", "Bob")
         trip_a = trip("owner-a", f"Trip {MARKER}", person_a)
         trip_b = trip("owner-b", "Bob's trip", person_b)
-        (leg_a,) = trips.list_legs(trip_a, "owner-a")
-        (leg_b,) = trips.list_legs(trip_b, "owner-b")
-        trips.update_leg(
-            trip_a,
-            leg_a.id,
-            "owner-a",
-            {"transport_type": "FLIGHT", "booking_reference": MARKER},
+        (leg_a,) = trips.get_for_owner(trip_a, "owner-a").legs
+        (leg_b,) = trips.get_for_owner(trip_b, "owner-b").legs
+        trips.patch_leg(
+            leg_a, {"transport_type": "FLIGHT", "booking_reference": MARKER}
         )
         UserProfileRepository().get_or_create("owner-a")
         UserProfileRepository().update("owner-a", {"city": MARKER})

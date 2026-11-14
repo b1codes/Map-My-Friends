@@ -374,10 +374,11 @@ class BudgetBase(ThrottleIsolationMixin, FirestoreTestMixin, APITestCase):
                 OWNER, {"name": f"Trip {n}", "date": "2026-08-01"}
             ).id
             trip_ids.append(trip_id)
-            trips_repo.replace_stops(
+            trips_repo.update(
                 trip_id,
                 OWNER,
-                [
+                {},
+                stops=[
                     {
                         "sequence_order": order,
                         "lat": 51.5,
@@ -392,8 +393,8 @@ class BudgetBase(ThrottleIsolationMixin, FirestoreTestMixin, APITestCase):
         # owner's trips until it finds one reaches this trip last: the worst
         # case, and the same count on every run.
         target_trip = max(trip_ids)
-        leg = trips_repo.list_legs(target_trip, OWNER)[0].id
-        trips_repo.update_leg(target_trip, leg, OWNER, {"transport_type": "FLIGHT"})
+        leg = trips_repo.get_for_owner(target_trip, OWNER).legs[0]
+        trips_repo.patch_leg(leg, {"transport_type": "FLIGHT"})
         UserProfileRepository().update(OWNER, {"city": "London"})
 
         return Seed(
@@ -403,7 +404,7 @@ class BudgetBase(ThrottleIsolationMixin, FirestoreTestMixin, APITestCase):
             people=people,
             log=last_log,
             trip=target_trip,
-            leg=leg,
+            leg=leg.id,
         )
 
     def measure(self, key, budget: Budget, size: dict) -> RpcCounts:

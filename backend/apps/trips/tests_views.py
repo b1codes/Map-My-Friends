@@ -361,7 +361,7 @@ class TripUpdateTests(TripViewTestCase):
         self.assertEqual(response.data["stops"], [])
         self.assertEqual(response.data["legs"], [])
         self.assertEqual(self.trips.list_stops(created["id"], "owner-a"), [])
-        self.assertEqual(self.trips.list_legs(created["id"], "owner-a"), [])
+        self.assertEqual(self.trips.get_for_owner(created["id"], "owner-a").legs, [])
 
     def test_patch_stop_without_location_is_rejected(self):
         # On PATCH DRF skips required=True for nested fields, so the stop
@@ -466,7 +466,9 @@ class TripUpdateTests(TripViewTestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["legs"][0]["booking_reference"], "")
-        self.assertEqual(len(self.trips.list_legs(created["id"], "owner-a")), 1)
+        self.assertEqual(
+            len(self.trips.get_for_owner(created["id"], "owner-a").legs), 1
+        )
 
     def test_patch_invalid_leg_returns_400(self):
         created = self.create_trip_with_stops(CHICAGO, LONDON)
@@ -480,7 +482,8 @@ class TripUpdateTests(TripViewTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("transport_type", response.data["legs"][0])
         self.assertEqual(
-            self.trips.list_legs(created["id"], "owner-a")[0].transport_type, "CAR"
+            self.trips.get_for_owner(created["id"], "owner-a").legs[0].transport_type,
+            "CAR",
         )
 
     def test_booking_trip_freezes_stop_snapshots(self):
@@ -861,10 +864,11 @@ class TripLegListRetrieveTests(TripViewTestCase):
         first = self.create_trip_with_stops(CHICAGO, LONDON, PARIS)
         second = self.create_trip_with_stops(PARIS, CHICAGO)
         theirs = self.trips.create("owner-b", {"name": "Theirs", "date": "2026-08-01"})
-        self.trips.replace_stops(
+        self.trips.update(
             theirs.id,
             "owner-b",
-            [{"lat": 1.0, "lng": 2.0}, {"lat": 3.0, "lng": 4.0}],
+            {},
+            stops=[{"lat": 1.0, "lng": 2.0}, {"lat": 3.0, "lng": 4.0}],
         )
 
         response = self.client.get(LEGS_URL)
@@ -908,12 +912,13 @@ class TripLegListRetrieveTests(TripViewTestCase):
 
     def test_retrieve_another_owners_leg_returns_404(self):
         theirs = self.trips.create("owner-b", {"name": "Theirs", "date": "2026-08-01"})
-        self.trips.replace_stops(
+        self.trips.update(
             theirs.id,
             "owner-b",
-            [{"lat": 1.0, "lng": 2.0}, {"lat": 3.0, "lng": 4.0}],
+            {},
+            stops=[{"lat": 1.0, "lng": 2.0}, {"lat": 3.0, "lng": 4.0}],
         )
-        leg_id = self.trips.list_legs(theirs.id, "owner-b")[0].id
+        leg_id = self.trips.get_for_owner(theirs.id, "owner-b").legs[0].id
 
         response = self.client.get(f"{LEGS_URL}{leg_id}/")
         self.assertEqual(response.status_code, 404)
@@ -925,7 +930,9 @@ class TripLegListRetrieveTests(TripViewTestCase):
         self.assertEqual(self.client.post(LEGS_URL, {}, format="json").status_code, 405)
         self.assertEqual(self.client.put(leg_url, {}, format="json").status_code, 405)
         self.assertEqual(self.client.delete(leg_url).status_code, 405)
-        self.assertEqual(len(self.trips.list_legs(created["id"], "owner-a")), 1)
+        self.assertEqual(
+            len(self.trips.get_for_owner(created["id"], "owner-a").legs), 1
+        )
 
     def test_requires_authentication(self):
         self.client.force_authenticate(user=None)
@@ -955,7 +962,7 @@ class TripLegPartialUpdateTests(TripViewTestCase):
         self.assertEqual(response.data["transport_type"], "TRAIN")
         self.assertEqual(response.data["ticket_data"], {"seat": "12A"})
 
-        leg = self.trips.list_legs(self.trip["id"], "owner-a")[0]
+        leg = self.trips.get_for_owner(self.trip["id"], "owner-a").legs[0]
         self.assertEqual(leg.booking_reference, "AMT-42")
         self.assertEqual(
             datetime.fromisoformat(leg.arrival_time),
@@ -1107,7 +1114,8 @@ class SmartLookupTests(TripViewTestCase):
         self.url = f"{LEGS_URL}{self.leg_id}/smart_lookup/"
 
     def set_leg(self, **fields):
-        self.trips.update_leg(self.trip["id"], self.leg_id, "owner-a", fields)
+        leg = self.trips.find_leg(self.leg_id, "owner-a")
+        self.trips.patch_leg(leg, fields)
 
     # Found by the API fuzz test: a 500, as in calculate_route.
     def test_body_that_is_not_an_object_is_400(self):
@@ -1136,7 +1144,7 @@ class SmartLookupTests(TripViewTestCase):
         self.assertEqual(ticket["airline"], "British Airways")
         self.assertEqual(ticket["departure"]["iata"], "LHR")
 
-        leg = self.trips.list_legs(self.trip["id"], "owner-a")[0]
+        leg = self.trips.get_for_owner(self.trip["id"], "owner-a").legs[0]
         self.assertEqual(leg.departure_time, "2026-07-04T10:00:00Z")
         self.assertEqual(leg.ticket_data["arrival"]["iata"], "JFK")
 

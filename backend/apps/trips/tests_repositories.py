@@ -26,8 +26,15 @@ class TripRepositoryTestCase(FirestoreTestMixin, SimpleTestCase):
         self.trip = self.trips.create("owner-a", TRIP_DATA)
 
     def add_stops(self, *stops, trip_id=None):
-        self.trips.replace_stops(trip_id or self.trip.id, "owner-a", list(stops))
+        self.trips.update(trip_id or self.trip.id, "owner-a", {}, stops=list(stops))
         return self.trips.list_stops(trip_id or self.trip.id, "owner-a")
+
+    def legs(self, trip_id=None, owner_key="owner-a"):
+        return self.trips.get_for_owner(trip_id or self.trip.id, owner_key).legs
+
+    def patch_leg(self, leg_id, data, owner_key="owner-a"):
+        """Write to a leg as the leg PATCH view does: find it, then patch it."""
+        return self.trips.patch_leg(self.trips.find_leg(leg_id, owner_key), data)
 
 
 class TripRepositoryOwnershipTests(TripRepositoryTestCase):
@@ -46,30 +53,18 @@ class TripRepositoryOwnershipTests(TripRepositoryTestCase):
     def test_children_hidden_from_wrong_owner(self):
         self.add_stops({"lat": 1.0, "lng": 2.0}, {"lat": 3.0, "lng": 4.0})
         self.assertEqual(self.trips.list_stops(self.trip.id, "owner-b"), [])
-        self.assertEqual(self.trips.list_legs(self.trip.id, "owner-b"), [])
+        self.assertEqual(self.trips.list_all_legs("owner-b"), [])
+        self.assertIsNone(self.trips.find_leg(self.legs()[0].id, "owner-b"))
 
-    def test_replace_stops_by_wrong_owner_is_refused(self):
+    def test_replacing_stops_by_wrong_owner_is_refused(self):
         self.add_stops({"lat": 1.0, "lng": 2.0})
-        self.assertFalse(
-            self.trips.replace_stops(
-                self.trip.id, "owner-b", [{"lat": 9.0, "lng": 9.0}]
+        self.assertIsNone(
+            self.trips.update(
+                self.trip.id, "owner-b", {}, stops=[{"lat": 9.0, "lng": 9.0}]
             )
         )
         stops = self.trips.list_stops(self.trip.id, "owner-a")
         self.assertEqual([(s.lat, s.lng) for s in stops], [(1.0, 2.0)])
-
-    def test_update_leg_by_wrong_owner_is_refused(self):
-        self.add_stops({"lat": 1.0, "lng": 2.0}, {"lat": 3.0, "lng": 4.0})
-        leg = self.trips.list_legs(self.trip.id, "owner-a")[0]
-
-        self.assertIsNone(
-            self.trips.update_leg(
-                self.trip.id, leg.id, "owner-b", {"booking_reference": "X"}
-            )
-        )
-        self.assertEqual(
-            self.trips.list_legs(self.trip.id, "owner-a")[0].booking_reference, ""
-        )
 
     def test_booking_by_wrong_owner_does_not_snapshot(self):
         self.add_stops({"lat": 1.0, "lng": 2.0, "airport_id": HEATHROW_ID})
@@ -114,12 +109,12 @@ class TripRepositoryStopTests(TripRepositoryTestCase):
 
     def test_replace_stops_rebuilds_legs_for_new_stops(self):
         self.add_stops({"lat": 1.0, "lng": 2.0}, {"lat": 3.0, "lng": 4.0})
-        old_leg = self.trips.list_legs(self.trip.id, "owner-a")[0]
+        old_leg = self.legs()[0]
 
         stops = self.add_stops(
             {"lat": 5.0, "lng": 6.0}, {"lat": 7.0, "lng": 8.0}, {"lat": 9.0, "lng": 9.5}
         )
-        legs = self.trips.list_legs(self.trip.id, "owner-a")
+        legs = self.legs()
         self.assertEqual(len(legs), 2)
         self.assertNotIn(old_leg.id, [leg.id for leg in legs])
         stop_ids = {s.id for s in stops}
@@ -138,7 +133,7 @@ class TripRepositoryStopTests(TripRepositoryTestCase):
             self.trip.id, "owner-a", {"sequence_order": 1, "lat": 2.0, "lng": 2.0}
         )
 
-        legs = self.trips.list_legs(self.trip.id, "owner-a")
+        legs = self.legs()
         self.assertEqual(
             sorted((leg.departure_stop_id, leg.arrival_stop_id) for leg in legs),
             sorted([(first.id, middle.id), (middle.id, last.id)]),
@@ -149,16 +144,14 @@ class TripRepositoryStopTests(TripRepositoryTestCase):
             {"sequence_order": 0, "lat": 1.0, "lng": 2.0},
             {"sequence_order": 1, "lat": 3.0, "lng": 4.0},
         )
-        (booked,) = self.trips.list_legs(self.trip.id, "owner-a")
-        self.trips.update_leg(
-            self.trip.id, booked.id, "owner-a", {"booking_reference": "BA123"}
-        )
+        (booked,) = self.legs()
+        self.patch_leg(booked.id, {"booking_reference": "BA123"})
 
         self.trips.add_stop(
             self.trip.id, "owner-a", {"sequence_order": 2, "lat": 5.0, "lng": 6.0}
         )
 
-        legs = {leg.id: leg for leg in self.trips.list_legs(self.trip.id, "owner-a")}
+        legs = {leg.id: leg for leg in self.legs()}
         self.assertEqual(len(legs), 2)
         self.assertEqual(legs[booked.id].booking_reference, "BA123")
 
@@ -170,34 +163,21 @@ class TripRepositoryStopTests(TripRepositoryTestCase):
         self.assertEqual(stop.person_ids, [])
 
 
-class TripRepositoryUpdateLegTests(TripRepositoryTestCase):
+class TripRepositoryPatchLegTests(TripRepositoryTestCase):
     def setUp(self):
         super().setUp()
         self.add_stops({"lat": 1.0, "lng": 2.0}, {"lat": 3.0, "lng": 4.0})
-        self.leg = self.trips.list_legs(self.trip.id, "owner-a")[0]
+        self.leg = self.legs()[0]
 
-    def test_update_leg_merges_fields(self):
-        updated = self.trips.update_leg(
-            self.trip.id,
-            self.leg.id,
-            "owner-a",
-            {"transport_type": "FLIGHT", "ticket_data": {"seat": "1A"}},
+    def test_patch_leg_merges_fields(self):
+        updated = self.patch_leg(
+            self.leg.id, {"transport_type": "FLIGHT", "ticket_data": {"seat": "1A"}}
         )
         self.assertEqual(updated.id, self.leg.id)
         self.assertEqual(updated.transport_type, "FLIGHT")
         self.assertEqual(updated.ticket_data, {"seat": "1A"})
         self.assertEqual(updated.departure_stop_id, self.leg.departure_stop_id)
-
-    def test_update_unknown_leg_returns_none_without_creating_it(self):
-        self.assertIsNone(
-            self.trips.update_leg(
-                self.trip.id, "missing", "owner-a", {"booking_reference": "X"}
-            )
-        )
-        self.assertEqual(
-            [leg.id for leg in self.trips.list_legs(self.trip.id, "owner-a")],
-            [self.leg.id],
-        )
+        self.assertEqual(self.legs(), [updated])
 
 
 class TripRepositorySnapshotTests(TripRepositoryTestCase):
@@ -329,10 +309,11 @@ class TripRepositoryBatchedReadTests(TripRepositoryTestCase):
             trip_id=other.id,
         )
         someone_elses = self.trips.create("owner-b", TRIP_DATA)
-        self.trips.replace_stops(
+        self.trips.update(
             someone_elses.id,
             "owner-b",
-            [{"lat": 0.5, "lng": 0.5}, {"lat": 1, "lng": 1}],
+            {},
+            stops=[{"lat": 0.5, "lng": 0.5}, {"lat": 1, "lng": 1}],
         )
 
         listed = {trip.id: trip for trip in self.trips.list_for_owner("owner-a")}
@@ -361,10 +342,13 @@ class TripRepositoryBatchedReadTests(TripRepositoryTestCase):
             {"lat": 5.0, "lng": 6.0}, {"lat": 7.0, "lng": 8.0}, trip_id=other.id
         )
         theirs = self.trips.create("owner-b", TRIP_DATA)
-        self.trips.replace_stops(
-            theirs.id, "owner-b", [{"lat": 0.5, "lng": 0.5}, {"lat": 1, "lng": 1}]
+        self.trips.update(
+            theirs.id,
+            "owner-b",
+            {},
+            stops=[{"lat": 0.5, "lng": 0.5}, {"lat": 1, "lng": 1}],
         )
-        (their_leg,) = self.trips.list_legs(theirs.id, "owner-b")
+        (their_leg,) = self.legs(theirs.id, "owner-b")
 
         legs = self.trips.list_all_legs("owner-a")
         self.assertEqual(
@@ -388,7 +372,7 @@ class TripRepositoryAtomicWriteTests(TripRepositoryTestCase):
 
     def test_update_returns_what_a_fresh_read_returns(self):
         self.add_stops({"lat": 1.0, "lng": 2.0}, {"lat": 3.0, "lng": 4.0})
-        (leg,) = self.trips.list_legs(self.trip.id, "owner-a")
+        (leg,) = self.legs()
 
         updated = self.trips.update(
             self.trip.id,
@@ -402,7 +386,7 @@ class TripRepositoryAtomicWriteTests(TripRepositoryTestCase):
 
     def test_leg_patches_naming_replaced_legs_are_dropped(self):
         self.add_stops({"lat": 1.0, "lng": 2.0}, {"lat": 3.0, "lng": 4.0})
-        (old_leg,) = self.trips.list_legs(self.trip.id, "owner-a")
+        (old_leg,) = self.legs()
 
         updated = self.trips.update(
             self.trip.id,
@@ -481,7 +465,6 @@ class TripRepositoryDeleteRaceTests(TripRepositoryTestCase):
         self.assertIsNone(self.trips.get_for_owner(self.trip.id, "owner-a"))
         self.assertEqual(self.trips.list_all_legs("owner-a"), [])
         self.assertEqual(self.trips.list_stops(self.trip.id, "owner-a"), [])
-        self.assertEqual(self.trips.list_legs(self.trip.id, "owner-a"), [])
 
     def test_a_stop_added_during_a_delete_is_deleted_too(self):
         self.add_stops({"lat": 1.0, "lng": 2.0}, {"lat": 3.0, "lng": 4.0})
@@ -521,16 +504,6 @@ class TripRepositoryInvalidIdTests(TripRepositoryTestCase):
         for bad in ("", "__reserved__", "a/b", ".."):
             with self.subTest(id=bad):
                 self.assertEqual(self.trips.list_stops(bad, "owner-a"), [])
-                self.assertEqual(self.trips.list_legs(bad, "owner-a"), [])
+                self.assertIsNone(self.trips.get_for_owner(bad, "owner-a"))
                 self.assertIsNone(self.trips.find_leg(bad, "owner-a"))
                 self.assertIsNone(self.trips.add_stop(bad, "owner-a", {"lat": 1}))
-                self.assertIsNone(
-                    self.trips.update_leg(
-                        bad, "leg", "owner-a", {"booking_reference": "X"}
-                    )
-                )
-                self.assertIsNone(
-                    self.trips.update_leg(
-                        self.trip.id, bad, "owner-a", {"booking_reference": "X"}
-                    )
-                )

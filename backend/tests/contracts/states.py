@@ -116,10 +116,11 @@ def user_with_trip() -> ProviderState:
             "status": "DRAFT",
         },
     )
-    trips.replace_stops(
+    trips.update(
         trip.id,
         owner,
-        [
+        {},
+        stops=[
             {
                 "sequence_order": 0,
                 "lat": geocoder["lat"],

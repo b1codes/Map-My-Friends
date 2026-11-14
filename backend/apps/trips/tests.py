@@ -74,7 +74,7 @@ class TripRepositoryTests(FirestoreTestMixin, SimpleTestCase):
                 trip.id, "owner-a", {"sequence_order": order, "lat": 1.0, "lng": 2.0}
             )
 
-        self.assertEqual(len(self.trips.list_legs(trip.id, "owner-a")), 2)
+        self.assertEqual(len(self.trips.get_for_owner(trip.id, "owner-a").legs), 2)
 
     def test_snapshot_on_draft_to_booked(self):
         trip = self.trips.create("owner-a", TRIP_DATA)
