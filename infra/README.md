@@ -4,7 +4,7 @@ Terraform for production: the API on Cloud Run, data in Firestore, uploaded phot
 
 | File | What it creates |
 | --- | --- |
-| `cloud_run.tf` | The API service: 1 vCPU, 512 MiB, 8 requests per instance, 0 to `max_instances` (default 3), probes on `/health`, settings as env, `DJANGO_SECRET_KEY` from Secret Manager. Public (the API does its own auth). |
+| `cloud_run.tf` | The API service: 1 vCPU, 512 MiB, 8 requests per instance, 0 to `max_instances` (1 until GCIP, since users are SQLite on each instance), probes on `/health`, settings as env, `DJANGO_SECRET_KEY` from Secret Manager. Public (the API does its own auth). |
 | `artifact_registry.tf` | The image repository. It keeps the 5 most recent images and deletes older ones after 7 days. |
 | `firestore.tf` | The `(default)` Firestore database, with delete protection. `terraform destroy` leaves it alone. |
 | `storage.tf` | The photo bucket. Objects are readable by URL, the bucket can't be listed, CORS is open to the web app only, and soft delete keeps deletions for 7 days. |
@@ -15,7 +15,7 @@ Terraform for production: the API on Cloud Run, data in Firestore, uploaded phot
 
 What's checked, on every PR and with `make check-infra`, with no GCP project needed: `terraform fmt` and `validate`, `terraform test` (`tests/infra.tftest.hcl`, providers mocked), tflint with the Google ruleset, and `trivy config`. The two deliberate exceptions carry a `#trivy:ignore` with the reason: the bucket's public object reads, and no object versioning.
 
-> **Not ready for real users yet.** Django's own tables (users, the refresh-token blacklist) live in SQLite on the instance's disk, so every account disappears when an instance stops, which happens when it scales to zero. The migration to Google Cloud Identity Platform fixes that (ClickUp 86bb3eu64). Until it lands, a deploy works and passes its smoke test, but nobody stays signed up. The release is switched off until the repository variables below are set.
+> **Not ready for real users yet.** Django's own tables (users, the refresh-token blacklist) live in SQLite on the instance's disk, so every account disappears when the instance stops, which happens when it scales to zero and on every release. The migration to Google Cloud Identity Platform fixes that (ClickUp 86bb3eu64). Until it lands, the API runs on one instance at most, so an account at least works on every request while it lasts, and a deploy works and passes its smoke test, but nobody stays signed up. The release is switched off until the repository variables below are set.
 
 ## Bootstrapping (once)
 

@@ -2,7 +2,7 @@
 project_id = "your-gcp-project-id"
 
 # region        = "us-central1"
-# max_instances = 3
+# max_instances = 1   # 1 until GCIP (variables.tf says why)
 # api_domain    = "api.mapmyfriends.com"
 # web_domain    = "mapmyfriends.com"
 

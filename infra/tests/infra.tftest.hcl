@@ -56,8 +56,8 @@ run "the_api_scales_to_zero_and_stops_at_the_cap" {
     error_message = "The API must scale to zero when idle; a warm instance is billed around the clock."
   }
   assert {
-    condition     = google_cloud_run_v2_service.api.template[0].scaling[0].max_instance_count == 3
-    error_message = "The API must stop at max_instances, the cap on what a spike can cost."
+    condition     = google_cloud_run_v2_service.api.template[0].scaling[0].max_instance_count == 1
+    error_message = "The API must run on one instance at most until GCIP: users are per-instance SQLite (variables.tf, max_instances)."
   }
   assert {
     condition     = google_cloud_run_v2_service.api.template[0].containers[0].resources[0].cpu_idle
@@ -314,6 +314,16 @@ run "the_instance_cap_is_bounded" {
   command = plan
   variables {
     max_instances = 50
+  }
+  expect_failures = [var.max_instances]
+}
+
+run "a_second_instance_is_refused_until_gcip" {
+  # Two instances would each have their own users: random 401s, and a
+  # username claimable on the other one.
+  command = plan
+  variables {
+    max_instances = 2
   }
   expect_failures = [var.max_instances]
 }

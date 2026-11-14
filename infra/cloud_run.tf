@@ -1,6 +1,9 @@
 # The API. One instance is the shape the load test measured
 # (docker-compose.perf.yml): 1 vCPU, 512 MiB, gunicorn with 8 threads, so 8
-# requests at a time. It scales to zero when idle and stops at max_instances.
+# requests at a time. It scales to zero when idle and stops at max_instances,
+# which is 1 until GCIP: users are per-instance SQLite (variables.tf). The cap
+# is per revision, so during a release the candidate, at 0% traffic, can run
+# one more instance for the smoke test, which only the release calls.
 #
 # Terraform creates the service and owns its settings. The release workflow
 # owns which image runs and where traffic goes, so Terraform ignores those.

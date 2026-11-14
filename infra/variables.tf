@@ -37,13 +37,20 @@ variable "service_name" {
 }
 
 variable "max_instances" {
-  description = "The most Cloud Run instances the API scales to: the cap on what a traffic spike can cost."
+  description = <<-EOT
+    The most Cloud Run instances the API scales to: the cap on what a traffic
+    spike can cost. Held at 1 until GCIP (ClickUp 86bb3eu64): Django's users
+    and refresh-token blacklist are SQLite on each instance, so with two a
+    request that lands on the other one is a random 401, and a username can be
+    claimed again there. One instance held about 4x the load test's rate
+    (docs/testing.md). After GCIP, allow up to 10.
+  EOT
   type        = number
-  default     = 3
+  default     = 1
 
   validation {
-    condition     = var.max_instances >= 1 && var.max_instances <= 10
-    error_message = "Between 1 and 10. One instance held about 4x the load test's rate (docs/testing.md)."
+    condition     = var.max_instances == 1
+    error_message = "1 until GCIP: users are per-instance SQLite, so a second instance means random 401s and usernames that can be claimed twice."
   }
 }
 
