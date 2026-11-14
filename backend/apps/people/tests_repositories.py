@@ -2,10 +2,16 @@ import threading
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
+from google.api_core.exceptions import FailedPrecondition
+from google.cloud.firestore_v1.collection import CollectionReference
 
 from apps.common import firestore as fs
 from apps.common.testing import FirestoreTestMixin
-from apps.people.repositories import ContactLogRepository, PersonRepository
+from apps.people.repositories import (
+    DELETE_ATTEMPTS,
+    ContactLogRepository,
+    PersonRepository,
+)
 
 PERSON_DATA = {
     "tag": "FRIEND",
@@ -425,6 +431,61 @@ class PersonDeleteCascadeTests(FirestoreTestMixin, SimpleTestCase):
             .stream()
         )
         self.assertEqual(list(remaining), [])
+
+    def test_a_log_written_during_the_delete_goes_with_the_person(self):
+        """A log created after the delete listed the person's logs, but before
+        it committed, used to outlive the person: still listed by the
+        collection-group query, and a 404 on every edit."""
+        people = PersonRepository()
+        logs = ContactLogRepository()
+        person = people.create("owner-a", PERSON_DATA)
+        logs.create(
+            "owner-a",
+            person.id,
+            {"channel": "CALL", "contacted_at": "2026-07-01T12:00:00+00:00"},
+        )
+        # Purging people can't reach a log whose person is gone, so one left
+        # behind by a failure here would turn up in every later test.
+        orphans = fs.collection("people").document(person.id).collection("contact_logs")
+        self.addCleanup(lambda: fs.delete_all(d.reference for d in orphans.stream()))
+        list_logs = CollectionReference.stream
+        raced = []
+
+        def stream_then_log(collection, *args, **kwargs):
+            found = list(list_logs(collection, *args, **kwargs))
+            if collection.id == "contact_logs" and not raced:
+                raced.append(
+                    logs.create(
+                        "owner-a",
+                        person.id,
+                        {"channel": "VIDEO", "contacted_at": "2026-07-02T12:00:00Z"},
+                    )
+                )
+            return iter(found)
+
+        with patch.object(CollectionReference, "stream", stream_then_log):
+            self.assertTrue(people.delete(person.id, "owner-a"))
+
+        self.assertIsNotNone(raced[0])
+        self.assertEqual(logs.list_for_owner("owner-a"), [])
+        self.assertIsNone(people.get_for_owner(person.id, "owner-a"))
+
+    def test_a_person_that_keeps_changing_is_contention_not_a_crash(self):
+        people = PersonRepository()
+        person = people.create("owner-a", PERSON_DATA)
+
+        with (
+            patch.object(
+                PersonRepository,
+                "_delete_with_logs",
+                side_effect=FailedPrecondition("changed"),
+            ) as delete,
+            self.assertRaises(fs.TransactionContention),
+        ):
+            people.delete(person.id, "owner-a")
+
+        self.assertEqual(delete.call_count, DELETE_ATTEMPTS)
+        self.assertIsNotNone(people.get_for_owner(person.id, "owner-a"))
 
 
 class ContactLogWriteTests(FirestoreTestMixin, SimpleTestCase):
