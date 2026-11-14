@@ -99,7 +99,7 @@ class PersonViewSet(viewsets.ViewSet):
         if current is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
         if any(k in payload for k in ADDRESS_FIELDS):
-            payload = self._apply_geocoding(payload)
+            payload = self._apply_geocoding(payload, current)
         photo = self._apply_upload(request, payload)
 
         try:
@@ -135,15 +135,19 @@ class PersonViewSet(viewsets.ViewSet):
             for k, v in payload.items()
         }
 
-    def _apply_geocoding(self, payload):
+    def _apply_geocoding(self, payload, current=None):
+        """Geocode the address the person will have: payload's address fields
+        over current's, the person as stored (None for a new person)."""
+        address = {f: getattr(current, f) for f in ADDRESS_FIELDS} if current else {}
+        address.update({f: payload[f] for f in ADDRESS_FIELDS if f in payload})
         # geocode_address raises Django's ValidationError, which DRF does not
         # translate, so it would otherwise surface as a 500.
         try:
             lat, lng, timezone = geocode_address(
-                payload.get("city", ""),
-                payload.get("state", ""),
-                payload.get("country", ""),
-                payload.get("street"),
+                address.get("city", ""),
+                address.get("state", ""),
+                address.get("country", ""),
+                address.get("street"),
             )
         except GeocodingUnavailable as exc:
             raise GeocoderUnavailable({"error": exc.messages[0]}) from exc

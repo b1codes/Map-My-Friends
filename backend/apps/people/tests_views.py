@@ -348,6 +348,22 @@ class PersonUpdateTests(PersonTestCase):
                 self.assertEqual((doc["lat"], doc["lng"]), (PARIS[0], PARIS[1]))
                 self.assertEqual(doc["timezone"], "Europe/Paris")
 
+    def test_patch_of_part_of_the_address_geocodes_it_whole(self, geocode):
+        # The fields the PATCH leaves out are still the person's address.
+        self.client.patch(self.url, {"street": "10 Downing St"}, format="json")
+        geocode.assert_called_once_with("London", "England", "UK", "10 Downing St")
+
+        geocode.reset_mock()
+        self.client.patch(self.url, {"city": "Westminster"}, format="json")
+        geocode.assert_called_once_with("Westminster", "England", "UK", "10 Downing St")
+
+    def test_patch_can_clear_part_of_the_address(self, geocode):
+        self.people.update(self.person.id, "owner-a", {"street": "10 Downing St"})
+
+        self.client.patch(self.url, {"street": None, "state": ""}, format="json")
+
+        geocode.assert_called_once_with("London", "", "UK", None)
+
     def test_patch_bumps_updated_at(self, _geocode):
         before = stored(self.person.id).to_dict()["updated_at"]
         self.client.patch(self.url, {"first_name": "Augusta"}, format="json")
