@@ -131,13 +131,26 @@ jobs:
           echo "::error::Indexes were still building after 30 minutes."
           exit 1
 
+      # What takes traffic now, as --to-revisions takes it (rev=100, or
+      # a=60,b=40 for a split), for the rollback. Only entries with traffic
+      # count: the list also holds tags at 0%, such as the candidate a failed
+      # release left on a revision that never served, and that can be first.
+      # One revision can appear twice (as latest and by name), so they're
+      # summed per revision.
       - name: Record the Serving Revision
         id: previous
         run: |
-          revision=$(gcloud run services describe "$SERVICE" --region "$REGION" \
-            --format='value(status.traffic[0].revisionName)')
+          revision=$(gcloud run services describe "$SERVICE" --region "$REGION" --format=json |
+            jq -r '[.status.traffic[]? | select((.percent // 0) > 0)]
+              | group_by(.revisionName)
+              | map("\(.[0].revisionName)=\(map(.percent) | add)")
+              | join(",")')
+          if [ -z "$revision" ]; then
+            echo "::error::Can't tell which revision of $SERVICE is serving, so a failed release couldn't be rolled back."
+            exit 1
+          fi
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
-          echo "Serving before this deploy: ${revision:-none}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Serving before this deploy: $revision" >> "$GITHUB_STEP_SUMMARY"
 
       # A new revision, reachable only at the candidate URL.
       - name: Deploy a Revision with No Traffic
@@ -167,7 +180,7 @@ jobs:
           PREVIOUS: ${{ steps.previous.outputs.revision }}
         run: |
           gcloud run services update-traffic "$SERVICE" --region "$REGION" \
-            --to-revisions "$PREVIOUS=100"
+            --to-revisions "$PREVIOUS"
           echo "::error::The live smoke test failed; traffic is back on $PREVIOUS."
 
       - name: Summary
