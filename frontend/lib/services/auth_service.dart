@@ -299,6 +299,36 @@ class AuthService {
     return _storage.read(key: _accessTokenKey);
   }
 
+  /// Marks a request already retried with a refreshed token.
+  static const String _retriedAfterRefresh = 'retriedAfterRefresh';
+
+  /// The 401 handling the API interceptors share: refresh the token and
+  /// retry the request on [dio], once.
+  ///
+  /// A retry that still gets a 401 signs out rather than refreshing again.
+  /// Otherwise a server that keeps issuing tokens it then refuses (a refresh
+  /// token minted before a claim change, say) turns every call into an
+  /// endless refresh-and-retry loop that rotates a token on each turn.
+  Future<void> retryUnauthorized(
+    DioException error,
+    ErrorInterceptorHandler handler,
+    Dio dio,
+  ) async {
+    final request = error.requestOptions;
+    if (error.response?.statusCode != 401) return handler.next(error);
+    if (request.extra[_retriedAfterRefresh] == true) {
+      await logout();
+      return handler.next(error);
+    }
+
+    final newToken = await refreshAccessToken();
+    if (newToken == null) return handler.next(error);
+
+    request.headers['Authorization'] = 'Bearer $newToken';
+    request.extra[_retriedAfterRefresh] = true;
+    return handler.resolve(await dio.fetch<dynamic>(request));
+  }
+
   // ============ Profile Methods ============
 
   /// Get the current user's profile

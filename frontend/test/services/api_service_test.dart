@@ -215,6 +215,46 @@ void main() {
       expect(await storedValues(), isEmpty);
     });
 
+    test('retries once after a refresh, and signs out if that still gets a '
+        '401', () async {
+      // A server that keeps issuing tokens it then refuses. Without a guard
+      // each 401 refreshes and retries again, forever; past a few rounds this
+      // answers 200 so a regression fails here instead of hanging.
+      var calls = 0;
+      api.on('GET', 'people/', (_) {
+        calls++;
+        return calls > 5
+            ? const FakeResponse(200, <Object>[])
+            : const FakeResponse(401, {'detail': 'still expired'});
+      });
+      var refreshes = 0;
+      authBackend.on('POST', 'user/auth/token/refresh/', (_) {
+        refreshes++;
+        return FakeResponse(200, {
+          'access': 'fresh$refreshes',
+          'refresh': 'ref$refreshes',
+        });
+      });
+
+      await expectLater(
+        service.getPeople(),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            allOf(
+              startsWith('Exception: Failed to load people: '),
+              contains('401'),
+            ),
+          ),
+        ),
+      );
+      expect(api.requests, hasLength(2));
+      expect(authHeaderOf(api.requests.last), 'Bearer fresh1');
+      expect(refreshes, 1);
+      expect(await storedValues(), isEmpty);
+    });
+
     test('does not try to refresh on non-401 errors', () async {
       api.reply('GET', 'trips/', 500);
 

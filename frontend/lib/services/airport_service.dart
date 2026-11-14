@@ -46,18 +46,9 @@ class AirportService {
           }
           return handler.next(options);
         },
-        onError: (error, handler) async {
-          if (error.response?.statusCode == 401) {
-            final newToken = await _authService.refreshAccessToken();
-            if (newToken != null) {
-              error.requestOptions.headers['Authorization'] =
-                  'Bearer $newToken';
-              final response = await _dio.fetch<dynamic>(error.requestOptions);
-              return handler.resolve(response);
-            }
-          }
-          return handler.next(error);
-        },
+        // On a 401, refresh the token and retry once.
+        onError: (error, handler) =>
+            _authService.retryUnauthorized(error, handler, _dio),
       ),
     );
   }

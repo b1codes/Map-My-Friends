@@ -183,6 +183,36 @@ void main() {
       },
     );
 
+    test('retries once after a refresh, and signs out if that still gets a '
+        '401', () async {
+      var calls = 0;
+      api.on('GET', 'airports/nearest/', (_) {
+        calls++;
+        return calls > 5
+            ? const FakeResponse(200, {
+                'type': 'FeatureCollection',
+                'features': <Object>[],
+              })
+            : const FakeResponse(401);
+      });
+      var refreshes = 0;
+      authBackend.on('POST', 'user/auth/token/refresh/', (_) {
+        refreshes++;
+        return FakeResponse(200, {
+          'access': 'fresh$refreshes',
+          'refresh': 'ref$refreshes',
+        });
+      });
+
+      await expectLater(
+        service.getNearestAirports(1, 2),
+        throwsA(exceptionStartingWith('Failed to load nearest airports: ')),
+      );
+      expect(api.requests, hasLength(2));
+      expect(refreshes, 1);
+      expect(await storedValues(), isEmpty);
+    });
+
     test('propagates the 401 when the refresh fails', () async {
       api.reply('GET', 'airports/nearest/', 401);
       authBackend.reply('POST', 'user/auth/token/refresh/', 401);
