@@ -20,7 +20,11 @@ ORIGIN = "https://app.example.test"
 
 
 class FakeApi:
-    """Answers like the real API; a test breaks one behaviour at a time."""
+    """Answers like the real API; a test breaks one behaviour at a time.
+
+    Like Cloud Run until GCIP, it can have several instances, each with its
+    own users (SQLite), taking requests in turn. Trips are shared (Firestore).
+    """
 
     def __init__(self):
         self.trips = {}
@@ -31,18 +35,38 @@ class FakeApi:
         self.delete_status = 204
         self.cors_origin = ORIGIN
         self.registered = []
+        self.instances = 1
+        self.users = {}  # instance -> {username: password}
+        self.standing = {"watcher": "pw"}  # on every instance
+        self.sign_in_broken = False
+        self.served = 0
 
     def handle(self, method, path, body, headers):
         self.requests.append((method, path))
+        instance = self.served % self.instances
+        self.served += 1
+        users = {**self.standing, **self.users.setdefault(instance, {})}
         if path == "/health":
             return self.health
         if path == "/api/user/auth/register/":
+            if body["username"] in users:
+                return 400, {"username": ["A user with that username already exists."]}
+            self.users[instance][body["username"]] = body["password"]
             self.registered.append(body["username"])
             return 201, {"username": body["username"]}
         if path == "/api/user/auth/token/":
-            return 200, {"access": "a-token", "refresh": "r-token"}
-        if headers.get("authorization") != "Bearer a-token" and method != "OPTIONS":
-            return 401, {"detail": "not signed in"}
+            if self.sign_in_broken or users.get(body["username"]) != body["password"]:
+                return 401, {
+                    "detail": "No active account found with the given credentials",
+                    "code": "no_active_account",
+                }
+            return 200, {"access": f"token:{body['username']}", "refresh": "r"}
+        auth = headers.get("authorization", "")
+        if method != "OPTIONS":
+            if not auth.startswith("Bearer token:"):
+                return 401, {"detail": "not signed in"}
+            if auth.removeprefix("Bearer token:") not in users:
+                return 401, {"detail": "User not found", "code": "user_not_found"}
         if path.startswith("/api/airports/nearest/"):
             return 200, {
                 "type": "FeatureCollection",
@@ -149,6 +173,54 @@ class SmokeTests(unittest.TestCase):
             ok, out = self.run_smoke()
 
         self.assertTrue(ok, out)
+        self.assertEqual(self.api.registered, [])
+
+    def test_passes_when_requests_land_on_instances_without_the_account(self):
+        # Each request goes to the next instance in turn, so the account
+        # registered on one is missing on the instance that signs in, and on
+        # some that serve the checks after. With two or four, a retry that
+        # registered once each time would stay in step with the rotation.
+        for instances in (2, 3, 4):
+            with self.subTest(instances=instances):
+                self.setUp()
+                self.api.instances = instances
+
+                ok, out = self.run_smoke()
+
+                self.assertTrue(ok, out)
+                self.assertEqual(self.api.trips, {})
+                self.assertEqual(len(set(self.api.registered)), 1, "one account")
+
+    def test_fails_when_sign_in_never_works_and_stops_retrying(self):
+        self.api.instances = 3
+        self.api.sign_in_broken = True
+
+        ok, out = self.run_smoke()
+
+        self.assertFalse(ok)
+        self.assertIn("FAIL  sign in", out)
+        # /health, registering, then each sign-in and at most two registrations.
+        self.assertLessEqual(len(self.api.requests), 2 + 3 * smoke.ATTEMPTS)
+
+    def test_fails_when_a_token_is_refused_for_another_reason(self):
+        smoke_client = smoke.Client(self.url, timeout=5)
+        smoke_client.token = "not-a-token"
+        smoke_client.account = {"username": "smoke-x", "password": "pw"}
+
+        response = smoke_client.request("GET", "/api/trips/")
+
+        self.assertEqual(response.status, 401)
+        self.assertEqual(self.api.registered, [], "re-registered for a bad token")
+
+    def test_a_standing_account_is_never_registered(self):
+        self.api.instances = 3
+        with mock.patch.dict(
+            os.environ, {"SMOKE_USERNAME": "watcher", "SMOKE_PASSWORD": "wrong"}
+        ):
+            ok, out = self.run_smoke()
+
+        self.assertFalse(ok)
+        self.assertIn("signing in", out)
         self.assertEqual(self.api.registered, [])
 
     def test_fails_when_health_does(self):

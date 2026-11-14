@@ -7,7 +7,11 @@ It walks the path every user takes, against a real deployment:
   2. Sign in: with SMOKE_USERNAME / SMOKE_PASSWORD if set, otherwise by
      registering a throwaway account first. Until the GCIP migration, users
      live in SQLite on the instance, so production can't keep a standing
-     smoke account; a new revision starts with none.
+     smoke account; a new revision starts with none. For the same reason a
+     throwaway account exists only on the instances it was registered on:
+     when a request lands on another (sign-in refused, or a token's user
+     "not found"), it's registered there too and the request retried, a
+     few times at most. Auth that's really broken still fails.
   3. A Firestore-free read: the nearest airport to Heathrow is LHR (the
      in-memory reference data loaded).
   4. A Firestore round trip: create a trip, find it in the list, delete it,
@@ -47,6 +51,12 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 
+# How many times one request is tried when the instance that answers doesn't
+# have the throwaway account. Production runs at most 3 instances
+# (infra/cloud_run.tf); each retry registers the account on whichever
+# instance answers, so it spreads to them all within a few.
+ATTEMPTS = 8
+
 
 class SmokeFailure(Exception):
     """A check failed. The message says which, and what was seen."""
@@ -70,17 +80,61 @@ class Client:
     base_url: str
     timeout: float = 20.0
     token: str | None = None
+    # The throwaway account's registration, once registered, to register it
+    # again on an instance that doesn't have it. None for a standing account.
+    account: dict | None = None
     # Sent with every request; the release sets nothing here, tests do.
     extra_headers: dict[str, str] = field(default_factory=dict)
 
     def request(self, method, path, body=None, headers=None) -> Response:
+        return self.retry_without_account(
+            lambda: self._send(method, path, body, headers), _user_not_found
+        )
+
+    def retry_without_account(self, send, missing) -> Response:
+        """send(), retried while missing(response) says the instance that
+        answered hasn't got the throwaway account, after registering it on
+        another. A standing account (self.account None) is never retried.
+
+        Every second retry registers twice, so the requests can't fall into
+        step with a fixed rotation of instances (always registering on one
+        that has the account, and retrying on one that hasn't).
+        """
+        response = send()
+        for attempt in range(1, ATTEMPTS):
+            if not (self.account and missing(response)):
+                break
+            self.register_here()
+            if attempt % 2 == 0:
+                self.register_here()
+            response = send()
+        return response
+
+    def register_here(self):
+        """Register the throwaway account on whichever instance answers.
+
+        The username already taken there is fine: it's this account.
+        """
+        response = self._send(
+            "POST", "/api/user/auth/register/", self.account, auth=False
+        )
+        if response.status == 201:
+            return
+        if response.status == 400 and "username" in _json_or_empty(response):
+            return
+        raise SmokeFailure(
+            "registering the throwaway account: expected 201, "
+            f"got {response.status}: {response.body[:300]!r}"
+        )
+
+    def _send(self, method, path, body=None, headers=None, auth=True) -> Response:
         url = self.base_url.rstrip("/") + path
         data = None
         all_headers = {"Accept": "application/json", **self.extra_headers}
         if body is not None:
             data = json.dumps(body).encode()
             all_headers["Content-Type"] = "application/json"
-        if self.token:
+        if self.token and auth:
             all_headers["Authorization"] = f"Bearer {self.token}"
         all_headers.update(headers or {})
         req = urllib.request.Request(url, data=data, method=method, headers=all_headers)
@@ -95,6 +149,22 @@ class Client:
 
 def _lower(headers) -> dict[str, str]:
     return {k.lower(): v for k, v in headers.items()}
+
+
+def _json_or_empty(response: Response) -> dict:
+    try:
+        body = json.loads(response.body)
+    except ValueError:
+        return {}
+    return body if isinstance(body, dict) else {}
+
+
+def _user_not_found(response: Response) -> bool:
+    """A valid token whose user isn't on the instance that answered."""
+    return (
+        response.status == 401
+        and _json_or_empty(response).get("code") == "user_not_found"
+    )
 
 
 def expect(response: Response, status: int, what: str) -> Response:
@@ -123,31 +193,27 @@ def check_sign_in(client, state):
         # the username (the similarity validator would refuse it).
         username = f"smoke-{secrets.token_hex(6)}"
         password = secrets.token_urlsafe(18)
+        account = {
+            "username": username,
+            "email": f"{username}@example.com",
+            "password": password,
+            "password_confirm": password,
+            "first_name": "Smoke",
+            "last_name": "Test",
+        }
         expect(
-            client.request(
-                "POST",
-                "/api/user/auth/register/",
-                {
-                    "username": username,
-                    "email": f"{username}@example.com",
-                    "password": password,
-                    "password_confirm": password,
-                    "first_name": "Smoke",
-                    "last_name": "Test",
-                },
-            ),
+            client.request("POST", "/api/user/auth/register/", account),
             201,
             "registering a throwaway account",
         )
-    tokens = expect(
-        client.request(
-            "POST",
-            "/api/user/auth/token/",
-            {"username": username, "password": password},
-        ),
-        200,
-        "signing in",
-    ).json()
+        client.account = account
+    credentials = {"username": username, "password": password}
+    # Refused (401) may mean the instance that answered hasn't the account.
+    response = client.retry_without_account(
+        lambda: client.request("POST", "/api/user/auth/token/", credentials),
+        lambda r: r.status == 401,
+    )
+    tokens = expect(response, 200, "signing in").json()
     if not tokens.get("access"):
         raise SmokeFailure("signing in returned no access token")
     client.token = tokens["access"]
