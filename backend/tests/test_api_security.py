@@ -1,15 +1,17 @@
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.common.testing import FirestoreTestMixin
+from apps.common.testing import FirestoreTestMixin, ThrottleIsolationMixin
 from apps.people.repositories import ContactLogRepository, PersonRepository
 from apps.trips.repositories import TripRepository
 
 
-class JWTAuthTests(APITestCase):
+class JWTAuthTests(ThrottleIsolationMixin, APITestCase):
     def setUp(self):
+        super().setUp()
         self.username = "testuser"
         self.password = "StrongPass123!"
         self.user = User.objects.create_user(
@@ -66,8 +68,9 @@ class JWTAuthTests(APITestCase):
         self.assertEqual(response.data["username"], self.username)
 
 
-class SecurityBehaviorTests(APITestCase):
+class SecurityBehaviorTests(ThrottleIsolationMixin, APITestCase):
     def setUp(self):
+        super().setUp()
         self.register_url = reverse("register")
         self.reset_url = reverse("password_reset")
 
@@ -93,8 +96,11 @@ class SecurityBehaviorTests(APITestCase):
 
     def test_registration_throttling(self):
         """Test that multiple registration attempts trigger throttling."""
-        # Note: In a real test environment, we might need to ensure the cache is used
-        # for throttling to work across requests.
+        # anon_burst allows 10 a minute, so the 11th attempt is the first 429.
+        # ThrottleIsolationMixin clears the cache-backed counters first, so
+        # earlier tests can't have spent any of the budget. Exact-limit and
+        # window behavior is covered in tests/test_throttling.py.
+        hit_429_at = None
         for i in range(15):
             payload = {
                 "username": f"throttleuser{i}",
@@ -104,13 +110,66 @@ class SecurityBehaviorTests(APITestCase):
             }
             response = self.client.post(self.register_url, payload)
             if response.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+                hit_429_at = i + 1
                 break
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        # Note: Throttling might be disabled in some test environments.
-        # If it doesn't hit, we'll log it but not necessarily fail the whole suite
-        # if the environment is known to disable it.
-        # For this task, we want to verify it works in a realistic setup.
-        # self.assertTrue(hit_429, "Throttling did not kick in after 15 attempts")
+        self.assertEqual(hit_429_at, 11, "Throttling did not kick in at attempt 11")
+
+
+class PasswordResetDisclosureTests(APITestCase):
+    """The reset request must not hand out what only the inbox owner may have.
+
+    It used to return the reset token and user_id to anyone who knew an
+    address, and /confirm/ takes exactly those two: a full account takeover
+    from an email alone.
+    """
+
+    def setUp(self):
+        # The reset endpoints are throttled, and DRF's counters live in the
+        # process-wide cache, so earlier tests could leave this one at a 429.
+        cache.clear()
+        self.reset_url = reverse("password_reset")
+        self.confirm_url = reverse("password_reset_confirm")
+        self.user = User.objects.create_user(
+            username="victim", email="victim@example.com", password="Original!234"
+        )
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_reset_request_does_not_return_the_token_or_user_id(self):
+        response = self.client.post(self.reset_url, {"email": "victim@example.com"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn("token", response.data)
+        self.assertNotIn("user_id", response.data)
+
+    def test_reset_response_is_the_same_whether_or_not_the_email_has_an_account(
+        self,
+    ):
+        known = self.client.post(self.reset_url, {"email": "victim@example.com"})
+        unknown = self.client.post(self.reset_url, {"email": "nobody@example.com"})
+
+        self.assertEqual(known.status_code, unknown.status_code)
+        self.assertEqual(known.data, unknown.data)
+
+    def test_reset_request_alone_cannot_change_the_password(self):
+        """The attack end to end: request, then confirm with what came back."""
+        response = self.client.post(self.reset_url, {"email": "victim@example.com"})
+        self.client.post(
+            self.confirm_url,
+            {
+                "token": response.data.get("token", ""),
+                "user_id": response.data.get("user_id", ""),
+                "password": "Attacker!9876",
+                "password_confirm": "Attacker!9876",
+            },
+        )
+
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("Original!234"))
+        self.assertFalse(self.user.check_password("Attacker!9876"))
 
 
 class APIPermissionTests(FirestoreTestMixin, APITestCase):

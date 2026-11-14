@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -20,6 +23,7 @@ import '../../components/shared/thermal_response.dart';
 import '../../components/shared/glass_surfaces.dart';
 import '../../components/shared/glass_header.dart';
 import '../../components/shared/thermal_button.dart';
+import '../../utils/initials.dart';
 
 class PersonDetailsScreen extends StatelessWidget {
   final String personId;
@@ -61,7 +65,7 @@ class PersonDetailsScreen extends StatelessWidget {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
+                    MaterialPageRoute<void>(
                       builder: (context) => AddEditPersonScreen(person: person),
                     ),
                   );
@@ -86,7 +90,22 @@ class PersonDetailsScreen extends StatelessWidget {
                     tone: ThermalButtonTone.danger,
                   );
                   if (!confirmed) return;
-                  peopleBloc.add(DeletePerson(person.id));
+                  // Leave only once they're gone; if the delete fails,
+                  // stay, so the person is still there to try again.
+                  final deleted = Completer<void>();
+                  peopleBloc.add(DeletePerson(person.id, done: deleted));
+                  try {
+                    await deleted.future;
+                  } catch (_) {
+                    if (!context.mounted) return;
+                    GlassToast.show(
+                      context,
+                      "Couldn't delete ${person.firstName}. Check your "
+                      'connection and try again.',
+                      tone: ToastTone.failure,
+                    );
+                    return;
+                  }
                   navigator.pop();
                 },
               ),
@@ -156,7 +175,7 @@ class PersonDetailsScreen extends StatelessWidget {
     if (person.timezone != null && person.timezone!.isNotEmpty) {
       try {
         final location = tz.getLocation(person.timezone!);
-        final now = tz.TZDateTime.now(location);
+        final now = tz.TZDateTime.from(clock.now(), location);
         timeString = DateFormat.jm().format(now);
       } catch (_) {}
     }
@@ -314,10 +333,7 @@ class PersonDetailsScreen extends StatelessWidget {
   }
 
   String _getInitials(Person person) {
-    String initials = '';
-    if (person.firstName.isNotEmpty) initials += person.firstName[0];
-    if (person.lastName.isNotEmpty) initials += person.lastName[0];
-    return initials;
+    return initialsOf(person.firstName, person.lastName);
   }
 
   Widget _buildSectionTitle(BuildContext context, String title) {

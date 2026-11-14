@@ -223,7 +223,228 @@ void main() {
         expect: () => [
           const Unauthenticated(message: 'You have been logged out.'),
         ],
+        verify: (_) => verify(() => authService.logout()).called(1),
       );
+    });
+
+    group('CheckAuthStatus (username)', () {
+      blocTest<AuthBloc, AuthState>(
+        'passes through the stored username, even when empty',
+        build: () {
+          when(() => authService.getStoredTokens()).thenAnswer(
+            (_) async => {'access': 'a', 'refresh': 'r', 'username': ''},
+          );
+          return authBloc;
+        },
+        act: (bloc) => bloc.add(CheckAuthStatus()),
+        expect: () => [
+          AuthLoading(),
+          const Authenticated(
+            accessToken: 'a',
+            refreshToken: 'r',
+            username: '',
+          ),
+        ],
+      );
+    });
+
+    group('RegisterRequested (optional fields)', () {
+      blocTest<AuthBloc, AuthState>(
+        'forwards names and the honeypot field to the service',
+        build: () {
+          when(
+            () => authService.register(
+              username: any(named: 'username'),
+              email: any(named: 'email'),
+              password: any(named: 'password'),
+              passwordConfirm: any(named: 'passwordConfirm'),
+              firstName: any(named: 'firstName'),
+              lastName: any(named: 'lastName'),
+              firstNameHp: any(named: 'firstNameHp'),
+            ),
+          ).thenAnswer((_) async {});
+          return authBloc;
+        },
+        act: (bloc) => bloc.add(
+          const RegisterRequested(
+            username: 'u',
+            email: 'e@x.com',
+            password: 'p',
+            passwordConfirm: 'p',
+            firstName: 'First',
+            lastName: 'Last',
+            firstNameHp: 'bot',
+          ),
+        ),
+        expect: () => [AuthLoading(), const RegistrationSuccess()],
+        verify: (_) {
+          verify(
+            () => authService.register(
+              username: 'u',
+              email: 'e@x.com',
+              password: 'p',
+              passwordConfirm: 'p',
+              firstName: 'First',
+              lastName: 'Last',
+              firstNameHp: 'bot',
+            ),
+          ).called(1);
+        },
+      );
+
+      test('RegistrationSuccess carries the default prompt', () {
+        expect(
+          const RegistrationSuccess().message,
+          'Registration successful! Please login.',
+        );
+      });
+    });
+
+    group('PasswordResetRequested', () {
+      blocTest<AuthBloc, AuthState>(
+        'emits a neutral confirmation that does not reveal the account',
+        build: () {
+          when(
+            () => authService.requestPasswordReset('a@b.com'),
+          ).thenAnswer((_) async {});
+          return authBloc;
+        },
+        act: (bloc) => bloc.add(const PasswordResetRequested(email: 'a@b.com')),
+        expect: () => [
+          AuthLoading(),
+          const PasswordResetSent(
+            message:
+                'If an account exists with this email, a password reset '
+                'link has been sent.',
+          ),
+        ],
+        verify: (_) =>
+            verify(() => authService.requestPasswordReset('a@b.com')).called(1),
+      );
+
+      blocTest<AuthBloc, AuthState>(
+        'emits AuthError without the "Exception: " prefix on failure',
+        build: () {
+          when(
+            () => authService.requestPasswordReset(any()),
+          ).thenThrow(Exception('Too many requests'));
+          return authBloc;
+        },
+        act: (bloc) => bloc.add(const PasswordResetRequested(email: 'a@b.com')),
+        expect: () => [
+          AuthLoading(),
+          const AuthError(message: 'Too many requests'),
+        ],
+      );
+    });
+
+    group('Auth0LoginRequested', () {
+      blocTest<AuthBloc, AuthState>(
+        'signs in through the requested connection',
+        build: () {
+          when(
+            () => authService.loginWithAuth0(
+              connection: any(named: 'connection'),
+            ),
+          ).thenAnswer(
+            (_) async => {
+              'access': 'auth0_access',
+              'refresh': 'auth0_refresh',
+              'username': 'social',
+            },
+          );
+          return authBloc;
+        },
+        act: (bloc) =>
+            bloc.add(const Auth0LoginRequested(connection: 'google-oauth2')),
+        expect: () => [
+          AuthLoading(),
+          const Authenticated(
+            accessToken: 'auth0_access',
+            refreshToken: 'auth0_refresh',
+            username: 'social',
+          ),
+        ],
+        verify: (_) => verify(
+          () => authService.loginWithAuth0(connection: 'google-oauth2'),
+        ).called(1),
+      );
+
+      blocTest<AuthBloc, AuthState>(
+        'uses the default connection when none is given',
+        build: () {
+          when(
+            () => authService.loginWithAuth0(
+              connection: any(named: 'connection'),
+            ),
+          ).thenAnswer((_) async => {'access': 'a', 'refresh': 'r'});
+          return authBloc;
+        },
+        act: (bloc) => bloc.add(const Auth0LoginRequested()),
+        expect: () => [
+          AuthLoading(),
+          const Authenticated(accessToken: 'a', refreshToken: 'r'),
+        ],
+        verify: (_) => verify(
+          () => authService.loginWithAuth0(connection: null),
+        ).called(1),
+      );
+
+      blocTest<AuthBloc, AuthState>(
+        'emits AuthError when the user cancels or Auth0 fails',
+        build: () {
+          when(
+            () => authService.loginWithAuth0(
+              connection: any(named: 'connection'),
+            ),
+          ).thenThrow(Exception('Login cancelled'));
+          return authBloc;
+        },
+        act: (bloc) => bloc.add(const Auth0LoginRequested()),
+        expect: () => [
+          AuthLoading(),
+          const AuthError(message: 'Login cancelled'),
+        ],
+      );
+    });
+
+    test('auth events have value equality', () {
+      expect(
+        const LoginRequested(username: 'u', password: 'p'),
+        const LoginRequested(username: 'u', password: 'p'),
+      );
+      expect(
+        const LoginRequested(username: 'u', password: 'p'),
+        isNot(const LoginRequested(username: 'u', password: 'q')),
+      );
+      expect(
+        const RegisterRequested(
+          username: 'u',
+          email: 'e',
+          password: 'p',
+          passwordConfirm: 'p',
+        ),
+        isNot(
+          const RegisterRequested(
+            username: 'u',
+            email: 'e',
+            password: 'p',
+            passwordConfirm: 'p',
+            firstNameHp: 'bot',
+          ),
+        ),
+      );
+      expect(
+        const PasswordResetRequested(email: 'a'),
+        const PasswordResetRequested(email: 'a'),
+      );
+      expect(
+        const Auth0LoginRequested(connection: 'apple'),
+        isNot(const Auth0LoginRequested()),
+      );
+      expect(const DevLoginRequested(), const DevLoginRequested());
+      expect(CheckAuthStatus(), CheckAuthStatus());
+      expect(LogoutRequested(), LogoutRequested());
     });
   });
 }

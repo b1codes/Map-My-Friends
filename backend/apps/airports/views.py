@@ -3,6 +3,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.common.geo import parse_lat_lon
+
 from . import reference
 from .serializers import AirportSerializer
 
@@ -20,15 +22,11 @@ class NearestAirportsView(APIView):
 
     def get(self, request):
         try:
-            lat = float(request.query_params.get("lat"))
-            lon = float(request.query_params.get("lon"))
-        except (TypeError, ValueError):
-            return Response(
-                {
-                    "error": "lat and lon query parameters are required and must be numbers."
-                },
-                status=status.HTTP_400_BAD_REQUEST,
+            lat, lon = parse_lat_lon(
+                request.query_params.get("lat"), request.query_params.get("lon")
             )
+        except ValueError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             count = int(request.query_params.get("count", 3))

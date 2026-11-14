@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/pin_color.dart';
 
 class CustomMapMarker extends StatelessWidget {
   final String pinColorHex;
@@ -24,13 +25,7 @@ class CustomMapMarker extends StatelessWidget {
     this.semanticsLabel,
   });
 
-  Color _parseColor(String hexColor) {
-    String hex = hexColor.replaceAll('#', '');
-    if (hex.length == 6) {
-      hex = 'FF$hex'; // Add alpha if missing
-    }
-    return Color(int.parse('0x$hex'));
-  }
+  Color _parseColor(String hexColor) => parsePinColor(hexColor);
 
   Widget _buildInnerContent() {
     switch (pinIconType) {

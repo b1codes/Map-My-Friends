@@ -1,16 +1,8 @@
-@Tags(['golden'])
-library;
-
-// Golden images only match the platform that generated them: text
-// antialiasing differs between macOS and Linux, which shows up here as a
-// sub-4% pixel diff with identical layout. These are tagged so CI skips them
-// (`flutter test --exclude-tags golden`) and they stay useful locally, where
-// they are the check on what the UI actually looks like.
-
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golden_harness/golden_harness.dart';
 import 'package:map_my_friends/bloc/pulse/pulse_bloc.dart';
 import 'package:map_my_friends/models/contact_log.dart';
 import 'package:map_my_friends/models/person.dart';
@@ -43,18 +35,7 @@ Person _p(
 }
 
 void main() {
-  setUpAll(() {
-    // Render offline: the real theme, a local typeface. See
-    // AppTheme.textThemeBuilder for why this seam exists.
-    AppTheme.textThemeBuilder = (color) => Typography.material2021().black
-        .apply(bodyColor: color, displayColor: color);
-    AppTheme.resetThemeCache();
-  });
-
-  tearDownAll(() {
-    AppTheme.textThemeBuilder = AppTheme.buildBrandTextTheme;
-    AppTheme.resetThemeCache();
-  });
+  setUpGoldens();
 
   final now = DateTime(2026, 7, 22);
 
@@ -117,22 +98,11 @@ void main() {
     return PulseLoaded(people: people, logs: logs);
   }
 
-  // The real theme, with GoogleFonts fetching disabled so the golden renders
-  // offline in the fallback face. Everything these goldens exist to check --
-  // the glass material, the Ambient Field behind it, spacing, and the thermal
-  // recency colours -- comes from AppTheme itself; only the typeface differs
-  // from production.
-  ThemeData testTheme(Brightness brightness) {
-    return brightness == Brightness.dark
-        ? AppTheme.darkTheme
-        : AppTheme.lightTheme;
-  }
-
   Widget harness(PulseBloc bloc, {required Brightness brightness}) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: testTheme(Brightness.light),
-      darkTheme: testTheme(Brightness.dark),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
       themeMode: brightness == Brightness.dark
           ? ThemeMode.dark
           : ThemeMode.light,
@@ -163,7 +133,7 @@ void main() {
     );
   }
 
-  testWidgets('Pulse screen — mobile light', (tester) async {
+  goldenTest('Pulse screen — mobile light', now: now, (tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -179,13 +149,14 @@ void main() {
     await tester.pumpWidget(harness(bloc, brightness: Brightness.light));
     await tester.pumpAndSettle();
 
-    await expectLater(
+    await expectGolden(
+      tester,
       find.byType(PulseScreen),
-      matchesGoldenFile('goldens/pulse_mobile_light.png'),
+      'goldens/pulse_mobile_light.png',
     );
   });
 
-  testWidgets('Pulse screen — mobile dark', (tester) async {
+  goldenTest('Pulse screen — mobile dark', now: now, (tester) async {
     tester.view.physicalSize = const Size(390 * 3, 844 * 3);
     tester.view.devicePixelRatio = 3.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -201,9 +172,10 @@ void main() {
     await tester.pumpWidget(harness(bloc, brightness: Brightness.dark));
     await tester.pumpAndSettle();
 
-    await expectLater(
+    await expectGolden(
+      tester,
       find.byType(PulseScreen),
-      matchesGoldenFile('goldens/pulse_mobile_dark.png'),
+      'goldens/pulse_mobile_dark.png',
     );
   });
 }

@@ -4,6 +4,7 @@ import '../../models/person.dart';
 import '../../utils/contact_recency.dart';
 import '../shared/thermal_response.dart';
 import '../../utils/app_theme.dart';
+import '../../utils/initials.dart';
 
 /// A single row in the Keep-in-Touch roster: avatar with a thermal status orb,
 /// the person's name in a contrast-safe recency ink, a status chip, the last
@@ -22,9 +23,7 @@ class ContactRosterTile extends StatelessWidget {
   });
 
   String get _initials {
-    final f = person.firstName.isNotEmpty ? person.firstName[0] : '';
-    final l = person.lastName.isNotEmpty ? person.lastName[0] : '';
-    final joined = '$f$l'.trim();
+    final joined = initialsOf(person.firstName, person.lastName);
     return joined.isEmpty ? '?' : joined.toUpperCase();
   }
 

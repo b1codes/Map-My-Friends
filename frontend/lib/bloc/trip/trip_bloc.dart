@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:latlong2/latlong.dart';
 import '../../models/trip.dart';
@@ -27,6 +28,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     on<ClearTrip>(_onClearTrip);
     on<OptimizeTrip>(_onOptimizeTrip);
     on<SaveTrip>(_onSaveTrip);
+    on<UpdateTripStatus>(_onUpdateTripStatus);
     on<UpdateLegDetails>(_onUpdateLegDetails);
     on<FetchUserTrips>(_onFetchUserTrips);
     on<LoadTrip>(_onLoadTrip);
@@ -37,8 +39,8 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     if (event.person.latitude == null || event.person.longitude == null) return;
 
     // Auto-fill hub if available
-    Airport? preferredAirport = event.person.preferredAirport;
-    Station? preferredStation = event.person.preferredStation;
+    final Airport? preferredAirport = event.person.preferredAirport;
+    final Station? preferredStation = event.person.preferredStation;
 
     LatLng location = LatLng(event.person.latitude!, event.person.longitude!);
     if (preferredAirport != null) {
@@ -147,7 +149,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
     ReorderStops event,
     Emitter<TripState> emit,
   ) async {
-    var newStops = List<TripStop>.from(state.stops);
+    final newStops = List<TripStop>.from(state.stops);
     int newIndex = event.newIndex;
     if (event.oldIndex < newIndex) newIndex -= 1;
     final item = newStops.removeAt(event.oldIndex);
@@ -217,7 +219,7 @@ class TripBloc extends Bloc<TripEvent, TripState> {
       final tripToSave = Trip(
         id: state.currentTripId,
         name: event.name,
-        date: event.startDate ?? DateTime.now(),
+        date: event.startDate ?? clock.now(),
         startDate: event.startDate,
         endDate: event.endDate,
         status: event.status,
@@ -240,6 +242,23 @@ class TripBloc extends Bloc<TripEvent, TripState> {
           legs: savedTrip.legs,
         ),
       );
+      add(const FetchUserTrips());
+    } catch (e) {
+      emit(state.copyWith(isLoading: false, error: e.toString()));
+    }
+  }
+
+  Future<void> _onUpdateTripStatus(
+    UpdateTripStatus event,
+    Emitter<TripState> emit,
+  ) async {
+    emit(state.copyWith(isLoading: true, clearError: true));
+    try {
+      final id = event.trip.id;
+      if (id == null) throw Exception('Trip ID is required for update');
+      // Status only: the whole trip would replace its stops and legs, and
+      // with them the legs' booking details and the stops' snapshots.
+      await _apiService.updateTripStatus(id, event.status);
       add(const FetchUserTrips());
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString()));

@@ -35,8 +35,20 @@ class UserProfileRecord:
 _EDITABLE = {f.name for f in fields(UserProfileRecord)} - {"owner_key"}
 
 
+class UnstorableOwnerKey(ValueError):
+    """The owner key can't name a Firestore document.
+
+    The key is the username, and Django's username validator allows ".",
+    ".." and "__x__", which Firestore refuses as document ids. Sign-up and
+    the Auth0 backend refuse such names, but an older account, an admin or a
+    shell can still hold one, and its profile can't be read or written.
+    """
+
+
 class UserProfileRepository:
     def _document(self, owner_key: str):
+        if not fs.is_valid_doc_id(owner_key):
+            raise UnstorableOwnerKey(owner_key)
         return fs.collection(USER_PROFILES).document(owner_key)
 
     def _hydrate(self, owner_key: str, data: dict) -> UserProfileRecord:
@@ -57,8 +69,21 @@ class UserProfileRepository:
         ref.set(payload)
         return record
 
-    def update(self, owner_key: str, data: dict) -> UserProfileRecord:
-        self.get_or_create(owner_key)
+    def update(
+        self,
+        owner_key: str,
+        data: dict,
+        current: UserProfileRecord | None = None,
+    ) -> UserProfileRecord:
+        """Apply data to the profile, and return it as it is afterwards.
+
+        current is the profile as get_or_create returned it, which saves
+        reading (or creating) it again.
+        """
+        if current is None:
+            self.get_or_create(owner_key)
+        elif current.owner_key != owner_key:
+            raise ValueError("current is not this owner's profile")
         payload = {k: v for k, v in data.items() if k in _EDITABLE}
         ref = self._document(owner_key)
         # Firestore raises "Cannot update with an empty document" rather than

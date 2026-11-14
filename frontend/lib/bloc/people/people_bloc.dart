@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
@@ -33,68 +34,85 @@ class PeopleBloc extends Bloc<PeopleEvent, PeopleState> {
     }
   }
 
+  // Each write applies its result to the list as it is when the API
+  // answers, not as it was when the request left: the bloc handles events
+  // concurrently, so two quick saves would otherwise each write back a list
+  // without the other's person.
+  //
+  // A failed write leaves the list alone and reports through the event's
+  // `done`. It used to replace the whole list with PeopleError, a dead end
+  // with no retry until the app restarted, and the form that asked had
+  // already closed with its input.
+
   Future<void> _onAddPerson(AddPerson event, Emitter<PeopleState> emit) async {
-    final currentState = state;
-    if (currentState is PeopleLoaded) {
-      try {
-        final newPerson = await _apiService.addPerson(
-          event.person,
-          profileImage: event.profileImage,
-          imageBytes: event.imageBytes,
-        );
-        final updatedList = List<Person>.from(currentState.people)
-          ..add(newPerson);
-        emit(PeopleLoaded(updatedList));
-      } catch (e) {
-        emit(PeopleError(e.toString()));
-        // Re-emit loaded state to allow retry without full reload?
-        // Or handle specific error state for operations.
-        // For simplicity, just error for now. A better approach would be separate status.
+    await _write(event, () async {
+      final newPerson = await _apiService.addPerson(
+        event.person,
+        profileImage: event.profileImage,
+        imageBytes: event.imageBytes,
+        idempotencyKey: event.idempotencyKey,
+      );
+      final current = state;
+      if (current is PeopleLoaded) {
+        emit(PeopleLoaded([...current.people, newPerson]));
+      } else {
+        // Saved before the list arrived (or after it failed to): load it,
+        // new person included.
+        add(LoadPeople());
       }
-    } else {
-      // If not loaded yet, just try to load? Or add blind?
-      // Let's assume user is on a screen where load happened.
-      emit(PeopleError("Cannot add person before loading list"));
-    }
+    });
   }
 
   Future<void> _onUpdatePerson(
     UpdatePerson event,
     Emitter<PeopleState> emit,
   ) async {
-    final currentState = state;
-    if (currentState is PeopleLoaded) {
-      try {
-        final updatedPerson = await _apiService.updatePerson(
-          event.person,
-          profileImage: event.profileImage,
-          imageBytes: event.imageBytes,
+    await _write(event, () async {
+      final updatedPerson = await _apiService.updatePerson(
+        event.person,
+        profileImage: event.profileImage,
+        imageBytes: event.imageBytes,
+      );
+      final current = state;
+      if (current is PeopleLoaded) {
+        emit(
+          PeopleLoaded([
+            for (final p in current.people)
+              p.id == updatedPerson.id ? updatedPerson : p,
+          ]),
         );
-        final updatedList = currentState.people.map((p) {
-          return p.id == updatedPerson.id ? updatedPerson : p;
-        }).toList();
-        emit(PeopleLoaded(updatedList));
-      } catch (e) {
-        emit(PeopleError(e.toString()));
+      } else {
+        add(LoadPeople());
       }
-    }
+    });
   }
 
   Future<void> _onDeletePerson(
     DeletePerson event,
     Emitter<PeopleState> emit,
   ) async {
-    final currentState = state;
-    if (currentState is PeopleLoaded) {
-      try {
-        await _apiService.deletePerson(event.id);
-        final updatedList = currentState.people
-            .where((p) => p.id != event.id)
-            .toList();
-        emit(PeopleLoaded(updatedList));
-      } catch (e) {
-        emit(PeopleError(e.toString()));
+    await _write(event, () async {
+      await _apiService.deletePerson(event.id);
+      final current = state;
+      if (current is PeopleLoaded) {
+        emit(
+          PeopleLoaded([
+            for (final p in current.people)
+              if (p.id != event.id) p,
+          ]),
+        );
+      } else {
+        add(LoadPeople());
       }
+    });
+  }
+
+  Future<void> _write(PersonWrite event, Future<void> Function() run) async {
+    try {
+      await run();
+      event.done?.complete();
+    } catch (e, stack) {
+      event.done?.completeError(e, stack);
     }
   }
 }

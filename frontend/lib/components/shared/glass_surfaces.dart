@@ -90,49 +90,54 @@ class GlassSheet extends StatelessWidget {
       isScrollControlled: false,
       builder: (context) {
         final theme = Theme.of(context);
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            if (title != null) ...<Widget>[
-              Text(title, style: theme.textTheme.titleMedium),
-              const SizedBox(height: MapSpacing.sm),
-            ],
-            for (final action in actions)
-              Padding(
-                padding: const EdgeInsets.only(bottom: MapSpacing.xs),
-                child: ThermalResponse(
-                  borderRadius: MapGlass.radiusSm,
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    action.onTap();
-                  },
-                  child: GlassInlay(
+        // A sheet that isn't scroll-controlled gets at most 9/16 of the
+        // window: about 220 px on a phone in landscape, less than a title
+        // and three choices need. Scrolling keeps the last ones reachable.
+        return SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              if (title != null) ...<Widget>[
+                Text(title, style: theme.textTheme.titleMedium),
+                const SizedBox(height: MapSpacing.sm),
+              ],
+              for (final action in actions)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: MapSpacing.xs),
+                  child: ThermalResponse(
                     borderRadius: MapGlass.radiusSm,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: MapSpacing.sm,
-                      vertical: 14,
-                    ),
-                    child: Row(
-                      children: <Widget>[
-                        Icon(
-                          action.icon,
-                          size: 20,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                        const SizedBox(width: MapSpacing.sm),
-                        Expanded(
-                          child: Text(
-                            action.label,
-                            style: theme.textTheme.titleSmall,
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      action.onTap();
+                    },
+                    child: GlassInlay(
+                      borderRadius: MapGlass.radiusSm,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: MapSpacing.sm,
+                        vertical: 14,
+                      ),
+                      child: Row(
+                        children: <Widget>[
+                          Icon(
+                            action.icon,
+                            size: 20,
+                            color: theme.colorScheme.onSurface,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: MapSpacing.sm),
+                          Expanded(
+                            child: Text(
+                              action.label,
+                              style: theme.textTheme.titleSmall,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -381,58 +386,63 @@ class GlassToast {
               child: Row(
                 children: <Widget>[
                   Container(width: 3, color: accent),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      MapSpacing.sm,
-                      14,
-                      MapSpacing.sm,
-                      14,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        if (leading != null) ...<Widget>[
-                          Icon(leading, size: 18, color: accent),
-                          const SizedBox(width: MapSpacing.xs),
-                        ],
-                        Flexible(
-                          child: Text(
-                            message,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                        ),
-                        if (actionLabel != null &&
-                            onAction != null) ...<Widget>[
-                          const SizedBox(width: MapSpacing.sm),
-                          // The follow-up offer lives inside the panel and
-                          // reads in the accent, so the message stays one
-                          // object rather than a notice with a button bolted
-                          // to its edge.
-                          TextButton(
-                            onPressed: () {
-                              messenger.hideCurrentSnackBar();
-                              onAction();
-                            },
-                            style: TextButton.styleFrom(
-                              foregroundColor: accent,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: MapSpacing.xs,
-                              ),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
+                  // Expanded, so the message gets the panel's width and
+                  // wraps. Without it the Flexible text below had unbounded
+                  // width, and a long toast ran off the screen instead.
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        MapSpacing.sm,
+                        14,
+                        MapSpacing.sm,
+                        14,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          if (leading != null) ...<Widget>[
+                            Icon(leading, size: 18, color: accent),
+                            const SizedBox(width: MapSpacing.xs),
+                          ],
+                          Flexible(
                             child: Text(
-                              actionLabel,
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: accent,
-                                fontWeight: FontWeight.w600,
+                              message,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface,
                               ),
                             ),
                           ),
+                          if (actionLabel != null &&
+                              onAction != null) ...<Widget>[
+                            const SizedBox(width: MapSpacing.sm),
+                            // The follow-up offer lives inside the panel and
+                            // reads in the accent, so the message stays one
+                            // object rather than a notice with a button bolted
+                            // to its edge.
+                            TextButton(
+                              onPressed: () {
+                                messenger.hideCurrentSnackBar();
+                                onAction();
+                              },
+                              style: TextButton.styleFrom(
+                                foregroundColor: accent,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: MapSpacing.xs,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                actionLabel,
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                  color: accent,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ],

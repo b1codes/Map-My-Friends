@@ -1,0 +1,23 @@
+{
+  "description": "Create an account. The honeypot field (first_name_hp) is only sent when a bot fills it in, so it is absent here.",
+  "consumer": "AuthService.register",
+  "provider_state": "anonymous",
+  "request": {
+    "method": "POST",
+    "path": "user/auth/register/",
+    "auth": "none",
+    "json": {
+      "username": "ada",
+      "email": "ada@example.com",
+      "password": "Analytical-Engine-1843",
+      "password_confirm": "Analytical-Engine-1843",
+      "first_name": "Ada",
+      "last_name": "Lovelace"
+    }
+  },
+  "response": {
+    "status": 201,
+    "schema": "RegisteredUser",
+    "example": { "username": "ada", "email": "ada@example.com", "first_name": "Ada", "last_name": "Lovelace" }
+  }
+}

@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from apps.airports import reference as airport_reference
 from apps.airports.serializers import AirportSerializer
+from apps.common.fields import PinColorField
 from apps.common.serializers import GeoFeatureSerializer
 from apps.stations import reference as station_reference
 from apps.stations.serializers import StationSerializer
@@ -50,7 +51,7 @@ class PersonSerializer(GeoFeatureSerializer):
     lat = serializers.FloatField(read_only=True)
     lng = serializers.FloatField(read_only=True)
     timezone = serializers.CharField(read_only=True, allow_null=True)
-    pin_color = serializers.CharField(max_length=20, required=False)
+    pin_color = PinColorField(required=False)
     pin_style = serializers.ChoiceField(choices=PIN_STYLE_CHOICES, required=False)
     pin_icon_type = serializers.ChoiceField(
         choices=PIN_ICON_TYPE_CHOICES, required=False

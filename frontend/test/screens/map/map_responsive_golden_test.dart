@@ -1,16 +1,11 @@
-@Tags(['golden'])
-library;
-
-// Golden images only match the platform that generated them: text
-// antialiasing differs between macOS and Linux, which shows up here as a
-// sub-4% pixel diff with identical layout. These are tagged so CI skips them
-// (`flutter test --exclude-tags golden`) and they stay useful locally, where
-// they are the check on what the UI actually looks like.
+// The Map screen's chrome at phone and tablet width. Tiles load from the
+// network, which tests can't reach, so the map itself is blank.
 
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:golden_harness/golden_harness.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:map_my_friends/bloc/airport/airport_bloc.dart';
 import 'package:map_my_friends/bloc/airport/airport_event.dart';
@@ -43,6 +38,8 @@ class MockStationBloc extends Mock implements StationBloc {}
 class MockTripBloc extends Mock implements TripBloc {}
 
 void main() {
+  setUpGoldens();
+
   late LocationBloc locationBloc;
   late PeopleBloc peopleBloc;
   late MapSettingsCubit mapSettingsCubit;
@@ -130,29 +127,33 @@ void main() {
     );
   }
 
-  testWidgets('MapScreen Golden Test - Mobile', (tester) async {
+  goldenTest('MapScreen Golden Test - Mobile', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
 
     await tester.pumpWidget(createWidgetUnderTest());
     await tester.pumpAndSettle();
 
-    await expectLater(
+    await expectGolden(
+      tester,
       find.byType(MapScreen),
-      matchesGoldenFile('goldens/map_screen_mobile.png'),
+      'goldens/map_screen_mobile.png',
     );
   });
 
-  testWidgets('MapScreen Golden Test - Tablet', (tester) async {
+  goldenTest('MapScreen Golden Test - Tablet', (tester) async {
     tester.view.physicalSize = const Size(820, 1180);
     tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
 
     await tester.pumpWidget(createWidgetUnderTest());
     await tester.pumpAndSettle();
 
-    await expectLater(
+    await expectGolden(
+      tester,
       find.byType(MapScreen),
-      matchesGoldenFile('goldens/map_screen_tablet.png'),
+      'goldens/map_screen_tablet.png',
     );
   });
 }

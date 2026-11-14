@@ -10,6 +10,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Every job only reads the repository.
+permissions:
+  contents: read
+
 jobs:
   # -----------------------------------------------------------------
   # BACKEND VALIDATION
@@ -26,14 +30,18 @@ jobs:
         with:
           python-version: '3.12'
 
+      # The version comes from `required-version` in backend/pyproject.toml,
+      # which also stops a different local Ruff from running.
       - name: Install Ruff
-        run: pip install ruff
+        run: |
+          version=$(python -c "import tomllib; print(tomllib.load(open('backend/pyproject.toml', 'rb'))['tool']['ruff']['required-version'])")
+          pip install "ruff${version}"
 
       - name: Run Ruff Format Check
-        run: ruff format --check backend/
+        run: ruff format --check backend/ smoke/
 
       - name: Run Ruff Lint Check
-        run: ruff check backend/
+        run: ruff check backend/ smoke/
 
   test-backend:
     name: Test Backend
@@ -72,9 +80,42 @@ jobs:
         run: |
           docker compose exec -T api python manage.py migrate
 
+      # In random order, so a test that only passes after another one fails
+      # here. The log prints the seed; rerun locally with --shuffle <seed>.
       - name: Run Django Tests
         run: |
-          docker compose exec -T api python manage.py test
+          docker compose exec -T api coverage run manage.py test --shuffle
+
+      # Fails below fail_under in backend/pyproject.toml ([tool.coverage.report]).
+      - name: Check Coverage Gate
+        run: |
+          docker compose exec -T api coverage report
+
+      # The ZAP scan (nightly, security.yml) attacks the routes its OpenAPI
+      # document lists. This fails when a route is added or removed without
+      # the contracts or .zap/extra-operations.json following, so a new
+      # endpoint can't silently go unscanned. Here because it needs Django,
+      # and this job already has the API running.
+      - name: Check the DAST Scan Covers Every Route
+        run: make check-dast-routes
+
+      - name: Publish Coverage Report
+        if: ${{ !cancelled() && hashFiles('backend/.coverage') != '' }}
+        run: |
+          {
+            echo "### Backend branch coverage"
+            echo
+            docker compose exec -T api coverage report --format=markdown || true
+          } >> "$GITHUB_STEP_SUMMARY"
+          docker compose exec -T api coverage html
+
+      - name: Upload Coverage Report
+        if: ${{ !cancelled() && hashFiles('backend/.coverage') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/htmlcov/
+          if-no-files-found: ignore
 
       - name: Stop Docker Compose Services
         if: always()
@@ -108,8 +149,9 @@ jobs:
           # Floating on latest stable meant CI and the production web build
           # used a Flutter nobody had run: it broke version solving on the
           # exact intl pin, and dart format disagreed with local output.
-          # Bump this deliberately, together with the team's SDK.
-          flutter-version: '3.41.7'
+          # The pin lives in .fvmrc so local (fvm) and CI read one value;
+          # bump it with `fvm use <version>` at the repo root.
+          flutter-version-file: ${{ github.workspace }}/.fvmrc
           cache: true
 
       - name: Install Dependencies
@@ -121,12 +163,50 @@ jobs:
       - name: Analyze Code
         run: flutter analyze
 
+      # The goldens' shared harness is its own package, so the app's analyzer
+      # leaves it out (see analysis_options.yaml).
+      - name: Analyze Golden Harness
+        working-directory: frontend/golden_harness
+        run: |
+          flutter pub get
+          flutter analyze
+
       - name: Run Unit Tests
-        # Golden images only match the platform that generated them — text
-        # antialiasing differs between macOS and Linux, which shows up as a
-        # sub-4%% pixel diff with identical layout. They stay a local tool;
-        # run them with `flutter test --tags golden`.
-        run: flutter test --exclude-tags golden
+        # Includes the goldens: this runner is Linux x64, the platform they
+        # are recorded on (see frontend/golden_harness).
+        # Random order, like the backend; the log prints the seed to rerun with.
+        run: flutter test --coverage --test-randomize-ordering-seed random
+
+      # A failed golden writes the expected, actual and diff images next to
+      # it, in failures/. They are what a reviewer needs to judge the change.
+      - name: Upload Golden Failures
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: golden-failures-frontend
+          path: frontend/test/**/failures/
+          if-no-files-found: ignore
+
+      # Fails below the gate in tool/check_coverage.dart, or when a file in
+      # lib/ has code that no test loads. Writes the summary to the job page.
+      - name: Check Coverage Gate
+        run: dart run tool/check_coverage.dart
+
+      # What a visitor's browser downloads, gzipped: the compiled app and
+      # each bundled asset, against the budgets in tool/check_web_size.dart.
+      # Writes the table to the job page.
+      - name: Build Web Release
+        run: flutter build web --release
+
+      - name: Check Web Download Size
+        run: dart run tool/check_web_size.dart build/web
+
+      - name: Upload Coverage Report
+        if: ${{ !cancelled() && hashFiles('frontend/coverage/lcov.info') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/lcov.info
 
   validate-widgetbook:
     name: Lint, Format, & Test Widgetbook
@@ -144,7 +224,7 @@ jobs:
           channel: 'stable'
           # Same pin as validate-frontend; widgetbook 3.23 is the newest
           # release that supports it (see frontend/widgetbook/pubspec.yaml).
-          flutter-version: '3.41.7'
+          flutter-version-file: ${{ github.workspace }}/.fvmrc
           cache: true
 
       - name: Install Dependencies
@@ -164,25 +244,278 @@ jobs:
       - name: Analyze Code
         run: flutter analyze
 
-      # Opens every catalog entry and fails on anything it throws.
-      - name: Run Catalog Smoke Test
+      # The smoke test opens every catalog entry and fails on anything it
+      # throws; the goldens compare each one, in light and dark, with its
+      # recorded image.
+      - name: Run Catalog Smoke Test and Goldens
         run: flutter test
 
+      - name: Upload Golden Failures
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: golden-failures-widgetbook
+          path: frontend/widgetbook/test/**/failures/
+          if-no-files-found: ignore
+
   # -----------------------------------------------------------------
-  # INFRASTRUCTURE VALIDATION
+  # END-TO-END JOURNEYS
   # -----------------------------------------------------------------
-  validate-infra:
-    name: Validate Terraform Configuration
+  # The real app in headless Chrome against the real API and Firestore
+  # emulator (docker-compose.e2e.yml), with Nominatim, OSRM and map tiles
+  # stubbed. scripts/e2e.sh is the same entry point as `make e2e` locally.
+  e2e:
+    name: E2E Journeys
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: infra
+    timeout-minutes: 30
     steps:
       - name: Checkout Code
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
 
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # ratchet:hashicorp/setup-terraform@v3
+      - name: Set up Chrome and chromedriver
+        id: chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # ratchet:browser-actions/setup-chrome@v2
+        with:
+          install-chromedriver: true
 
-      - name: Format Check
-        run: terraform fmt -check -recursive
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # ratchet:subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version-file: ${{ github.workspace }}/.fvmrc
+          cache: true
+
+      - name: Install Dependencies
+        working-directory: frontend
+        run: flutter pub get
+
+      - name: Run Journeys
+        env:
+          CHROMEDRIVER: ${{ steps.chrome.outputs.chromedriver-path }}
+          CHROME_EXECUTABLE: ${{ steps.chrome.outputs.chrome-path }}
+        run: scripts/e2e.sh
+
+      - name: Upload Failure Screenshots and Stack Logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: e2e-failure
+          path: |
+            frontend/build/e2e/screenshots/
+            frontend/build/e2e/stack.log
+          if-no-files-found: ignore
+
+  # -----------------------------------------------------------------
+  # MONKEY
+  # -----------------------------------------------------------------
+  # The real app (as main.dart wires it) over an in-memory API, under
+  # seeded random taps, gestures, typing, rotations, lifecycle changes and
+  # network failures (frontend/test/monkey). A fixed seed, so a PR gets the
+  # same run every time; .github/workflows/monkey.yml runs random seeds
+  # nightly. `make monkey` locally. The API's own fuzz test runs inside
+  # Test Backend.
+  monkey:
+    name: Monkey
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # ratchet:subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version-file: ${{ github.workspace }}/.fvmrc
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Run the Monkey
+        # A failure prints the seed, the `make monkey ...` that replays it and
+        # the last actions; the full log and a screenshot are uploaded below.
+        run: flutter test test/monkey --dart-define=MONKEY=true
+
+      - name: Upload Action Logs and Screenshots
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: monkey-failure
+          path: frontend/build/monkey/
+          if-no-files-found: ignore
+
+  # -----------------------------------------------------------------
+  # WORKFLOW VALIDATION
+  # -----------------------------------------------------------------
+  # actionlint checks every workflow's syntax, expressions, action inputs and
+  # job graph, and runs shellcheck on each `run:` script. The image is pinned
+  # by digest in the Makefile, so local and CI runs match.
+  lint-workflows:
+    name: Lint Workflows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Run actionlint
+        run: make lint-workflows
+
+  # -----------------------------------------------------------------
+  # SECURITY SCANS
+  # -----------------------------------------------------------------
+  # Every lockfile against the OSV vulnerability database. Fails on any known
+  # vulnerability that .osv-scanner.toml doesn't ignore. The same scan runs
+  # nightly (security.yml), since new advisories appear without code changes.
+  scan-deps:
+    name: Dependency Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Run OSV-Scanner
+        run: make scan-deps
+
+  # gitleaks over the commits this PR adds (on a push to main, the whole
+  # history). Nightly, security.yml scans the whole history too, with any
+  # rule gitleaks has added since.
+  scan-secrets:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+        with:
+          # gitleaks reads commits, not the working tree, so it needs them all.
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ]; then
+            make scan-secrets GITLEAKS_LOG_OPTS="$BASE_SHA..$HEAD_SHA"
+          else
+            make scan-secrets
+          fi
+
+  # -----------------------------------------------------------------
+  # PRODUCTION IMAGE
+  # -----------------------------------------------------------------
+  # The image Cloud Run runs, built and started as Cloud Run would, then
+  # scanned. Fails on a hadolint finding, a behaviour check (health, host
+  # check, HTTPS redirect, DEBUG, CORS, SIGTERM, the SECRET_KEY guard), or a
+  # fixable HIGH/CRITICAL CVE. The scan runs nightly too (security.yml).
+  prod-image:
+    name: Production Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Build and Check the Image
+        run: make prod-image
+
+  # -----------------------------------------------------------------
+  # SMOKE TEST
+  # -----------------------------------------------------------------
+  # The post-deploy smoke test's own tests, then the smoke test against the
+  # production image on a throwaway stack: what a release checks on each new
+  # revision before moving traffic to it.
+  smoke:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # ratchet:docker/setup-buildx-action@v3
+
+      - name: Run the Smoke Test
+        run: make smoke
+
+      - name: Upload the Stack's Logs
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # ratchet:actions/upload-artifact@v4
+        with:
+          name: smoke-stack-logs
+          path: build/smoke/stack.log
+          if-no-files-found: ignore
+
+  # -----------------------------------------------------------------
+  # FIRESTORE RULES
+  # -----------------------------------------------------------------
+  # firestore.rules in the emulator: every get, list, query, write, batch
+  # and transaction a client could try, signed out and signed in, must be
+  # refused, and leave the data unchanged.
+  test-rules:
+    name: Firestore Rules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Test the Rules
+        run: make test-rules
+
+  # -----------------------------------------------------------------
+  # INFRASTRUCTURE VALIDATION
+  # -----------------------------------------------------------------
+  # infra/ without a GCP project: fmt, validate, terraform test (providers
+  # mocked: cost caps, exposure, least privilege, who may deploy), tflint and
+  # trivy config. The same pinned images as `make check-infra`.
+  validate-infra:
+    name: Validate Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # ratchet:actions/checkout@v4
+
+      - name: Check the Terraform
+        env:
+          # tflint downloads its Google ruleset from GitHub.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: make check-infra
+
+  # -----------------------------------------------------------------
+  # SINGLE REQUIRED CHECK
+  # -----------------------------------------------------------------
+  # Passes only when every job above passed. Branch protection requires this
+  # one check, so adding or renaming a job doesn't mean editing the rules.
+  # The release workflow deploys only commits on main where this passed.
+  ci-passed:
+    name: CI Passed
+    if: ${{ always() }}
+    needs:
+      - lint-backend
+      - test-backend
+      - validate-frontend
+      - validate-widgetbook
+      - e2e
+      - monkey
+      - lint-workflows
+      - scan-deps
+      - scan-secrets
+      - prod-image
+      - smoke
+      - test-rules
+      - validate-infra
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check every job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          for result in $RESULTS; do
+            if [ "$result" != "success" ]; then
+              echo "::error::A required job did not pass ($result)."
+              exit 1
+            fi
+          done

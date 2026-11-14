@@ -1,0 +1,20 @@
+{
+  "name": "map-my-friends-firestore-rules-test",
+  "private": true,
+  "description": "Checks firestore.rules against the Firestore emulator. Run with `make test-rules`.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-reporter=spec"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "6.0.0",
+    "firebase": "13.1.0"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "1.13.7"
+  },
+  "//": [
+    "@firebase/firestore pins @grpc/grpc-js ~1.9, which has GHSA-m9gg-hp2v-232j and GHSA-f596-whhp-79r4 (fixed in 1.13.6).",
+    "The override lifts it to a fixed release; drop it once firebase depends on one itself."
+  ]
+}

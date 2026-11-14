@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from rest_framework.test import APITestCase
 
+from apps.common import firestore as fs
 from apps.common.testing import FirestoreTestMixin
 from apps.users.repositories import UserProfileRepository
 
@@ -32,6 +33,41 @@ class UserProfileRepositoryTests(FirestoreTestMixin, APITestCase):
         repo = UserProfileRepository()
         repo.update("owner-a", {"city": "Chicago"})
         self.assertEqual(repo.get_or_create("owner-b").city, "")
+
+    def test_update_creates_missing_profile_with_defaults(self):
+        updated = UserProfileRepository().update("owner-a", {"city": "Chicago"})
+        self.assertEqual(updated.city, "Chicago")
+        self.assertEqual(updated.pin_color, "#2196F3")
+
+    def test_update_ignores_non_profile_keys(self):
+        repo = UserProfileRepository()
+        updated = repo.update("owner-a", {"owner_key": "owner-b", "is_staff": True})
+        self.assertEqual(updated.owner_key, "owner-a")
+        self.assertNotIn(
+            "is_staff",
+            fs.collection("user_profiles").document("owner-a").get().to_dict(),
+        )
+
+    def test_unknown_stored_fields_are_ignored_on_read(self):
+        # Documents written by older or newer code may carry extra fields;
+        # hydration must not fail on them.
+        fs.collection("user_profiles").document("owner-a").set(
+            {"city": "Chicago", "legacy_field": "x"}
+        )
+        profile = UserProfileRepository().get_or_create("owner-a")
+        self.assertEqual(profile.city, "Chicago")
+        self.assertFalse(hasattr(profile, "legacy_field"))
+
+    def test_an_owner_key_firestore_cannot_store_is_refused(self):
+        # The owner key names the document, and Firestore refuses these ids
+        # outright. The repository must say so, not let the client raise.
+        repo = UserProfileRepository()
+        for owner_key in (".", "..", "__x__"):
+            with self.subTest(owner_key=owner_key):
+                with self.assertRaises(ValueError):
+                    repo.get_or_create(owner_key)
+                with self.assertRaises(ValueError):
+                    repo.update(owner_key, {"city": "Chicago"})
 
 
 class UserProfileEndpointTests(FirestoreTestMixin, APITestCase):

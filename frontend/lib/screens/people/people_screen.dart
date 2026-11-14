@@ -22,14 +22,16 @@ class PeopleScreen extends StatelessWidget {
   void _addPerson(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const AddEditPersonScreen()),
+      MaterialPageRoute<void>(
+        builder: (context) => const AddEditPersonScreen(),
+      ),
     );
   }
 
   void _openPerson(BuildContext context, String id) {
     Navigator.push(
       context,
-      MaterialPageRoute(
+      MaterialPageRoute<void>(
         builder: (context) => PersonDetailsScreen(personId: id),
       ),
     );

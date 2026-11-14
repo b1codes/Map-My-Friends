@@ -1,4 +1,5 @@
 import 'package:bloc/bloc.dart';
+import 'package:clock/clock.dart';
 import 'package:equatable/equatable.dart';
 import '../../models/person.dart';
 import '../../models/contact_log.dart';
@@ -42,7 +43,7 @@ class PulseBloc extends Bloc<PulseEvent, PulseState> {
     if (current is! PulseLoaded) return;
 
     // Optimistic insert with a temporary id, reconciled on success.
-    final tempId = 'temp-${DateTime.now().microsecondsSinceEpoch}';
+    final tempId = 'temp-${clock.now().microsecondsSinceEpoch}';
     final optimisticLog = ContactLog(
       id: tempId,
       personId: event.personId,

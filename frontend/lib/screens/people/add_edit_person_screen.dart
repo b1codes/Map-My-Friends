@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'dart:typed_data';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -23,11 +26,18 @@ import '../../components/shared/ambient_scaffold.dart';
 import '../../components/shared/chromatic_pulse.dart';
 import '../../components/shared/glass_surfaces.dart';
 import '../../components/shared/glass_header.dart';
+import '../../utils/idempotency_key.dart';
+import '../../utils/initials.dart';
+import '../../utils/pin_color.dart';
 
 class AddEditPersonScreen extends StatefulWidget {
   final Person? person;
 
-  const AddEditPersonScreen({super.key, this.person});
+  /// Loads the nearby hubs. Defaults to the app's shared [ApiService]; tests
+  /// pass a fake.
+  final ApiService? apiService;
+
+  const AddEditPersonScreen({super.key, this.person, this.apiService});
 
   @override
   State<AddEditPersonScreen> createState() => _AddEditPersonScreenState();
@@ -37,6 +47,11 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
   final _formKey = GlobalKey<FormState>();
   final _imagePicker = ImagePicker();
   bool _isSaving = false;
+
+  /// The `Idempotency-Key` for adding this person: one for every attempt
+  /// this form makes, so a retry after a save that timed out but went
+  /// through gets that person back rather than creating them again.
+  final String _idempotencyKey = newIdempotencyKey();
 
   late TextEditingController _firstNameController;
   late TextEditingController _lastNameController;
@@ -91,7 +106,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
     _preferredAirport = widget.person?.preferredAirport;
     _preferredStation = widget.person?.preferredStation;
 
-    _pinColor = widget.person?.pinColor ?? '#F44336';
+    _pinColor = pinColorHexOrDefault(widget.person?.pinColor, '#F44336');
     _pinStyle = widget.person?.pinStyle ?? 'teardrop';
     _pinIconType = widget.person?.pinIconType ?? 'none';
     _pinEmoji = widget.person?.pinEmoji ?? '😀';
@@ -108,7 +123,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
 
     setState(() => _isLoadingHubs = true);
     try {
-      final apiService = ApiService();
+      final apiService = widget.apiService ?? ApiService();
       final airports = await apiService.getNearestAirports(
         widget.person!.latitude!,
         widget.person!.longitude!,
@@ -118,16 +133,17 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
         widget.person!.longitude!,
       );
 
+      // The user may have left the form while the hubs were loading.
+      if (!mounted) return;
       setState(() {
         _nearbyAirports = airports;
         _nearbyStations = stations;
         _isLoadingHubs = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoadingHubs = false);
-      if (mounted) {
-        GlassToast.show(context, 'Failed to load hubs: $e');
-      }
+      GlassToast.show(context, 'Failed to load hubs: $e');
     }
   }
 
@@ -183,7 +199,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
   }
 
   void _showColorPicker() {
-    Color pickerColor = Color(int.parse(_pinColor.replaceFirst('#', '0xFF')));
+    final Color pickerColor = parsePinColor(_pinColor);
     GlassDialog.panel(
       context,
       title: 'Pick a Pin Color',
@@ -246,7 +262,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
     );
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (_isSaving) return;
     if (_formKey.currentState!.validate()) {
       setState(() => _isSaving = true);
@@ -278,83 +294,106 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
         preferredStation: _preferredStation,
       );
 
-      if (widget.person != null) {
-        context.read<PeopleBloc>().add(
-          UpdatePerson(
-            person,
-            profileImage: _selectedImage,
-            imageBytes: _selectedImageBytes,
-          ),
+      // Close only once the person is saved. If the save fails (offline,
+      // a server error), stay open with everything typed, so it can be
+      // tried again; the form used to close first and lose it.
+      final saved = Completer<void>();
+      context.read<PeopleBloc>().add(
+        widget.person != null
+            ? UpdatePerson(
+                person,
+                profileImage: _selectedImage,
+                imageBytes: _selectedImageBytes,
+                done: saved,
+              )
+            : AddPerson(
+                person,
+                profileImage: _selectedImage,
+                imageBytes: _selectedImageBytes,
+                idempotencyKey: _idempotencyKey,
+                done: saved,
+              ),
+      );
+      try {
+        await saved.future;
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _isSaving = false);
+        GlassToast.show(
+          context,
+          "Couldn't save ${person.firstName}. Check your connection and "
+          'try again.',
+          tone: ToastTone.failure,
         );
-      } else {
-        context.read<PeopleBloc>().add(
-          AddPerson(
-            person,
-            profileImage: _selectedImage,
-            imageBytes: _selectedImageBytes,
-          ),
-        );
+        return;
       }
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
     }
   }
 
   Widget _buildProfileImagePicker() {
+    final hasPhoto = _selectedImageBytes != null || _existingImageUrl != null;
     return Center(
-      child: GestureDetector(
-        onTap: _showImagePickerOptions,
-        child: Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: MapGlass.inlayFillStrong(Theme.of(context).brightness),
-                  width: 4,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: CircleAvatar(
-                radius: 64,
-                backgroundColor: MapGlass.inlayFillStrong(
-                  Theme.of(context).brightness,
-                ),
-                backgroundImage: _selectedImageBytes != null
-                    ? MemoryImage(_selectedImageBytes!)
-                    : (_existingImageUrl != null
-                              ? NetworkImage(_existingImageUrl!)
-                              : null)
-                          as ImageProvider?,
-                child:
-                    (_selectedImageBytes == null && _existingImageUrl == null)
-                    ? Icon(
-                        Icons.person,
-                        size: 64,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      )
-                    : null,
-              ),
-            ),
-            Positioned(
-              bottom: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.all(8),
+      child: Semantics(
+        button: true,
+        label: hasPhoto ? 'Change photo' : 'Add photo',
+        child: GestureDetector(
+          onTap: _showImagePickerOptions,
+          child: Stack(
+            children: [
+              Container(
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  shape: BoxShape.circle,
                   border: Border.all(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    width: 2,
+                    color: MapGlass.inlayFillStrong(
+                      Theme.of(context).brightness,
+                    ),
+                    width: 4,
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: CircleAvatar(
+                  radius: 64,
+                  backgroundColor: MapGlass.inlayFillStrong(
+                    Theme.of(context).brightness,
+                  ),
+                  backgroundImage: _selectedImageBytes != null
+                      ? MemoryImage(_selectedImageBytes!)
+                      : (_existingImageUrl != null
+                                ? NetworkImage(_existingImageUrl!)
+                                : null)
+                            as ImageProvider?,
+                  child:
+                      (_selectedImageBytes == null && _existingImageUrl == null)
+                      ? Icon(
+                          Icons.person,
+                          size: 64,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        )
+                      : null,
+                ),
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt,
+                    size: 20,
+                    color: Colors.white,
                   ),
                 ),
-                child: const Icon(
-                  Icons.camera_alt,
-                  size: 20,
-                  color: Colors.white,
-                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -378,7 +417,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
               widget.person!.timezone!.isNotEmpty) {
             try {
               final location = tz.getLocation(widget.person!.timezone!);
-              final now = tz.TZDateTime.now(location);
+              final now = tz.TZDateTime.from(clock.now(), location);
               timeString = DateFormat.jm().format(now);
             } catch (_) {}
           }
@@ -589,9 +628,9 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                             onTap: () async {
                               final date = await showDatePicker(
                                 context: context,
-                                initialDate: _birthday ?? DateTime.now(),
+                                initialDate: _birthday ?? clock.now(),
                                 firstDate: DateTime(1900),
-                                lastDate: DateTime.now(),
+                                lastDate: clock.now(),
                               );
                               if (date != null) {
                                 setState(() => _birthday = date);
@@ -671,11 +710,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  color: Color(
-                                    int.parse(
-                                      _pinColor.replaceFirst('#', '0xFF'),
-                                    ),
-                                  ),
+                                  color: parsePinColor(_pinColor),
                                   shape: BoxShape.circle,
                                   border: Border.all(color: Colors.grey),
                                 ),
@@ -817,14 +852,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
   }
 
   String _getInitials() {
-    String initials = '';
-    if (_firstNameController.text.isNotEmpty) {
-      initials += _firstNameController.text[0];
-    }
-    if (_lastNameController.text.isNotEmpty) {
-      initials += _lastNameController.text[0];
-    }
-    return initials;
+    return initialsOf(_firstNameController.text, _lastNameController.text);
   }
 
   Widget _buildHubSelection() {

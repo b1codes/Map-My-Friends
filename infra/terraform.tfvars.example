@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars (git-ignored) and fill in. variables.tf has the rest.
+project_id = "your-gcp-project-id"
+
+# region        = "us-central1"
+# max_instances = 1   # 1 until GCIP (variables.tf says why)
+# api_domain    = "api.mapmyfriends.com"
+# web_domain    = "mapmyfriends.com"
+
+# Bump to rotate DJANGO_SECRET_KEY (signs everyone out). README, Changing things.
+# secret_key_version = 1

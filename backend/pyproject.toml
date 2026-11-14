@@ -7,9 +7,9 @@ authors = [
 ]
 requires-python = ">=3.12,<4.0"
 dependencies = [
-    "django (>=6.0.2,<7.0.0)",
-    "djangorestframework (>=3.16.1,<4.0.0)",
-    "pillow (>=11.0.0,<12.0.0)",
+    "django (>=6.0.8,<7.0.0)",
+    "djangorestframework (>=3.18.2,<4.0.0)",
+    "pillow (>=13.0.0,<14.0.0)",
     "djangorestframework-simplejwt (>=5.4.0,<6.0.0)",
     "django-cors-headers (>=4.9.0,<5.0.0)",
     "geopy (>=2.4.1,<3.0.0)",
@@ -20,13 +20,22 @@ dependencies = [
     "django-phonenumber-field[phonenumbers] (>=8.4.0,<9.0.0)",
     "firebase-admin (>=6.5.0,<7.0.0)",
     "google-cloud-firestore (>=2.28.0,<3.0.0)",
+    # Uploads go to a Cloud Storage bucket in production (GS_BUCKET_NAME).
+    "django-storages[google] (>=1.14.6,<2.0.0)",
 ]
 
 [project.optional-dependencies]
 dev = [
     # Remote debugger – used by VS Code's debugpy attach launch config.
     # Installed in the image; activated via docker-compose.debug.yml.
-    "debugpy>=1.8.0,<2.0.0"
+    "debugpy>=1.8.0,<2.0.0",
+    # Coverage measurement for the test suite (`make test-cov`).
+    "coverage>=7.6.0,<8.0.0",
+    # Validates API and third-party responses against the shared JSON Schemas
+    # in contracts/ (backend/tests/contracts).
+    "jsonschema>=4.23.0,<5.0.0",
+    # Property-based fuzzing of every API route (tests/test_fuzz_api.py).
+    "hypothesis>=6.135.0,<7.0.0",
 ]
 
 [build-system]
@@ -35,12 +44,71 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 package-mode = false
+[tool.ruff]
+# CI installs exactly this version (see .github/workflows/ci.yml), and a
+# different local Ruff refuses to run rather than disagree with CI. Run it with
+# `uvx ruff@0.17.3`, or `make lint`.
+required-version = "==0.17.3"
+
 [tool.ruff.lint]
+# Ruff's defaults (pyflakes plus a few pycodestyle errors) and the rule families
+# that find bugs or dead code. Style the formatter already settles is left out.
+extend-select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "I",    # import order
+    "B",    # bugbear: likely bugs, e.g. exception chaining, mutable defaults
+    "BLE",  # blind `except Exception`
+    "C4",   # needless comprehension / collection calls
+    "DJ",   # Django: nullable string fields, model __str__, receiver order
+    "FURB", # modernisations that remove code
+    "LOG",  # logging misuse
+    "G",    # eager string formatting in logging calls
+    "PERF", # avoidable work in loops
+    "PGH",  # blanket `noqa` / `type: ignore`
+    "PIE",  # unnecessary statements
+    "RET",  # inconsistent or unreachable returns
+    "RUF",  # Ruff's own checks, incl. unused `noqa`
+    "SIM",  # simplifiable conditions
+    "T20",  # stray print()
+    "UP",   # syntax older than Python 3.12 needs
+]
 ignore = [
+    # The formatter owns line length. What it leaves long is strings, comments
+    # and docstrings, which it won't split and which read worse split by hand.
+    "E501",
     # Django and DRF configure classes by plain assignment —
     # `permission_classes = [IsAuthenticated]`, `serializer_class = ...`. The
     # rule is right in general and wrong for this idiom: annotating 42 framework
     # hooks as ClassVar would add noise without adding safety. Re-enable if the
     # codebase ever grows non-framework mutable class defaults worth catching.
     "RUF012",
+]
+
+[tool.coverage.run]
+source = ["apps", "config"]
+branch = true
+omit = [
+    # Tests measure the code, not themselves.
+    "*/tests.py",
+    "*/tests_*.py",
+    "*/tests/*",
+    "apps/common/testing.py",
+    "*/migrations/*",
+    # Server entry points: imported only by a WSGI/ASGI server, never by tests.
+    "config/asgi.py",
+    "config/wsgi.py",
+]
+
+[tool.coverage.report]
+# The CI gate (`coverage report` exits 1 below it). Set a little under the
+# measured total (99.86% branch, 2026-11-05) so a stray line doesn't fail a PR,
+# while an untested module or endpoint does. Raise it as coverage rises.
+fail_under = 99
+precision = 2
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
 ]

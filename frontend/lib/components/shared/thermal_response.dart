@@ -94,6 +94,11 @@ class _ThermalResponseState extends State<ThermalResponse>
   }
 
   void _release() {
+    // A pointer that went down here keeps its hit-test path until it lifts,
+    // so its up (or cancel) still arrives if the app removed this surface in
+    // between: a sheet that closed, a screen that was replaced. By then the
+    // controllers are disposed, and there is nothing left to cool.
+    if (!mounted) return;
     _heat.reverse();
     if (!_allowsDisplacement) {
       _press.value = 0.0;

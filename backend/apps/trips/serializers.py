@@ -1,7 +1,39 @@
 from rest_framework import serializers
 
+from apps.airports import reference as airport_reference
+from apps.airports.serializers import AirportSerializer
+from apps.common.ownership import owner_key_for
+from apps.people.repositories import PersonRepository
+from apps.stations import reference as station_reference
+from apps.stations.serializers import StationSerializer
+
+from .repositories import MAX_STOPS_PER_TRIP
+
 STATUS_CHOICES = ["DRAFT", "BOOKED", "CANCELLED"]
 TRANSPORT_CHOICES = ["FLIGHT", "TRAIN", "BUS", "CAR"]
+
+# How deep ticket_data may nest maps and lists, its own map counting as
+# the first. Firestore stores them at most 20 deep from the document root,
+# and ticket_data sits in the leg document; the JSON parser allows 64, so
+# anything between would fail at the write. 10 leaves room for where
+# ticket_data sits.
+MAX_TICKET_DATA_DEPTH = 10
+
+
+def _check_ticket_data(value, depth: int = 1) -> None:
+    """Refuse ticket_data that Firestore could not store."""
+    if depth > MAX_TICKET_DATA_DEPTH:
+        raise serializers.ValidationError(
+            f"ticket_data can nest maps and lists at most {MAX_TICKET_DATA_DEPTH} deep."
+        )
+    children = value.values() if isinstance(value, dict) else value
+    for child in children:
+        if isinstance(value, list) and isinstance(child, list):
+            raise serializers.ValidationError(
+                "ticket_data cannot hold a list directly inside a list."
+            )
+        if isinstance(child, (dict, list)):
+            _check_ticket_data(child, depth + 1)
 
 
 class PointField(serializers.Field):
@@ -38,13 +70,45 @@ class PointField(serializers.Field):
             )
         try:
             lng, lat = float(coordinates[0]), float(coordinates[1])
-        except (TypeError, ValueError):
-            raise serializers.ValidationError("coordinates must be numbers.")
+        except (TypeError, ValueError) as err:
+            raise serializers.ValidationError("coordinates must be numbers.") from err
         if not -90 <= lat <= 90 or not -180 <= lng <= 180:
             raise serializers.ValidationError(
                 "coordinates out of range; expected [longitude, latitude]."
             )
         return {"lat": lat, "lng": lng}
+
+
+class StopPersonSerializer(serializers.Serializer):
+    """A person on a trip stop, flat rather than GeoJSON.
+
+    TripStop.fromJson parses people_detail with Person.fromJson, which reads
+    `latitude`/`longitude` keys instead of a geometry.
+    """
+
+    id = serializers.CharField(read_only=True)
+    tag = serializers.CharField(read_only=True)
+    first_name = serializers.CharField(read_only=True)
+    last_name = serializers.CharField(read_only=True)
+    city = serializers.CharField(read_only=True)
+    state = serializers.CharField(read_only=True)
+    country = serializers.CharField(read_only=True)
+    street = serializers.CharField(read_only=True, allow_null=True)
+    birthday = serializers.CharField(read_only=True, allow_null=True)
+    phone_number = serializers.CharField(read_only=True, allow_null=True)
+    latitude = serializers.FloatField(source="lat", read_only=True, allow_null=True)
+    longitude = serializers.FloatField(source="lng", read_only=True, allow_null=True)
+    profile_image = serializers.SerializerMethodField()
+    timezone = serializers.CharField(read_only=True, allow_null=True)
+    pin_color = serializers.CharField(read_only=True)
+    pin_style = serializers.CharField(read_only=True)
+    pin_icon_type = serializers.CharField(read_only=True)
+    pin_emoji = serializers.CharField(read_only=True, allow_null=True)
+
+    def get_profile_image(self, obj):
+        from apps.common.storage import upload_url
+
+        return upload_url(obj.profile_image, self.context.get("request"))
 
 
 class TripStopSerializer(serializers.Serializer):
@@ -63,6 +127,33 @@ class TripStopSerializer(serializers.Serializer):
     )
     snapshot_address = serializers.CharField(read_only=True, allow_blank=True)
     snapshot_metadata = serializers.DictField(read_only=True)
+    # What the planner draws and routes with after a reload: TripStop.fromJson
+    # builds its people and hub from these, not from the bare ids above.
+    people_detail = serializers.SerializerMethodField()
+    airport_detail = serializers.SerializerMethodField()
+    station_detail = serializers.SerializerMethodField()
+
+    def get_people_detail(self, obj):
+        # The views prefetch the owner's people into the context (see
+        # stop_context), so ids that are not the owner's never resolve.
+        people = self.context.get("people", {})
+        return [
+            StopPersonSerializer(people[person_id], context=self.context).data
+            for person_id in obj.person_ids
+            if person_id in people
+        ]
+
+    def get_airport_detail(self, obj):
+        if not obj.airport_id:
+            return None
+        airport = airport_reference.get_by_id(obj.airport_id)
+        return AirportSerializer(airport).data if airport else None
+
+    def get_station_detail(self, obj):
+        if not obj.station_id:
+            return None
+        station = station_reference.get_by_id(obj.station_id)
+        return StationSerializer(station).data if station else None
 
     def to_internal_value(self, data):
         ret = super().to_internal_value(data)
@@ -92,6 +183,24 @@ class TripLegSerializer(serializers.Serializer):
     )
     ticket_data = serializers.DictField(required=False)
 
+    def validate_ticket_data(self, value):
+        _check_ticket_data(value)
+        return value
+
+
+def stop_context(request, stops, people=None) -> dict:
+    """Serializer context for stops: the request, plus the owner's people the
+    stops name, read in one batch rather than once per stop.
+
+    people, if given, is those people already read (TripRecord.people), and
+    is used instead of reading them again."""
+    if people is None:
+        person_ids = [person_id for stop in stops for person_id in stop.person_ids]
+        people = PersonRepository().get_many_for_owner(
+            person_ids, owner_key_for(request)
+        )
+    return {"request": request, "people": people}
+
 
 class TripSerializer(serializers.Serializer):
     """Trips carry their stops and legs inline.
@@ -108,5 +217,7 @@ class TripSerializer(serializers.Serializer):
     end_date = serializers.DateField(required=False, allow_null=True)
     status = serializers.ChoiceField(choices=STATUS_CHOICES, required=False)
     user = serializers.CharField(source="owner_key", read_only=True)
-    stops = TripStopSerializer(many=True, required=False)
-    legs = TripLegSerializer(many=True, required=False)
+    # A trip's writes go in one commit, which Firestore caps at 500 writes
+    # (see MAX_STOPS_PER_TRIP). A trip never has as many legs as stops.
+    stops = TripStopSerializer(many=True, required=False, max_length=MAX_STOPS_PER_TRIP)
+    legs = TripLegSerializer(many=True, required=False, max_length=MAX_STOPS_PER_TRIP)

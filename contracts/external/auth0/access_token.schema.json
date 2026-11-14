@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Auth0 access token (decoded)",
+  "description": "What Django requires of the access token the Flutter app gets from Auth0 and sends as a Bearer token: RS256 with a kid, the tenant as issuer, the API as (one of the) audiences, and a sub that becomes the Django username. With the openid scope Auth0 adds its userinfo URL as a second audience.",
+  "type": "object",
+  "required": [
+    "header",
+    "claims"
+  ],
+  "properties": {
+    "header": {
+      "type": "object",
+      "required": [
+        "alg",
+        "kid"
+      ],
+      "properties": {
+        "alg": {
+          "const": "RS256"
+        },
+        "kid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "typ": {
+          "const": "JWT"
+        }
+      }
+    },
+    "claims": {
+      "type": "object",
+      "required": [
+        "iss",
+        "sub",
+        "aud",
+        "iat",
+        "exp"
+      ],
+      "properties": {
+        "iss": {
+          "type": "string",
+          "pattern": "^https://.+/$"
+        },
+        "sub": {
+          "type": "string",
+          "minLength": 1
+        },
+        "aud": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "iat": {
+          "type": "integer"
+        },
+        "exp": {
+          "type": "integer"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "azp": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "email_verified": {
+          "type": "boolean"
+        },
+        "given_name": {
+          "type": "string"
+        },
+        "family_name": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

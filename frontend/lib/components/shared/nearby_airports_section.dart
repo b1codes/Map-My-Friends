@@ -22,7 +22,14 @@ class NearbyAirportsSection extends StatefulWidget {
     super.key,
     required this.latitude,
     required this.longitude,
+    this.createBloc,
   });
+
+  /// Builds the section's own bloc when no [NearbyBlocs] is provided.
+  /// Defaults to a production [AirportBloc]; a test passes a fake to drive the
+  /// own-bloc path without the network.
+  @visibleForTesting
+  final AirportBloc Function()? createBloc;
 
   @override
   State<NearbyAirportsSection> createState() => _NearbyAirportsSectionState();
@@ -34,7 +41,7 @@ class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
 
   AirportBloc _createOwnBloc() {
     // A separate bloc instance from the map's, for the nearest airports
-    final bloc = AirportBloc();
+    final bloc = widget.createBloc?.call() ?? AirportBloc();
     _load(bloc);
     return bloc;
   }
@@ -106,12 +113,14 @@ class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
                           Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: MapPalette.airport.withValues(alpha: 0.1),
+                              color: MapPalette.airport.vivid.withValues(
+                                alpha: 0.1,
+                              ),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.flight,
-                              color: MapPalette.airport,
+                              color: MapPalette.airport.vivid,
                             ),
                           ),
                           const SizedBox(width: 16),
@@ -128,7 +137,9 @@ class _NearbyAirportsSectionState extends State<NearbyAirportsSection> {
                                           .titleSmall
                                           ?.copyWith(
                                             fontWeight: FontWeight.bold,
-                                            color: MapPalette.airport,
+                                            color: MapPalette.airport.ink(
+                                              Theme.of(context).brightness,
+                                            ),
                                           ),
                                     ),
                                     const SizedBox(width: 8),

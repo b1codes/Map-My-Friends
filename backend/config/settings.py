@@ -14,6 +14,10 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from corsheaders.defaults import default_headers
+from django.core.exceptions import ImproperlyConfigured
+from django.utils.translation import gettext_lazy as _
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -21,16 +25,23 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-^qp=8@08yp#dg3*bbuyw7y*-l(hiuqx@pf9m_e#@!)91hf3^nq",
+# Off unless the environment turns it on: the dev, test and E2E stacks set
+# DJANGO_DEBUG=True, and a server that forgot to set anything gets production
+# behaviour. DEBUG on serves debug pages and media, and accepts the mock Auth0
+# tokens that sign in as any user (apps/users/auth.py).
+DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() == "true"
+
+# Signs sessions, password-reset tokens and the SimpleJWT access and refresh
+# tokens. This default is public, so with it anyone could mint a token for any
+# user; production refuses to start without its own key.
+_DEVELOPMENT_SECRET_KEY = (
+    "django-insecure-^qp=8@08yp#dg3*bbuyw7y*-l(hiuqx@pf9m_e#@!)91hf3^nq"
 )
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
-
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", _DEVELOPMENT_SECRET_KEY)
+if not DEBUG and SECRET_KEY == _DEVELOPMENT_SECRET_KEY:
+    raise ImproperlyConfigured(
+        "Set DJANGO_SECRET_KEY: DEBUG is off and the development key is public."
+    )
 
 
 # Application definition
@@ -44,6 +55,10 @@ INSTALLED_APPS = [
     "whitenoise.runserver_nostatic",
     "django.contrib.staticfiles",
     "rest_framework",
+    # Records issued refresh tokens, so BLACKLIST_AFTER_ROTATION has somewhere
+    # to put a rotated one; without it that setting did nothing and every
+    # refresh token stayed valid for its whole lifetime.
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "apps.common",
     "apps.users",
@@ -54,6 +69,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # First, so Cloud Run's probes are answered before the host check and the
+    # HTTPS redirect, neither of which a probe would pass. See config/health.py.
+    "config.health.HealthCheckMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -95,7 +113,11 @@ WSGI_APPLICATION = "config.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "django_internal.sqlite3",
+        # Overridable so a throwaway stack (the E2E suite) doesn't write its
+        # users into the bind-mounted development database.
+        "NAME": os.environ.get(
+            "DJANGO_SQLITE_PATH", BASE_DIR / "django_internal.sqlite3"
+        ),
     }
 }
 
@@ -121,8 +143,6 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
-
-from django.utils.translation import gettext_lazy as _
 
 LANGUAGE_CODE = "en-us"
 
@@ -166,6 +186,35 @@ STORAGES = {
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Production keeps uploads in a Cloud Storage bucket (infra/storage.tf), since
+# a Cloud Run instance's disk goes with it. Unset, they go to MEDIA_ROOT, which
+# only the dev and test stacks use (and only DEBUG serves).
+#
+# Each object is public to anyone with its URL, and nobody can list the
+# bucket. The name is a random UUID (apps/common/storage.py), so the URL is
+# the secret: a deliberate choice over signed URLs, which on Cloud Run cost an
+# IAM signBlob call per photo per response. Names are never reused, so the
+# objects can be cached for good.
+GS_BUCKET_NAME = os.environ.get("GS_BUCKET_NAME", "")
+if GS_BUCKET_NAME:
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        "OPTIONS": {
+            "bucket_name": GS_BUCKET_NAME,
+            # Plain public URLs, not signed ones.
+            "querystring_auth": False,
+            # The bucket uses uniform access (no per-object ACLs); its IAM
+            # policy decides who reads.
+            "default_acl": None,
+            # A UUID name never collides, so don't spend a round trip asking
+            # whether it exists before writing.
+            "file_overwrite": True,
+            "object_parameters": {
+                "cache_control": "public, max-age=31536000, immutable"
+            },
+        },
+    }
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -187,12 +236,38 @@ REST_FRAMEWORK = {
         "user": "2000/day",
         "anon_burst": "10/minute",
         "anon_sustained": "50/day",
+        "login_burst": "10/minute",
     },
     "EXCEPTION_HANDLER": "apps.common.exception_handlers.firestore_exception_handler",
+    # JSON that isn't valid Unicode (a lone "\ud800") is refused here: see
+    # apps/common/parsers.py.
+    "DEFAULT_PARSER_CLASSES": (
+        "apps.common.parsers.StrictJSONParser",
+        "rest_framework.parsers.FormParser",
+        "rest_framework.parsers.MultiPartParser",
+    ),
+    # How many proxies sit in front of Django: 1 on Cloud Run (its front end
+    # appends the connecting address to X-Forwarded-For; infra/locals.tf sets
+    # it), 0 when clients connect directly (dev). Throttles identify an anonymous
+    # client by the address the outermost proxy saw. Left unset, DRF used the
+    # whole X-Forwarded-For header, which the client writes, so a new value
+    # per request escaped every anonymous limit.
+    "NUM_PROXIES": int(os.environ.get("DJANGO_NUM_PROXIES", "0")),
 }
 
 # Simple JWT Configuration
 SIMPLE_JWT = {
+    # Tokens name the user by username, not by primary key. Django's users
+    # are in SQLite on each Cloud Run instance, so primary keys restart at 1
+    # on every instance and cold start: a token naming user 1 would sign in
+    # whoever is user 1 on the instance that serves the request. A username
+    # can still belong to someone else on another instance (docs/deploy.md);
+    # GCIP (ClickUp 86bb3eu64) removes the per-instance users entirely.
+    "USER_ID_FIELD": "username",
+    "USER_ID_CLAIM": "username",
+    "TOKEN_REFRESH_SERIALIZER": (
+        "apps.users.serializers.MissingUserTokenRefreshSerializer"
+    ),
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
@@ -204,8 +279,15 @@ if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOW_CREDENTIALS = True
 else:
-    CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    # Unset means no cross-origin access, not an origin of "".
+    CORS_ALLOWED_ORIGINS = [
+        origin for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if origin
+    ]
     CORS_ALLOW_CREDENTIALS = True
+
+# The web app retries a person create with the same Idempotency-Key, so the
+# preflight has to let that header through as well as the defaults.
+CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key")
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0").split(",")
 CSRF_TRUSTED_ORIGINS = os.getenv(
@@ -215,15 +297,29 @@ CSRF_TRUSTED_ORIGINS = os.getenv(
 
 # Security Headers
 if not DEBUG:
-    SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
     SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "False").lower() == "true"
+    # Cloud Run's front end terminates TLS and always sets X-Forwarded-Proto,
+    # so it's the proxy's word, not the client's. Without this, is_secure() is
+    # always False behind the proxy and SECURE_SSL_REDIRECT redirects forever.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000  # 1 year
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+
+# Logging. Django's defaults print a request's traceback only while DEBUG is
+# on, and otherwise mail it to ADMINS, which is empty, so a production 500 was
+# logged nowhere. Errors go to stderr, which gunicorn and Docker collect.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"django.request": {"handlers": ["console"], "level": "ERROR"}},
+}
 
 
 # Auth0 Configuration
@@ -234,3 +330,12 @@ AUTH0_AUDIENCE = os.environ.get("AUTH0_AUDIENCE", "https://api.mapmyfriends.com/
 # firebase-admin auto-detects FIRESTORE_EMULATOR_HOST; when it is set the
 # client talks to the local emulator and no credentials are required.
 FIRESTORE_PROJECT_ID = os.environ.get("FIRESTORE_PROJECT_ID", "map-my-friends-local")
+
+# Third-party services. The defaults are the public hosts the app uses in
+# production; the E2E stack (docker-compose.e2e.yml) points them at local stubs
+# so journeys are deterministic and don't load volunteer-run servers.
+NOMINATIM_DOMAIN = os.environ.get("NOMINATIM_DOMAIN", "nominatim.openstreetmap.org")
+NOMINATIM_SCHEME = os.environ.get("NOMINATIM_SCHEME", "https")
+OSRM_BASE_URL = os.environ.get(
+    "OSRM_BASE_URL", "https://router.project-osrm.org/route/v1/driving"
+)

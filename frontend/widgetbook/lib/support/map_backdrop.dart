@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:map_my_friends/utils/app_theme.dart';
 
 /// A live map to set map chrome against.
 ///
@@ -44,27 +45,36 @@ class _MapBackdropState extends State<MapBackdrop> {
       child: Stack(
         children: [
           Positioned.fill(
-            child: FlutterMap(
-              mapController: _controller,
-              options: MapOptions(
-                initialCenter: widget.center,
-                initialZoom: widget.zoom,
-              ),
-              children: [
-                TileLayer(
-                  // The app's "standard" style in each appearance.
-                  urlTemplate: dark
-                      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-                      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-                  subdomains: const ['a', 'b', 'c'],
-                  userAgentPackageName: 'com.mapmyfriends.widgetbook',
-                  // See MapScreen: on web, aborting obsolete tile requests
-                  // escapes as an uncaught DOMException on every zoom-out.
-                  tileProvider: NetworkTileProvider(
-                    abortObsoleteRequests: !kIsWeb,
+            // Labelled as MapScreen labels its map, so a screen reader names
+            // it here too.
+            child: Semantics(
+              label: 'Map',
+              child: FlutterMap(
+                mapController: _controller,
+                options: MapOptions(
+                  initialCenter: widget.center,
+                  initialZoom: widget.zoom,
+                  // As MapScreen: the ground until tiles arrive.
+                  backgroundColor: MapField.ground(
+                    dark ? Brightness.dark : Brightness.light,
                   ),
                 ),
-              ],
+                children: [
+                  TileLayer(
+                    // The app's "standard" style in each appearance.
+                    urlTemplate: dark
+                        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+                        : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+                    subdomains: const ['a', 'b', 'c'],
+                    userAgentPackageName: 'com.mapmyfriends.widgetbook',
+                    // See MapScreen: on web, aborting obsolete tile requests
+                    // escapes as an uncaught DOMException on every zoom-out.
+                    tileProvider: NetworkTileProvider(
+                      abortObsoleteRequests: !kIsWeb,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           Positioned.fill(

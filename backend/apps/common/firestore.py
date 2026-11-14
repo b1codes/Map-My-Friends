@@ -9,11 +9,16 @@ production.
 from __future__ import annotations
 
 import os
+import random
+import re
 import threading
+import time
 
 import firebase_admin
 from django.core.exceptions import ImproperlyConfigured
+from google.api_core import exceptions
 from google.cloud import firestore
+from google.cloud.firestore_v1 import transactional as gcloud_transactional
 
 _lock = threading.Lock()
 _client = None
@@ -64,3 +69,103 @@ def get_client():
 def collection(name: str):
     """Shorthand for get_client().collection(name)."""
     return get_client().collection(name)
+
+
+def is_valid_doc_id(doc_id) -> bool:
+    """Whether doc_id can name a document directly in a collection.
+
+    Ids reach the repositories from URLs, request bodies and query strings.
+    Firestore rejects an empty id, "." / "..", reserved __names__, and an id
+    over 1,500 bytes of UTF-8 outright (a 500 if it reached the client; an
+    over-long id went out in a request header and the client retried it for
+    five minutes first), and a "/" would address a different, deeper path.
+    Such ids can never name a real record, so callers treat them as not
+    found.
+    """
+    if not isinstance(doc_id, str) or not doc_id:
+        return False
+    try:
+        size = len(doc_id.encode("utf-8"))
+    except UnicodeEncodeError:
+        return False  # a lone surrogate: not UTF-8, so not storable
+    return (
+        size <= MAX_DOC_ID_BYTES
+        and "/" not in doc_id
+        and doc_id not in {".", ".."}
+        and re.fullmatch(r"__.*__", doc_id) is None
+    )
+
+
+# Firestore's limit on a document id.
+MAX_DOC_ID_BYTES = 1500
+
+
+# Firestore's limit on the writes in one commit.
+MAX_WRITES_PER_COMMIT = 500
+
+
+def delete_all(refs) -> None:
+    """Delete every document in refs, in as few commits as the limit allows."""
+    refs = list(refs)
+    for start in range(0, len(refs), MAX_WRITES_PER_COMMIT):
+        batch = get_client().batch()
+        for ref in refs[start : start + MAX_WRITES_PER_COMMIT]:
+            batch.delete(ref)
+        batch.commit()
+
+
+# Transactions are retried in rounds: each round is a transaction with
+# the client's own quick retries (a retried transaction keeps its place in
+# line), and between rounds the caller waits a random, growing time. Without
+# the waits, writers that abort one another retry in step and can keep doing
+# so: on CI's emulator, eight log writes to one person at once had seven give
+# up after ten immediate retries each, which the API answers with a 500.
+TRANSACTION_ROUNDS = 6
+ATTEMPTS_PER_ROUND = 3
+BACKOFF_BASE_S = 0.05
+BACKOFF_MAX_S = 1.0
+
+
+class TransactionContention(Exception):
+    """A transaction kept losing to concurrent writers through every round.
+
+    Retrying later can succeed, so the API answers it with a 503 rather than
+    a 500 (see apps.common.exception_handlers)."""
+
+
+def _contention_cause(exc: Exception) -> exceptions.Aborted | None:
+    """The Aborted behind exc if the transaction lost to other writers, as
+    opposed to the transaction's own code raising an error.
+
+    The client retries an abort at commit itself and, once out of attempts,
+    raises a ValueError caused by the last Aborted. An abort anywhere else
+    (beginning the transaction, or a read inside it) comes out as is."""
+    if isinstance(exc, exceptions.Aborted):
+        return exc
+    if isinstance(exc, ValueError) and isinstance(exc.__cause__, exceptions.Aborted):
+        return exc.__cause__
+    return None
+
+
+def run_transaction(fn):
+    """Run fn(transaction) in a transaction and return its result, retrying
+    on contention, each round in a fresh transaction. fn may run more than
+    once, so it must only read and write through the transaction it is given.
+
+    Raises TransactionContention if every round lost to other writers."""
+    transactional_fn = gcloud_transactional(fn)
+    for round_ in range(TRANSACTION_ROUNDS):
+        if round_:
+            wait = min(BACKOFF_MAX_S, BACKOFF_BASE_S * 2 ** (round_ - 1))
+            time.sleep(random.uniform(0, wait))
+        try:
+            return transactional_fn(
+                get_client().transaction(max_attempts=ATTEMPTS_PER_ROUND)
+            )
+        except (exceptions.Aborted, ValueError) as exc:
+            aborted = _contention_cause(exc)
+            if aborted is None:
+                raise
+    raise TransactionContention(
+        f"Transaction lost to concurrent writers in {TRANSACTION_ROUNDS} rounds."
+    ) from aborted

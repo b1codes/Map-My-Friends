@@ -120,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   MapGlass.radiusMd,
                                 ),
                                 child: Image.asset(
-                                  'assets/Map-My-Friends-Default-1024x1024@1x.png',
+                                  'assets/logo-256.png',
                                   width: 80,
                                   height: 80,
                                 ),
@@ -298,7 +298,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     : () {
                                         Navigator.push(
                                           context,
-                                          MaterialPageRoute(
+                                          MaterialPageRoute<void>(
                                             builder: (context) =>
                                                 const ForgotPasswordScreen(),
                                           ),
@@ -375,7 +375,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: GoogleFonts.montserrat(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white.withValues(alpha: 0.35),
+                                // At 0.35 this was 2.7:1 on the void.
+                                color: Colors.white.withValues(alpha: 0.6),
                                 letterSpacing: 1.5,
                               ),
                             ),
@@ -586,7 +587,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: GoogleFonts.openSans(
                             fontSize: 11,
                             height: 1.4,
-                            color: Colors.white.withValues(alpha: 0.35),
+                            // At 0.35 this was 2.9:1 on the void.
+                            color: Colors.white.withValues(alpha: 0.6),
                           ),
                         ),
                       ],
@@ -610,7 +612,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 : () {
                                     Navigator.push(
                                       context,
-                                      MaterialPageRoute(
+                                      MaterialPageRoute<void>(
                                         builder: (context) =>
                                             const RegisterScreen(),
                                       ),

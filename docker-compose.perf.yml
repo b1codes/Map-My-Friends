@@ -1,0 +1,67 @@
+# The stack the k6 load test (`make load`, scripts/load.sh) runs against.
+#
+# An override of docker-compose.e2e.yml, used as:
+#   docker compose -p map-my-friends-perf \
+#     -f docker-compose.e2e.yml -f docker-compose.perf.yml ...
+# It keeps the E2E stack's Firestore emulator and third-party stubs, and runs
+# the API as one production instance would on Cloud Run:
+#   - DEBUG off, a random SECRET_KEY (scripts/load.sh makes one per run)
+#   - the production image itself (backend/Dockerfile's production target),
+#     so the code is baked in, not bind-mounted from the host
+#   - one vCPU and 512 MiB, Cloud Run's defaults for an instance. Going over
+#     the memory limit kills the API, which fails the run.
+#   - gunicorn with one worker and 8 threads (gthread), the shape Cloud Run
+#     recommends for one vCPU (backend/gunicorn.conf.py), and its access log,
+#     which scripts/load.sh counts what the API answered from
+#   - uploads on a tmpfs, standing in for the Cloud Storage bucket
+#   - Firestore reached through Toxiproxy, which adds the latency of a
+#     same-region round trip (PERF_FIRESTORE_LATENCY_MS each way, set by
+#     scripts/load.sh). The emulator answers in about a millisecond, so
+#     without it a request's cost wouldn't depend on its round trips at all.
+#
+# The one deliberate difference from production is the throttle rates,
+# raised as on the E2E and DAST stacks, because k6 sends every user's
+# requests from one address. See docker/test-stack-settings/unthrottled_settings.py.
+services:
+  api:
+    build:
+      target: production
+    image: map-my-friends-backend:perf
+    # The image's own entrypoint and gunicorn command, as on Cloud Run.
+    command: !reset null
+    volumes: !override
+      - ./docker/test-stack-settings:/test-stack-settings:ro
+    tmpfs:
+      - /app/media:mode=1777
+    ports: !override
+      - "${PERF_API_PORT:-8300}:8000"
+    cpus: 1
+    mem_limit: 512m
+    depends_on: !override
+      - toxiproxy
+      - stubs
+    environment:
+      - DJANGO_DEBUG=False
+      - PORT=8000
+      - DJANGO_SECRET_KEY=${PERF_SECRET_KEY:?set PERF_SECRET_KEY, or run make load}
+      - ALLOWED_HOSTS=api,localhost,127.0.0.1
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000
+      # Without the E2E stack's request log (e2e_settings.py).
+      - DJANGO_SETTINGS_MODULE=unthrottled_settings
+      - DJANGO_SQLITE_PATH=/tmp/perf.sqlite3
+      - FIRESTORE_EMULATOR_HOST=toxiproxy:8080
+
+  toxiproxy:
+    # 2.13.0; the digest is the multi-arch index, so the same pin runs on x64
+    # CI and Apple Silicon.
+    image: ghcr.io/shopify/toxiproxy:2.13.0@sha256:5d3dae09bc185dcc5ff6cf43abf6062a4a720aff0c4306a471e773acdcd107aa
+    command: -host 0.0.0.0 -config /toxiproxy.json
+    volumes:
+      - ./docker/perf/toxiproxy.json:/toxiproxy.json:ro
+    depends_on:
+      - firestore
+
+  stubs:
+    # The API reaches the stubs on the compose network; nothing on the host
+    # needs them, so their port isn't published.
+    ports: !reset []

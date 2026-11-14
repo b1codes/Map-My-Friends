@@ -1,0 +1,16 @@
+{
+  "description": "Sign in with the wrong password. The client tells 401 apart from other failures to show 'Invalid username or password'.",
+  "consumer": "AuthService.login",
+  "provider_state": "registered_user",
+  "request": {
+    "method": "POST",
+    "path": "user/auth/token/",
+    "auth": "none",
+    "json": { "username": "ada", "password": "not-the-password" }
+  },
+  "response": {
+    "status": 401,
+    "schema": "Detail",
+    "example": { "detail": "No active account found with the given credentials" }
+  }
+}

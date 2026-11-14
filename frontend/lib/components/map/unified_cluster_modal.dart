@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../models/person.dart';
@@ -12,6 +14,7 @@ import '../../utils/app_theme.dart';
 
 import '../../components/map/map_bottom_sheets.dart';
 import '../shared/glass_surfaces.dart';
+import '../../utils/initials.dart';
 
 class UnifiedClusterModal extends StatelessWidget {
   final List<dynamic> items;
@@ -86,8 +89,7 @@ class UnifiedClusterModal extends StatelessWidget {
                 : null,
             child: p.profileImageUrl == null
                 ? Text(
-                    (p.firstName.isNotEmpty ? p.firstName[0] : '') +
-                        (p.lastName.isNotEmpty ? p.lastName[0] : ''),
+                    initialsOf(p.firstName, p.lastName),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onPrimaryContainer,
                       fontWeight: FontWeight.bold,
@@ -134,6 +136,13 @@ class UnifiedClusterModal extends StatelessWidget {
                     final peopleBloc = context.read<PeopleBloc>();
 
                     tripBloc.add(LinkPersonToStop(p, index));
+                    // The toast's action runs after this sheet has closed,
+                    // so a failure is reported from the app's navigator,
+                    // which outlives it.
+                    final host = Navigator.of(
+                      context,
+                      rootNavigator: true,
+                    ).context;
 
                     GlassToast.show(
                       context,
@@ -146,7 +155,18 @@ class UnifiedClusterModal extends StatelessWidget {
                           preferredAirport: stop.airport,
                           preferredStation: stop.station,
                         );
-                        peopleBloc.add(UpdatePerson(updatedPerson));
+                        final saved = Completer<void>();
+                        peopleBloc.add(
+                          UpdatePerson(updatedPerson, done: saved),
+                        );
+                        saved.future.catchError((Object _) {
+                          if (!host.mounted) return;
+                          GlassToast.show(
+                            host,
+                            "Couldn't update ${p.firstName}'s preferred stop.",
+                            tone: ToastTone.failure,
+                          );
+                        });
                       },
                     );
                   },
@@ -181,7 +201,7 @@ class UnifiedClusterModal extends StatelessWidget {
             Navigator.pop(context); // close modal
             Navigator.push(
               context,
-              MaterialPageRoute(
+              MaterialPageRoute<void>(
                 builder: (context) => PersonDetailsScreen(personId: p.id),
               ),
             );
@@ -196,10 +216,10 @@ class UnifiedClusterModal extends StatelessWidget {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: MapPalette.airport.withValues(alpha: 0.1),
+          color: MapPalette.airport.vivid.withValues(alpha: 0.1),
           shape: BoxShape.circle,
         ),
-        child: const Icon(Icons.flight, color: MapPalette.airport, size: 24),
+        child: Icon(Icons.flight, color: MapPalette.airport.vivid, size: 24),
       ),
       title: Text(a.name),
       subtitle: Text(
@@ -225,7 +245,7 @@ class UnifiedClusterModal extends StatelessWidget {
       ),
       onTap: () {
         Navigator.pop(context); // close modal
-        showModalBottomSheet(
+        showModalBottomSheet<void>(
           context: context,
           backgroundColor: Colors.transparent,
           builder: (context) => AirportBottomSheet(airport: a),
@@ -236,28 +256,28 @@ class UnifiedClusterModal extends StatelessWidget {
 
   Widget _buildStationTile(BuildContext context, Station s) {
     IconData iconData = Icons.train;
-    Color color = MapPalette.majorStation;
+    Color color = MapPalette.majorStation.vivid;
     String label = 'Station';
 
     switch (s.stationType) {
       case 'major_station':
         iconData = Icons.train;
-        color = MapPalette.majorStation;
+        color = MapPalette.majorStation.vivid;
         label = 'Major Station';
         break;
       case 'commuter_rail_station':
         iconData = Icons.directions_railway;
-        color = MapPalette.commuterRail;
+        color = MapPalette.commuterRail.vivid;
         label = 'Commuter Rail';
         break;
       case 'subway_station':
         iconData = Icons.subway;
-        color = MapPalette.subway;
+        color = MapPalette.subway.vivid;
         label = 'Subway Station';
         break;
       case 'regional_station':
         iconData = Icons.train;
-        color = MapPalette.regionalStation;
+        color = MapPalette.regionalStation.vivid;
         label = 'Regional Station';
         break;
       default:
@@ -297,7 +317,7 @@ class UnifiedClusterModal extends StatelessWidget {
       ),
       onTap: () {
         Navigator.pop(context); // close modal
-        showModalBottomSheet(
+        showModalBottomSheet<void>(
           context: context,
           backgroundColor: Colors.transparent,
           builder: (context) => StationBottomSheet(station: s),

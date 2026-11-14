@@ -9,6 +9,8 @@ from django.utils.translation import gettext_lazy as _
 from jwt import PyJWKClient
 from rest_framework import authentication, exceptions
 
+from apps.common import firestore as fs
+
 logger = logging.getLogger(__name__)
 
 # Determine if we are running unit tests
@@ -17,6 +19,14 @@ TESTING = (
     or "test_coverage" in sys.argv
     or getattr(settings, "TESTING", False)
 )
+
+
+def _refuse_unstorable(username):
+    """Refuse a sign-in whose username can't name its profile document."""
+    if not fs.is_valid_doc_id(username):
+        raise exceptions.AuthenticationFailed(
+            _("This sign-in's username can't be used for an account.")
+        )
 
 
 class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
@@ -34,17 +44,28 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
         if len(auth_header) == 1:
             msg = _("Invalid Authorization header. No credentials provided.")
             raise exceptions.AuthenticationFailed(msg)
-        elif len(auth_header) > 2:
+        if len(auth_header) > 2:
             msg = _(
                 "Invalid Authorization header. Credentials string should not contain spaces."
             )
             raise exceptions.AuthenticationFailed(msg)
 
-        auth_type = auth_header[0].decode("utf-8").lower()
+        # Header bytes arrive as whatever the client sent. Bytes that aren't
+        # UTF-8 can't be a token this API issued: refuse them, as DRF's own
+        # TokenAuthentication does, rather than raising a 500.
+        try:
+            auth_type = auth_header[0].decode("utf-8").lower()
+            token = auth_header[1].decode("utf-8")
+        except UnicodeError as e:
+            raise exceptions.AuthenticationFailed(
+                _(
+                    "Invalid Authorization header. It should not contain "
+                    "invalid characters."
+                )
+            ) from e
         if auth_type != "bearer":
             return None
 
-        token = auth_header[1].decode("utf-8")
         return self.authenticate_credentials(request, token)
 
     def authenticate_header(self, request):
@@ -55,11 +76,9 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
         if (settings.DEBUG or TESTING) and token.startswith("mock_auth0_jwt_token_"):
             parts = token.split("_")
             # Format: mock_auth0_jwt_token_{username}_{timestamp}
-            if len(parts) >= 5:
-                username = parts[4]
-            else:
-                username = "mock_auth0_user"
+            username = parts[4] if len(parts) >= 5 else "mock_auth0_user"
 
+            _refuse_unstorable(username)
             email = f"{username}@example.com"
             user, _created = User.objects.get_or_create(
                 username=username,
@@ -100,24 +119,45 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
                 audience=auth0_audience,
                 issuer=expected_issuer,
             )
-        except jwt.ExpiredSignatureError:
-            raise exceptions.AuthenticationFailed(_("Token has expired."))
+        except jwt.ExpiredSignatureError as e:
+            raise exceptions.AuthenticationFailed(_("Token has expired.")) from e
         except jwt.InvalidTokenError as e:
             raise exceptions.AuthenticationFailed(
                 _("Invalid token signature or claims: ") + str(e)
-            )
-        except Exception as e:  # noqa: BLE001 - deliberate catch-all so auth never leaks an internal error
-            raise exceptions.AuthenticationFailed(_("Authentication failed: ") + str(e))
+            ) from e
+        except (
+            Exception
+        ) as e:  # deliberate catch-all so auth never leaks an internal error
+            raise exceptions.AuthenticationFailed(
+                _("Authentication failed: ") + str(e)
+            ) from e
 
         sub = payload.get("sub")
         if not sub:
             raise exceptions.AuthenticationFailed(_("Missing sub claim in token."))
 
-        # Convert sub to a valid Django username (e.g. auth0_123456 instead of auth0|123456)
-        username = sub.replace("|", "_")
+        # The username is the sub as Auth0 sends it, "|" and all. Every sub
+        # has one ("github|123", "oauth2|corp|7"), and local sign-up can't
+        # produce one: Django's username validator allows only letters,
+        # digits and @.+-_. So no local account can ever take an Auth0
+        # user's username, whichever connection signed them in, and lock
+        # them out through the has_usable_password refusal below.
+        username = sub
+        # A sub Firestore can't take as a document id ("__corp|x__") would
+        # make an account whose profile 500s. No connection issues one, but
+        # if one ever arrives, it's a failed sign-in, not a broken account.
+        _refuse_unstorable(username)
 
         try:
             user = User.objects.get(username=username)
+            # Accounts this backend creates have no password. One that has
+            # a password was made some other way (local sign-up can't make
+            # this username, but an admin or a shell can): it isn't this
+            # login's account, whoever made it.
+            if user.has_usable_password():
+                raise exceptions.AuthenticationFailed(
+                    _("This sign-in's username belongs to another account.")
+                )
         except User.DoesNotExist:
             # Create a new user automatically
             email = payload.get("email")
@@ -147,20 +187,18 @@ class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
                     logger.warning("Auth0 userinfo lookup failed", exc_info=True)
 
             if not email:
-                email = f"{username}@temporary.auth0.com"
+                email = f"{sub.replace('|', '_')}@temporary.auth0.com"
 
-            # Check if user with this email already exists to prevent duplicate emails
-            # Only associate if email is verified in Auth0 to prevent spoofing
-            email_verified = payload.get("email_verified", False)
-            existing_user = User.objects.filter(email=email).first()
-            if existing_user and email_verified:
-                user = existing_user
-            else:
-                user = User.objects.create_user(
-                    username=username,
-                    email=email,
-                    first_name=first_name,
-                    last_name=last_name,
-                )
+            # Always a new account, never one found by email: local sign-up
+            # doesn't verify addresses, so an existing account with this
+            # email may be an attacker's, registered first to be linked into.
+            # Joining an Auth0 login to a local account needs proof the
+            # person controls both (ClickUp 86bcz9azj).
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                first_name=first_name,
+                last_name=last_name,
+            )
 
         return (user, token)

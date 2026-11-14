@@ -1,4 +1,6 @@
+from django.contrib.auth.models import User
 from django.test import SimpleTestCase
+from rest_framework.test import APITestCase
 
 from apps.common.testing import FirestoreTestMixin
 from apps.trips.repositories import DuplicateSequenceOrder, TripRepository
@@ -65,33 +67,14 @@ class TripRepositoryTests(FirestoreTestMixin, SimpleTestCase):
             )
         )
 
-    def test_generate_legs_links_consecutive_stops(self):
+    def test_add_stop_links_consecutive_stops(self):
         trip = self.trips.create("owner-a", TRIP_DATA)
-        self.trips.add_stop(
-            trip.id, "owner-a", {"sequence_order": 1, "lat": 1.0, "lng": 2.0}
-        )
-        self.trips.add_stop(
-            trip.id, "owner-a", {"sequence_order": 2, "lat": 3.0, "lng": 4.0}
-        )
-        self.trips.add_stop(
-            trip.id, "owner-a", {"sequence_order": 3, "lat": 5.0, "lng": 6.0}
-        )
+        for order in (1, 2, 3):
+            self.trips.add_stop(
+                trip.id, "owner-a", {"sequence_order": order, "lat": 1.0, "lng": 2.0}
+            )
 
-        legs = self.trips.generate_legs(trip.id, "owner-a")
-        self.assertEqual(len(legs), 2)
-
-    def test_generate_legs_is_idempotent(self):
-        trip = self.trips.create("owner-a", TRIP_DATA)
-        self.trips.add_stop(
-            trip.id, "owner-a", {"sequence_order": 1, "lat": 1.0, "lng": 2.0}
-        )
-        self.trips.add_stop(
-            trip.id, "owner-a", {"sequence_order": 2, "lat": 3.0, "lng": 4.0}
-        )
-
-        self.trips.generate_legs(trip.id, "owner-a")
-        legs = self.trips.generate_legs(trip.id, "owner-a")
-        self.assertEqual(len(legs), 1)
+        self.assertEqual(len(self.trips.get_for_owner(trip.id, "owner-a").legs), 2)
 
     def test_snapshot_on_draft_to_booked(self):
         trip = self.trips.create("owner-a", TRIP_DATA)
@@ -117,10 +100,6 @@ class TripRepositoryTests(FirestoreTestMixin, SimpleTestCase):
     def test_delete_by_wrong_owner_refused(self):
         trip = self.trips.create("owner-a", TRIP_DATA)
         self.assertFalse(self.trips.delete(trip.id, "owner-b"))
-
-
-from django.contrib.auth.models import User
-from rest_framework.test import APITestCase
 
 
 class TripEndpointTests(FirestoreTestMixin, APITestCase):

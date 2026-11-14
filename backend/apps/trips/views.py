@@ -5,9 +5,22 @@ from rest_framework.response import Response
 
 from apps.common.ownership import owner_key_for
 
-from .repositories import DuplicateSequenceOrder, TripRepository
-from .serializers import TripLegSerializer, TripSerializer, TripStopSerializer
+from .repositories import DuplicateSequenceOrder, TooManyStops, TripRepository
+from .serializers import (
+    TripLegSerializer,
+    TripSerializer,
+    TripStopSerializer,
+    stop_context,
+)
 from .services import OSRMService, RoutingError, TransportLookupService
+
+
+def _not_an_object():
+    """The answer to a body that is valid JSON but not an object (a list, a
+    string, a number, null), which the actions below read fields from."""
+    return Response(
+        {"error": "Expected a JSON object."}, status=status.HTTP_400_BAD_REQUEST
+    )
 
 
 class TripViewSet(viewsets.ViewSet):
@@ -17,15 +30,23 @@ class TripViewSet(viewsets.ViewSet):
     def repository(self):
         return TripRepository()
 
+    @staticmethod
+    def _represent(request, trips, many=False):
+        stops = [stop for trip in (trips if many else [trips]) for stop in trip.stops]
+        people = None if many else trips.people
+        return TripSerializer(
+            trips, many=many, context=stop_context(request, stops, people)
+        ).data
+
     def list(self, request):
         trips = self.repository.list_for_owner(owner_key_for(request))
-        return Response(TripSerializer(trips, many=True).data)
+        return Response(self._represent(request, trips, many=True))
 
     def retrieve(self, request, pk=None):
         trip = self.repository.get_for_owner(pk, owner_key_for(request))
         if trip is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(TripSerializer(trip).data)
+        return Response(self._represent(request, trip))
 
     @staticmethod
     def _split_payload(validated):
@@ -44,12 +65,8 @@ class TripViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
         payload, stops, _legs = self._split_payload(serializer.validated_data)
 
-        owner_key = owner_key_for(request)
-        trip = self.repository.create(owner_key, payload)
-        if stops:
-            self.repository.replace_stops(trip.id, owner_key, stops)
-            trip = self.repository.get_for_owner(trip.id, owner_key)
-        return Response(TripSerializer(trip).data, status=status.HTTP_201_CREATED)
+        trip = self.repository.create(owner_key_for(request), payload, stops=stops)
+        return Response(self._represent(request, trip), status=status.HTTP_201_CREATED)
 
     def update(self, request, pk=None):
         return self._write_update(request, pk, partial=False)
@@ -62,31 +79,27 @@ class TripViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
         payload, stops, legs = self._split_payload(serializer.validated_data)
 
-        owner_key = owner_key_for(request)
-        trip = self.repository.update(pk, owner_key, payload)
-        if trip is None:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-
         # Matching the old serializer: a supplied `stops` array replaces the
         # trip's stops wholesale, and `legs` patches existing legs by id.
-        if stops is not None:
-            self.repository.replace_stops(pk, owner_key, stops)
-        if legs:
-            for leg in legs:
-                leg_id = leg.get("id")
-                if not leg_id:
-                    continue
-                leg_payload = {
-                    k: (v.isoformat() if hasattr(v, "isoformat") else v)
-                    for k, v in leg.items()
-                    if k
-                    not in ("id", "trip_id", "departure_stop_id", "arrival_stop_id")
-                }
-                if leg_payload:
-                    self.repository.update_leg(pk, leg_id, owner_key, leg_payload)
+        leg_patches = []
+        for leg in legs or ():
+            leg_id = leg.get("id")
+            if not leg_id:
+                continue
+            leg_payload = {
+                k: (v.isoformat() if hasattr(v, "isoformat") else v)
+                for k, v in leg.items()
+                if k not in ("id", "trip_id", "departure_stop_id", "arrival_stop_id")
+            }
+            if leg_payload:
+                leg_patches.append((leg_id, leg_payload))
 
-        trip = self.repository.get_for_owner(pk, owner_key)
-        return Response(TripSerializer(trip).data)
+        trip = self.repository.update(
+            pk, owner_key_for(request), payload, stops=stops, legs=leg_patches
+        )
+        if trip is None:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        return Response(self._represent(request, trip))
 
     def destroy(self, request, pk=None):
         if not self.repository.delete(pk, owner_key_for(request)):
@@ -97,9 +110,10 @@ class TripViewSet(viewsets.ViewSet):
     def stops(self, request, pk=None):
         owner_key = owner_key_for(request)
         if request.method == "GET":
+            stops = self.repository.list_stops(pk, owner_key)
             return Response(
                 TripStopSerializer(
-                    self.repository.list_stops(pk, owner_key), many=True
+                    stops, many=True, context=stop_context(request, stops)
                 ).data
             )
 
@@ -113,12 +127,19 @@ class TripViewSet(viewsets.ViewSet):
             return Response(
                 {"sequence_order": [str(exc)]}, status=status.HTTP_400_BAD_REQUEST
             )
+        except TooManyStops as exc:
+            return Response({"stops": [str(exc)]}, status=status.HTTP_400_BAD_REQUEST)
         if stop is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
-        return Response(TripStopSerializer(stop).data, status=status.HTTP_201_CREATED)
+        return Response(
+            TripStopSerializer(stop, context=stop_context(request, [stop])).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=False, methods=["post"])
     def calculate_route(self, request):
+        if not isinstance(request.data, dict):
+            return _not_an_object()
         coordinates = request.data.get("coordinates")
 
         if not coordinates or not isinstance(coordinates, list):
@@ -162,18 +183,11 @@ class TripLegViewSet(viewsets.ViewSet):
         return TripRepository()
 
     def list(self, request):
-        owner_key = owner_key_for(request)
-        legs = []
-        for trip in self.repository.list_for_owner(owner_key):
-            legs.extend(self.repository.list_legs(trip.id, owner_key))
+        legs = self.repository.list_all_legs(owner_key_for(request))
         return Response(TripLegSerializer(legs, many=True).data)
 
     def _find_leg(self, leg_id, owner_key):
-        for trip in self.repository.list_for_owner(owner_key):
-            for leg in self.repository.list_legs(trip.id, owner_key):
-                if leg.id == leg_id:
-                    return leg
-        return None
+        return self.repository.find_leg(leg_id, owner_key)
 
     def retrieve(self, request, pk=None):
         leg = self._find_leg(pk, owner_key_for(request))
@@ -189,12 +203,16 @@ class TripLegViewSet(viewsets.ViewSet):
 
         serializer = TripLegSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+        # `id` addresses the leg; the doc id is the id, so it is never written.
         payload = {
             k: (v.isoformat() if hasattr(v, "isoformat") else v)
             for k, v in serializer.validated_data.items()
+            if k != "id"
         }
-        updated = self.repository.update_leg(leg.trip_id, pk, owner_key, payload)
-        return Response(TripLegSerializer(updated).data)
+        # Firestore rejects an empty update, so a no-op PATCH returns the leg.
+        if not payload:
+            return Response(TripLegSerializer(leg).data)
+        return Response(TripLegSerializer(self.repository.patch_leg(leg, payload)).data)
 
     @action(detail=True, methods=["post"])
     def smart_lookup(self, request, pk=None):
@@ -203,10 +221,17 @@ class TripLegViewSet(viewsets.ViewSet):
         if leg is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
+        if not isinstance(request.data, dict):
+            return _not_an_object()
         identifier = request.data.get("identifier", leg.booking_reference)
         if not identifier:
             return Response(
                 {"error": "Missing identifier"}, status=status.HTTP_400_BAD_REQUEST
+            )
+        if not isinstance(identifier, str):
+            return Response(
+                {"error": "Identifier must be a string"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         data = {}
@@ -224,7 +249,7 @@ class TripLegViewSet(viewsets.ViewSet):
             if "arrival" in data and "time" in data["arrival"]:
                 payload["arrival_time"] = data["arrival"]["time"]
 
-            updated = self.repository.update_leg(leg.trip_id, pk, owner_key, payload)
+            updated = self.repository.patch_leg(leg, payload)
             return Response(TripLegSerializer(updated).data)
 
         return Response(

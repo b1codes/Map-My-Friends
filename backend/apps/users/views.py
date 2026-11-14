@@ -1,20 +1,39 @@
 from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
+from django.db import transaction
 from rest_framework import generics, status
-from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from apps.common.ownership import owner_key_for
+from apps.common.parsers import StrictJSONParser
+from apps.common.storage import delete_upload, save_upload
 
 from .serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     RegisterSerializer,
     UserProfileSerializer,
+    validate_password_for,
 )
-from .throttles import BurstAnonRateThrottle, SustainedAnonRateThrottle
+from .throttles import (
+    BurstAnonRateThrottle,
+    LoginBurstRateThrottle,
+    SustainedAnonRateThrottle,
+)
+
+PHOTO_PREFIX = "user_profiles"
+
+# Sign-up refuses these usernames now (RegisterSerializer.validate_username),
+# but an account made before that, or by an admin, can still hold one.
+UNSTORABLE_USERNAME = (
+    "This account's username can't hold a profile. Usernames can't be "
+    '"." or "..", or begin and end with "__".'
+)
 
 
 class UserProfileView(APIView):
@@ -24,13 +43,24 @@ class UserProfileView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    parser_classes = [MultiPartParser, FormParser, StrictJSONParser]
 
     @property
     def repository(self):
         from .repositories import UserProfileRepository
 
         return UserProfileRepository()
+
+    def handle_exception(self, exc):
+        from .repositories import UnstorableOwnerKey
+
+        # Raised before anything is read or written, so a 400 leaves the
+        # profile, the name and storage as they were.
+        if isinstance(exc, UnstorableOwnerKey):
+            return Response(
+                {"detail": UNSTORABLE_USERNAME}, status=status.HTTP_400_BAD_REQUEST
+            )
+        return super().handle_exception(exc)
 
     def get(self, request):
         profile = self.repository.get_or_create(owner_key_for(request))
@@ -55,23 +85,39 @@ class UserProfileView(APIView):
         # via source='user.*'; with a plain Serializer that has to be explicit,
         # or name-only edits silently no-op (and used to 500 on an empty
         # Firestore update).
+        # They're saved last, with the Firestore write, so a rejected photo
+        # or a failed write leaves the name as it was.
         user_fields = {
             field: payload.pop(field)
             for field in ("first_name", "last_name")
             if field in payload
         }
-        if user_fields:
-            for field, value in user_fields.items():
-                setattr(request.user, field, value)
-            request.user.save(update_fields=list(user_fields))
 
+        owner_key = owner_key_for(request)
+        # Read first, so a Firestore outage stores no photo, and so the photo
+        # a new one replaces is known.
+        current = self.repository.get_or_create(owner_key)
+        photo = None
         uploaded = request.FILES.get("profile_image")
         if uploaded is not None:
-            from apps.common.storage import save_upload
+            photo = save_upload(uploaded, prefix=PHOTO_PREFIX)
+            payload["profile_image"] = photo
 
-            payload["profile_image"] = save_upload(uploaded, prefix="user_profiles")
-
-        profile = self.repository.update(owner_key_for(request), payload)
+        try:
+            # If the Firestore write fails, the name change rolls back with it.
+            with transaction.atomic():
+                if user_fields:
+                    for field, value in user_fields.items():
+                        setattr(request.user, field, value)
+                    request.user.save(update_fields=list(user_fields))
+                profile = self.repository.update(owner_key, payload, current=current)
+        except Exception:
+            if user_fields:
+                request.user.refresh_from_db(fields=list(user_fields))
+            delete_upload(photo, PHOTO_PREFIX)
+            raise
+        if photo is not None:
+            delete_upload(current.profile_image, PHOTO_PREFIX)
         return Response(
             UserProfileSerializer(profile, context={"request": request}).data
         )
@@ -98,28 +144,16 @@ class PasswordResetRequestView(generics.GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        email = serializer.validated_data["email"]
-        try:
-            user = User.objects.get(email=email)
-            token = default_token_generator.make_token(user)
-            # In production, send an actual email with the reset link
-            # For now, we'll just return the token (development only)
-            return Response(
-                {
-                    "message": "Password reset email sent.",
-                    "token": token,  # Remove this in production!
-                    "user_id": user.pk,  # Remove this in production!
-                },
-                status=status.HTTP_200_OK,
-            )
-        except User.DoesNotExist:
-            # Don't reveal whether the email exists
-            return Response(
-                {
-                    "message": "Password reset email sent.",
-                },
-                status=status.HTTP_200_OK,
-            )
+        # The token and user_id are what PasswordResetConfirmView takes, so
+        # they may only ever reach the address's inbox, never this response:
+        # returning them let anyone who knew an email reset that account's
+        # password. No email is sent yet, so a reset can't be completed; the
+        # response is the same for every address so it doesn't reveal which
+        # ones have accounts.
+        return Response(
+            {"message": "Password reset email sent."},
+            status=status.HTTP_200_OK,
+        )
 
 
 class PasswordResetConfirmView(generics.GenericAPIView):
@@ -140,18 +174,31 @@ class PasswordResetConfirmView(generics.GenericAPIView):
         try:
             user = User.objects.get(pk=user_id)
             if default_token_generator.check_token(user, token):
+                validate_password_for(password, user)
                 user.set_password(password)
                 user.save()
                 return Response(
                     {"message": "Password has been reset successfully."},
                     status=status.HTTP_200_OK,
                 )
-            else:
-                return Response(
-                    {"error": "Invalid or expired token."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-        except User.DoesNotExist:
+            return Response(
+                {"error": "Invalid or expired token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except (User.DoesNotExist, ValueError, TypeError):
+            # ValueError/TypeError: user_id is not coercible to a primary key
+            # (e.g. "abc" or a list), which is a bad request, not a server error.
             return Response(
                 {"error": "Invalid request."}, status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class LoginView(TokenObtainPairView):
+    """Exchange a username and password for tokens.
+
+    Limited to 10 attempts a minute per client IP on top of the default 100 a
+    day, so a password can't be guessed back to back. The view ignores the
+    Authorization header, so every caller counts as anonymous here.
+    """
+
+    throttle_classes = [LoginBurstRateThrottle, AnonRateThrottle]

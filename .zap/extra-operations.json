@@ -1,0 +1,140 @@
+{
+  "description": "Endpoints the API serves that no contract in contracts/api/interactions describes, because the app doesn't call them. They are still reachable, so the ZAP scan needs them too. scripts/dast_openapi.py adds these to the OpenAPI document it builds from the contracts, and fails when a served route is in neither place, when one listed here no longer exists, or when one listed here gains a contract (then delete it here). Requests are written like a contract's: path relative to /api/, ids as the placeholders in contracts/api/fixtures.json.",
+  "excluded_prefixes": {
+    "admin/": "Django's HTML admin site, not part of the JSON API. Nothing in the app links to it; it needs a staff login.",
+    "media/": "Uploaded files, served by Django only when DEBUG is on. The scanned stack runs with DEBUG off, so the route isn't there."
+  },
+  "operations": [
+    {
+      "request": { "method": "GET", "path": "people/Pp5ltxR4W9tpvZTZUlY7/", "auth": "user" }
+    },
+    {
+      "request": {
+        "method": "PUT",
+        "path": "people/Pp5ltxR4W9tpvZTZUlY7/",
+        "auth": "user",
+        "json": {
+          "first_name": "Grace",
+          "last_name": "Hopper",
+          "tag": "FRIEND",
+          "city": "Chicago",
+          "state": "IL",
+          "country": "USA",
+          "pin_color": "#2196F3",
+          "pin_style": "circle",
+          "pin_icon_type": "emoji",
+          "pin_emoji": "🚢",
+          "contact_cadence_days": 14
+        }
+      }
+    },
+    {
+      "request": { "method": "GET", "path": "contact-logs/MdSXYBzGfdyHp1R17jee/", "auth": "user" }
+    },
+    {
+      "request": {
+        "method": "PUT",
+        "path": "contact-logs/MdSXYBzGfdyHp1R17jee/",
+        "auth": "user",
+        "json": {
+          "person": "Pp5ltxR4W9tpvZTZUlY7",
+          "channel": "CALL",
+          "contacted_at": "2026-10-20T18:30:00.000Z",
+          "note": "Caught up about COBOL"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "PATCH",
+        "path": "contact-logs/MdSXYBzGfdyHp1R17jee/",
+        "auth": "user",
+        "json": { "note": "Caught up about COBOL" }
+      }
+    },
+    {
+      "request": { "method": "DELETE", "path": "contact-logs/MdSXYBzGfdyHp1R17jee/", "auth": "user" }
+    },
+    {
+      "request": { "method": "GET", "path": "trips/CPczK4heHksu4O9ODudG/", "auth": "user" }
+    },
+    {
+      "request": {
+        "method": "PUT",
+        "path": "trips/CPczK4heHksu4O9ODudG/",
+        "auth": "user",
+        "json": {
+          "name": "Milwaukee weekend",
+          "start_date": "2026-11-14",
+          "end_date": "2026-11-16",
+          "status": "DRAFT"
+        }
+      }
+    },
+    {
+      "request": { "method": "GET", "path": "trips/CPczK4heHksu4O9ODudG/stops/", "auth": "user" }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "trips/CPczK4heHksu4O9ODudG/stops/",
+        "auth": "user",
+        "json": {
+          "sequence_order": 2,
+          "location": { "type": "Point", "coordinates": [-87.6298, 41.8781] },
+          "people": ["Pp5ltxR4W9tpvZTZUlY7"],
+          "airport": null,
+          "station": null
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "trips/calculate_route/",
+        "auth": "user",
+        "json": { "coordinates": [[-87.9065, 43.0389], [-87.6298, 41.8781]] }
+      }
+    },
+    {
+      "request": { "method": "GET", "path": "trips/legs/", "auth": "user" }
+    },
+    {
+      "request": { "method": "GET", "path": "trips/legs/TzgYzOtSeqrdtWScrbVF/", "auth": "user" }
+    },
+    {
+      "request": {
+        "method": "PATCH",
+        "path": "trips/legs/TzgYzOtSeqrdtWScrbVF/",
+        "auth": "user",
+        "json": {
+          "transport_type": "FLIGHT",
+          "booking_reference": "UA123",
+          "departure_time": "2026-11-14T09:00:00Z",
+          "arrival_time": "2026-11-14T10:30:00Z"
+        }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "trips/legs/TzgYzOtSeqrdtWScrbVF/smart_lookup/",
+        "auth": "user",
+        "json": { "identifier": "UA123" }
+      }
+    },
+    {
+      "request": {
+        "method": "POST",
+        "path": "user/auth/password-reset/confirm/",
+        "auth": "none",
+        "json": {
+          "user_id": 1,
+          "token": "cyx3pa-0123456789abcdef0123456789abcdef",
+          "password": "Analytical-Engine-1843",
+          "password_confirm": "Analytical-Engine-1843"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "description": "The tenant's discovery document: where its signing keys and userinfo live, and who it says the issuer is.",
+  "consumer": "Auth0JSONWebTokenAuthentication (backend), indirectly",
+  "provider": "Auth0 tenant",
+  "live": true,
+  "request": {
+    "method": "GET",
+    "url": "https://b1codes.us.auth0.com/.well-known/openid-configuration",
+    "auth": "none"
+  },
+  "response": {
+    "status": 200,
+    "schema": "openid_configuration.schema.json",
+    "expect": {
+      "/issuer": "https://b1codes.us.auth0.com/",
+      "/jwks_uri": "https://b1codes.us.auth0.com/.well-known/jwks.json",
+      "/userinfo_endpoint": "https://b1codes.us.auth0.com/userinfo"
+    },
+    "example": {
+      "issuer": "https://b1codes.us.auth0.com/",
+      "authorization_endpoint": "https://b1codes.us.auth0.com/authorize",
+      "token_endpoint": "https://b1codes.us.auth0.com/oauth/token",
+      "userinfo_endpoint": "https://b1codes.us.auth0.com/userinfo",
+      "jwks_uri": "https://b1codes.us.auth0.com/.well-known/jwks.json",
+      "id_token_signing_alg_values_supported": [
+        "HS256",
+        "RS256",
+        "PS256"
+      ],
+      "scopes_supported": [
+        "openid",
+        "profile",
+        "offline_access",
+        "name",
+        "given_name",
+        "family_name",
+        "nickname",
+        "email",
+        "email_verified",
+        "picture",
+        "created_at",
+        "identities",
+        "phone",
+        "address"
+      ],
+      "response_types_supported": [
+        "code",
+        "token",
+        "id_token",
+        "code token",
+        "code id_token",
+        "token id_token",
+        "code token id_token"
+      ],
+      "subject_types_supported": [
+        "public"
+      ]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+# OSV-Scanner configuration (make scan-deps, and the Dependency Scan CI job).
+#
+# Every finding fails the scan unless it is ignored here. Ignore one only
+# after checking it can't be exploited in this app, not because the upgrade
+# is inconvenient, and:
+#   - give one of the ids OSV prints for it (that covers its aliases too),
+#   - say why it can't be exploited here, specifically enough that a reader
+#     can check the claim still holds,
+#   - set ignoreUntil no more than three months out. The finding fails again
+#     after that date, so the triage gets redone instead of lasting forever.
+# Remove the entry once the dependency is upgraded past the fix.
+# Triage steps: docs/testing.md, Security scans.
+
+# No ignores: every known vulnerability is fixed by an upgrade.

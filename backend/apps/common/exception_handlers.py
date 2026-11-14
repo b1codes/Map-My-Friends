@@ -8,6 +8,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
+from apps.common.firestore import TransactionContention
+
 
 def firestore_exception_handler(exc, context):
     response = drf_exception_handler(exc, context)
@@ -20,6 +22,16 @@ def firestore_exception_handler(exc, context):
         return Response(
             {"error": "Data store temporarily unavailable. Please retry."},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    # Writers contending for the same documents: run_transaction gave up
+    # retrying, or a write outside a transaction was aborted. Worth a retry
+    # in a moment; not a server fault.
+    if isinstance(exc, (TransactionContention, gcloud_exceptions.Aborted)):
+        return Response(
+            {"error": "Too many changes to this data at once. Please retry."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            headers={"Retry-After": "1"},
         )
 
     if isinstance(exc, gcloud_exceptions.NotFound):

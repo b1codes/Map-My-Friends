@@ -24,7 +24,7 @@ A personal geospatial application to track and visualize friends' locations in r
 ### Security & Bot Protection
 - **Rate Limiting** - Burst and sustained throttling for sensitive endpoints
 - **Honeypot Validation** - Hidden fields to deter automated registration bots
-- **Security Hardening** - Production-ready headers, CORS, and Nginx rate limiting
+- **Security Hardening** - Production-ready headers, CORS, and rate limiting
 
 ---
 
@@ -32,24 +32,20 @@ A personal geospatial application to track and visualize friends' locations in r
 
 ```mermaid
 graph TD
-    User([User]) -->|Interacts with| Frontend[Flutter Mobile App]
-    Frontend -->|HTTP / JSON| API[Django REST Framework]
-    API -->|SQL Read/Write| DB[(PostgreSQL + PostGIS)]
-    API -->|File I/O| Media[Media Storage]
-    
-    subgraph Docker Containers
-        API
-        DB
-    end
+    User([User]) -->|Interacts with| Frontend[Flutter app: mobile, desktop, web]
+    Frontend -->|HTTP / JSON| API[Django REST Framework on Cloud Run]
+    API -->|Admin SDK| DB[(Firestore)]
+    API -->|Uploads| Media[Cloud Storage]
+    Frontend -->|Photos by URL| Media
 ```
 
 ### Backend (The Geo-Engine)
 * **Framework:** Django 6.0 + Django REST Framework
 * **Authentication:** Simple JWT (JSON Web Tokens)
-* **Database:** PostgreSQL 16 + PostGIS (Geospatial extension)
+* **Database:** Firestore (the emulator locally); airports and stations are an in-memory index
 * **Dependency Manager:** Poetry 2.0+
-* **Infrastructure:** Docker & Docker Compose
-* **Hosting Goal:** AWS (App Runner/ECS)
+* **Infrastructure:** Docker & Docker Compose locally; Terraform for Google Cloud ([infra/](infra/README.md))
+* **Hosting:** Cloud Run (API), Firebase Hosting (web app), Cloud Storage (photos). See [docs/deploy.md](docs/deploy.md).
 
 ### Frontend (The Map)
 * **Framework:** Flutter (iOS/Android/Desktop)
@@ -63,7 +59,7 @@ graph TD
 ## 🛠 Prerequisites
 
 1.  **Docker Desktop:** Required to run the backend and database.
-2.  **Flutter SDK:** Required for running the mobile app locally.
+2.  **Flutter SDK, via [FVM](https://fvm.app):** The project pins its Flutter version in `.fvmrc`, and CI reads the same file. Install FVM (`brew tap leoafarias/fvm && brew install fvm`), then run `fvm install` at the repo root and prefix Flutter commands with `fvm` (e.g. `fvm flutter test`).
 3.  **Git:** To clone the repo.
 
 ---
@@ -71,7 +67,7 @@ graph TD
 ## ⚡️ Quick Start
 
 ### 1. Backend Setup (Docker)
-The backend is fully containerized. You do **not** need to install Python, GDAL, or PostGIS on your local machine.
+The backend is fully containerized, alongside a Firestore emulator. You don't need Python or a Google Cloud account on your machine.
 
 ```bash
 # 1. Clone the repo
@@ -98,11 +94,12 @@ Open a **new terminal** tab (leave Docker running in the first one).
 ```bash
 cd frontend
 
-# 1. Install Dart dependencies
-flutter pub get
+# 1. Install the pinned Flutter SDK (reads ../.fvmrc) and Dart dependencies
+fvm install
+fvm flutter pub get
 
 # 2. Run the App (Select your Simulator/Emulator)
-flutter run
+fvm flutter run
 ```
 
 #### DEV sign-in (local only)
@@ -144,6 +141,8 @@ compound.
 ---
 
 ## 🔌 API Endpoints
+
+The exact request and response of every call the app makes are in [`contracts/`](contracts/README.md). Both the Flutter and Django test suites are held to them.
 
 ### Authentication (`/api/user/auth/`)
 | Method | Endpoint | Description |
@@ -193,6 +192,9 @@ Since the backend runs inside a Docker container, you must execute commands *ins
 | **Open Python Shell** | `make shell` |
 | **Access Database** | `make db` |
 | **Run Tests** | `make test` |
+| **Run Every CI Gate Locally** | `make check` (lint, plus both suites under their coverage gates; see [docs/testing.md](docs/testing.md)) |
+| **Lint Only** | `make lint` |
+| **Run E2E Journeys** | `make e2e` (see [frontend/integration_test](frontend/integration_test/README.md)) |
 | **Install Dependencies** | `make install` |
 | **Add Package** | `make add` |
 | **Update Dependencies** | `make update` |
@@ -203,11 +205,18 @@ Since the backend runs inside a Docker container, you must execute commands *ins
 
 ```text
 map-my-friends/
-├── docker-compose.yml          # Orchestrates Django (api) and PostGIS (db)
+├── docker-compose.yml          # Django (api) and the Firestore emulator, for development
+├── infra/                      # Terraform for Google Cloud (see infra/README.md)
+├── smoke/                      # The post-deploy smoke test
+├── docs/deploy.md              # How a release deploys, and how to roll back
 ├── Makefile                    # Shortcuts for Docker commands
+├── contracts/                  # API and third-party contracts both test suites check (see contracts/README.md)
+├── docker-compose.e2e.yml      # Throwaway full stack for the E2E journeys (make e2e)
+├── docs/testing.md             # What CI runs on each PR, the coverage gates, and how to run them locally
+├── docs/manual-qa.md           # The few checks automation can't do (Auth0, OS prompts, real devices)
 │
 ├── backend/                    # Django Backend
-│   ├── Dockerfile              # Python environment (w/ GDAL)
+│   ├── Dockerfile              # The dev image and the production (Cloud Run) image
 │   ├── pyproject.toml          # Poetry dependencies
 │   ├── manage.py
 │   ├── config/                 # Core Django settings & URLs
@@ -234,26 +243,13 @@ map-my-friends/
         │   ├── people/         # People list, Add/Edit person
         │   └── profile/        # User profile (Me screen)
         └── services/           # API services & networking
+    └── integration_test/       # E2E journeys against the full stack (see its README)
 ```
 
 ---
 
 ## ⚠️ Important Notes
 
-### Apple Silicon (M1/M2/M3) Users
+### Looking at the data
 
-You may see a warning in the Docker logs:
-
-> *The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8)...*
-
-**This is normal.** The official PostGIS Docker image does not yet have a native ARM64 build. Docker uses Rosetta emulation to run the Intel image. It is stable for development purposes, just slightly slower on startup.
-
-### Database Connection
-
-* **Internal (Docker):** The Django app talks to the DB via the hostname `db`.
-* **External (GUI):** Connect using DBeaver or TablePlus:
-  * **Host:** `localhost`
-  * **Port:** `5432`
-  * **User:** `mapuser`
-  * **Password:** `password`
-  * **Database:** `mapfriends_db`
+The Firestore emulator's UI is at http://localhost:4000 while `make up` is running. Its data is in memory: `docker compose restart firestore` empties it, and `make seed` adds the sample data back.

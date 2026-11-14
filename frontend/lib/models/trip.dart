@@ -88,19 +88,26 @@ class TripStop extends Equatable {
           .toList();
     } else if (json['person_detail'] != null) {
       // Legacy support/fallback
-      peopleList = [Person.fromJson(json['person_detail'])];
+      peopleList = [
+        Person.fromJson(json['person_detail'] as Map<String, dynamic>),
+      ];
     }
 
     return TripStop(
       id: json['id']?.toString(),
       people: peopleList,
       airport: json['airport_detail'] != null
-          ? Airport.fromGeoJson(json['airport_detail'])
+          ? Airport.fromGeoJson(json['airport_detail'] as Map<String, dynamic>)
           : null,
       station: json['station_detail'] != null
-          ? Station.fromGeoJson(json['station_detail'])
+          ? Station.fromGeoJson(json['station_detail'] as Map<String, dynamic>)
           : null,
-      location: LatLng(coordinates[1] as double, coordinates[0] as double),
+      // GeoJSON Point is [longitude, latitude]; JSON has one number type, so
+      // a whole-degree value decodes as int.
+      location: LatLng(
+        (coordinates[1] as num).toDouble(),
+        (coordinates[0] as num).toDouble(),
+      ),
       sequenceOrder: json['sequence_order'] as int,
       snapshotAddress: json['snapshot_address'] as String?,
       snapshotMetadata: json['snapshot_metadata'] as Map<String, dynamic>?,

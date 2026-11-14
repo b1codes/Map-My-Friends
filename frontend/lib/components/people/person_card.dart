@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import '../../models/person.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -19,7 +20,7 @@ class PersonCard extends StatelessWidget {
     if (person.timezone != null && person.timezone!.isNotEmpty) {
       try {
         final location = tz.getLocation(person.timezone!);
-        final now = tz.TZDateTime.now(location);
+        final now = tz.TZDateTime.from(clock.now(), location);
         timeString = DateFormat.jm().format(now);
       } catch (_) {
         // Ignore invalid timezones

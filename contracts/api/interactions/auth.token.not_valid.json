@@ -1,0 +1,21 @@
+{
+  "description": "An expired or garbled access token gets 401, never 403: the API client's interceptor refreshes and retries only on 401.",
+  "consumer": "ApiService (auth interceptor)",
+  "provider_state": "registered_user",
+  "request": {
+    "method": "GET",
+    "path": "trips/",
+    "auth": "invalid"
+  },
+  "response": {
+    "status": 401,
+    "schema": "TokenNotValid",
+    "example": {
+      "detail": "Given token not valid for any token type",
+      "code": "token_not_valid",
+      "messages": [
+        { "token_class": "AccessToken", "token_type": "access", "message": "Token is invalid" }
+      ]
+    }
+  }
+}

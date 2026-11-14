@@ -1,3 +1,4 @@
+import '../utils/pin_color.dart';
 import 'airport.dart';
 import 'station.dart';
 
@@ -89,17 +90,21 @@ class Person {
       longitude: (json['longitude'] as num?)?.toDouble(),
       profileImageUrl: json['profile_image'] as String?,
       timezone: json['timezone'] as String?,
-      pinColor: json['pin_color'] as String? ?? '#F44336',
+      pinColor: pinColorHexOrDefault(json['pin_color'] as String?, '#F44336'),
       pinStyle: json['pin_style'] as String? ?? 'teardrop',
       pinIconType: json['pin_icon_type'] as String? ?? 'none',
       pinEmoji: json['pin_emoji'] as String?,
       preferredAirportId: json['preferred_airport']?.toString(),
       preferredStationId: json['preferred_station']?.toString(),
       preferredAirport: json['preferred_airport_detail'] != null
-          ? Airport.fromGeoJson(json['preferred_airport_detail'])
+          ? Airport.fromGeoJson(
+              json['preferred_airport_detail'] as Map<String, dynamic>,
+            )
           : null,
       preferredStation: json['preferred_station_detail'] != null
-          ? Station.fromGeoJson(json['preferred_station_detail'])
+          ? Station.fromGeoJson(
+              json['preferred_station_detail'] as Map<String, dynamic>,
+            )
           : null,
       contactCadenceDays: _cadenceFrom(json),
       lastContactedAt: _lastContactedFrom(json),
@@ -132,17 +137,24 @@ class Person {
           : null,
       profileImageUrl: properties['profile_image'] as String?,
       timezone: properties['timezone'] as String?,
-      pinColor: properties['pin_color'] as String? ?? '#F44336',
+      pinColor: pinColorHexOrDefault(
+        properties['pin_color'] as String?,
+        '#F44336',
+      ),
       pinStyle: properties['pin_style'] as String? ?? 'teardrop',
       pinIconType: properties['pin_icon_type'] as String? ?? 'none',
       pinEmoji: properties['pin_emoji'] as String?,
       preferredAirportId: properties['preferred_airport']?.toString(),
       preferredStationId: properties['preferred_station']?.toString(),
       preferredAirport: properties['preferred_airport_detail'] != null
-          ? Airport.fromGeoJson(properties['preferred_airport_detail'])
+          ? Airport.fromGeoJson(
+              properties['preferred_airport_detail'] as Map<String, dynamic>,
+            )
           : null,
       preferredStation: properties['preferred_station_detail'] != null
-          ? Station.fromGeoJson(properties['preferred_station_detail'])
+          ? Station.fromGeoJson(
+              properties['preferred_station_detail'] as Map<String, dynamic>,
+            )
           : null,
       contactCadenceDays: _cadenceFrom(properties),
       lastContactedAt: _lastContactedFrom(properties),

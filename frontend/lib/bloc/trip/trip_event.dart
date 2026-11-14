@@ -101,3 +101,13 @@ class DeleteTrip extends TripEvent {
   @override
   List<Object?> get props => [tripId];
 }
+
+/// Changes the status of one saved [trip], whichever trip (if any) is open
+/// in the planner. The planner's own stops and current trip are untouched.
+class UpdateTripStatus extends TripEvent {
+  final Trip trip;
+  final TripStatus status;
+  const UpdateTripStatus(this.trip, this.status);
+  @override
+  List<Object?> get props => [trip, status];
+}
