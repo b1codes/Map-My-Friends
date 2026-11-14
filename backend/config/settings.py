@@ -14,6 +14,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.translation import gettext_lazy as _
 
@@ -283,6 +284,10 @@ else:
         origin for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if origin
     ]
     CORS_ALLOW_CREDENTIALS = True
+
+# The web app retries a person create with the same Idempotency-Key, so the
+# preflight has to let that header through as well as the defaults.
+CORS_ALLOW_HEADERS = (*default_headers, "idempotency-key")
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0").split(",")
 CSRF_TRUSTED_ORIGINS = os.getenv(
