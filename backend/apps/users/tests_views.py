@@ -11,6 +11,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from PIL import Image
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.common.testing import FirestoreTestMixin, ThrottleIsolationMixin
 from apps.users.repositories import UserProfileRepository
@@ -437,6 +438,28 @@ class TokenTests(ThrottleIsolationMixin, FirestoreTestMixin, APITestCase):
         response = self.client.post(REFRESH_URL, {"refresh": refresh})
 
         self.assertEqual(response.status_code, 401)
+
+    def legacy_refresh(self, **claims):
+        """A refresh token as issued before tokens named the user by
+        username: it carries only the SQLite id, as user_id."""
+        token = RefreshToken()
+        for claim, value in claims.items():
+            token[claim] = value
+        return str(token)
+
+    def test_refresh_token_without_a_username_is_401(self):
+        # SimpleJWT skips its user check when the claim is absent and mints
+        # an access token that lacks it too, which every request then
+        # refuses: the client refreshes and retries forever. A 401 here
+        # signs it out instead.
+        for claims in ({"user_id": str(self.user.pk)}, {"username": ""}):
+            with self.subTest(claims=claims):
+                response = self.client.post(
+                    REFRESH_URL, {"refresh": self.legacy_refresh(**claims)}
+                )
+
+                self.assertEqual(response.status_code, 401)
+                self.assertNotIn("access", response.data)
 
     def test_access_token_cannot_be_used_as_refresh(self):
         tokens = self.obtain()

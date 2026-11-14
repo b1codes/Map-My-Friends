@@ -3,7 +3,10 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.settings import api_settings
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.common.fields import PinColorField
 
@@ -167,13 +170,33 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         return attrs
 
 
+class UserNamingRefreshToken(RefreshToken):
+    """A refresh token that must name its user (USER_ID_CLAIM).
+
+    Refresh tokens issued before tokens named the user by username carry only
+    user_id. SimpleJWT's refresh skips its user check when the claim is
+    missing and mints an access token without it, which every request then
+    refuses with a 401: the client refreshes again, and loops. Failing
+    verification makes the refresh itself a 401, so the client signs out,
+    and no access token is ever minted from such a token.
+    """
+
+    def verify(self, *args, **kwargs):
+        super().verify(*args, **kwargs)
+        if not self.payload.get(api_settings.USER_ID_CLAIM):
+            raise TokenError("Token contained no recognizable user identification")
+
+
 class MissingUserTokenRefreshSerializer(TokenRefreshSerializer):
     """SimpleJWT's refresh, with a 401 when the token's user isn't here.
 
     SimpleJWT looks the user up with objects.get() and lets DoesNotExist
     escape as a 500. Until GCIP, that is every refresh served by an instance
-    other than the one the user signed up on.
+    other than the one the user signed up on. A token that names no user at
+    all is refused too (UserNamingRefreshToken).
     """
+
+    token_class = UserNamingRefreshToken
 
     def validate(self, attrs):
         try:
