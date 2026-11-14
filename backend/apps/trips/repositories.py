@@ -67,6 +67,10 @@ class TripRecord:
     start_date: str | None = None
     end_date: str | None = None
     status: str = STATUS_DRAFT
+    # The owner's people the stops name, by id, when the write that returned
+    # this record already read them (booking reads them for the snapshots),
+    # so the response can use them instead of reading them again.
+    people: dict | None = field(default=None, compare=False, repr=False)
 
 
 @dataclass
@@ -394,8 +398,12 @@ class TripRepository:
             previous_status == STATUS_DRAFT and payload.get("status") == STATUS_BOOKED
         )
 
+        people = None
+
         def snapshots(stops):
-            return self._stop_snapshots(stops, owner_key)
+            nonlocal people
+            people = self._people(stops, owner_key)
+            return self._stop_snapshots(stops, people)
 
         if stops is not None:
             write.replace_stops(stops, snapshot=snapshots if booking else None)
@@ -405,7 +413,9 @@ class TripRepository:
             write.patch_leg(leg_id, changes)
 
         batch.commit()
-        return self._record(doc.id, {**current, **payload}, write.stops, write.legs)
+        record = self._record(doc.id, {**current, **payload}, write.stops, write.legs)
+        record.people = people
+        return record
 
     def delete(self, trip_id: str, owner_key: str) -> bool:
         """Delete a trip with its stops and legs.
@@ -537,17 +547,22 @@ class TripRepository:
         return _patched(leg, data)
 
     @staticmethod
-    def _stop_snapshots(stops, owner_key: str) -> dict[str, dict]:
-        """Each stop's frozen address and metadata, by stop id.
-
-        Mirrors the previous TripStop.perform_snapshot(), reading the people
-        in one batch and hubs from the in-memory reference indexes.
-        """
+    def _people(stops, owner_key: str) -> dict:
+        """The owner's people the stops name, by id, read in one batch."""
         from apps.people.repositories import PersonRepository
 
-        people = PersonRepository().get_many_for_owner(
+        return PersonRepository().get_many_for_owner(
             [person_id for stop in stops for person_id in stop.person_ids], owner_key
         )
+
+    @staticmethod
+    def _stop_snapshots(stops, people: dict) -> dict[str, dict]:
+        """Each stop's frozen address and metadata, by stop id.
+
+        Mirrors the previous TripStop.perform_snapshot(), taking the people
+        from people (see _people) and hubs from the in-memory reference
+        indexes.
+        """
         snapshots = {}
         for stop in stops:
             metadata: dict = {"people": [], "hub": None}

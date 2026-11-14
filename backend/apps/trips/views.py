@@ -33,8 +33,9 @@ class TripViewSet(viewsets.ViewSet):
     @staticmethod
     def _represent(request, trips, many=False):
         stops = [stop for trip in (trips if many else [trips]) for stop in trip.stops]
+        people = None if many else trips.people
         return TripSerializer(
-            trips, many=many, context=stop_context(request, stops)
+            trips, many=many, context=stop_context(request, stops, people)
         ).data
 
     def list(self, request):

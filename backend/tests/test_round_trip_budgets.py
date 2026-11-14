@@ -277,7 +277,7 @@ BUDGETS: dict[tuple[str, str], Budget] = {
         url=_trip_url,
         payload=lambda s: {"status": "BOOKED"},
         prepare=_book,
-        rpcs=6,
+        rpcs=5,
     ),
     ("trip-detail", "DELETE"): Budget(url=_trip_url, status=204, rpcs=4),
     ("trip-stops", "GET"): Budget(

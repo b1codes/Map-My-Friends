@@ -188,11 +188,17 @@ class TripLegSerializer(serializers.Serializer):
         return value
 
 
-def stop_context(request, stops) -> dict:
+def stop_context(request, stops, people=None) -> dict:
     """Serializer context for stops: the request, plus the owner's people the
-    stops name, read in one batch rather than once per stop."""
-    person_ids = [person_id for stop in stops for person_id in stop.person_ids]
-    people = PersonRepository().get_many_for_owner(person_ids, owner_key_for(request))
+    stops name, read in one batch rather than once per stop.
+
+    people, if given, is those people already read (TripRecord.people), and
+    is used instead of reading them again."""
+    if people is None:
+        person_ids = [person_id for stop in stops for person_id in stop.person_ids]
+        people = PersonRepository().get_many_for_owner(
+            person_ids, owner_key_for(request)
+        )
     return {"request": request, "people": people}
 
 
