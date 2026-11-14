@@ -104,6 +104,7 @@ class Budget:
     task: str | None = None
     # Set by the cases that only make sense on a fresh trip (booking).
     prepare: Callable[[Seed], None] | None = None
+    headers: dict[str, str] | None = None
 
     def __post_init__(self):
         assert (self.rpcs is None) != (self.known_gap is None), (
@@ -195,6 +196,15 @@ BUDGETS: dict[tuple[str, str], Budget] = {
     ("person-list", "GET"): Budget(url=lambda s: reverse("person-list"), rpcs=1),
     ("person-list", "POST"): Budget(
         url=lambda s: reverse("person-list"), payload=_new_person, status=201, rpcs=1
+    ),
+    # The app always sends a key, so its real create reads the derived id
+    # first. A replay is that read alone (apps/people/tests_views.py).
+    ("person-list", "POST", "idempotent"): Budget(
+        url=lambda s: reverse("person-list"),
+        payload=_new_person,
+        headers={"Idempotency-Key": "budget-create-1"},
+        status=201,
+        rpcs=2,
     ),
     ("person-detail", "GET"): Budget(url=_person_url, rpcs=1),
     ("person-detail", "PUT"): Budget(
@@ -420,7 +430,9 @@ class BudgetBase(ThrottleIsolationMixin, FirestoreTestMixin, APITestCase):
         )
         method = key[1].lower()
         with count_firestore_rpcs() as counts:
-            response = getattr(self.client, method)(url, payload, format="json")
+            response = getattr(self.client, method)(
+                url, payload, format="json", headers=budget.headers
+            )
         self.assertEqual(
             response.status_code,
             budget.status,
