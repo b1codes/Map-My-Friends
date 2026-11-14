@@ -8,7 +8,9 @@ and any file at all could be parked there.
 
 import io
 import shutil
+import struct
 import tempfile
+import zlib
 from pathlib import Path
 from unittest.mock import patch
 
@@ -34,6 +36,26 @@ def image_bytes(fmt="PNG", size=(4, 4), **save_args):
     buffer = io.BytesIO()
     Image.new("RGB", size, color="teal").save(buffer, format=fmt, **save_args)
     return buffer.getvalue()
+
+
+def png_header_only(width, height):
+    """A PNG that claims a size in its header and holds one empty row."""
+
+    def chunk(kind, body):
+        return (
+            struct.pack(">I", len(body))
+            + kind
+            + body
+            + struct.pack(">I", zlib.crc32(kind + body))
+        )
+
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 0, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", ihdr)
+        + chunk(b"IDAT", zlib.compress(b"\0"))
+        + chunk(b"IEND", b"")
+    )
 
 
 def upload(name, content, content_type="image/png"):
@@ -103,6 +125,12 @@ class SaveUploadValidationTests(TempMediaMixin, SimpleTestCase):
         self.assertRejected(
             upload("avatar.png", image_bytes("PNG", size=(MAX_IMAGE_SIDE + 1, 1)))
         )
+
+    def test_a_header_past_pillows_own_pixel_limit_is_rejected(self):
+        # Pillow refuses this in Image.open, from the header alone, with an
+        # error that is neither OSError nor ValueError. 69 bytes claiming
+        # 20000x20000 used to be a 500.
+        self.assertRejected(upload("avatar.png", png_header_only(20000, 20000)))
 
     def test_the_extension_comes_from_the_content(self):
         name = save_upload(

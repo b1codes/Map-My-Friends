@@ -44,6 +44,9 @@ def clean_image(uploaded_file) -> tuple[bytes, str]:
         raise _invalid(f"Images must be under {MAX_IMAGE_BYTES // (1024 * 1024)} MB.")
 
     data = uploaded_file.read()
+    too_large = _invalid(
+        f"Images must be at most {MAX_IMAGE_SIDE} pixels on each side."
+    )
     try:
         with Image.open(io.BytesIO(data)) as probe:
             fmt = probe.format
@@ -53,14 +56,17 @@ def clean_image(uploaded_file) -> tuple[bytes, str]:
         # Checked before decoding: a small, highly compressed file can
         # decode to gigabytes.
         if max(width, height) > MAX_IMAGE_SIDE:
-            raise _invalid(
-                f"Images must be at most {MAX_IMAGE_SIDE} pixels on each side."
-            )
+            raise too_large
         with Image.open(io.BytesIO(data)) as image:
             image.load()
             # Applies the EXIF orientation to the pixels, since the tag that
             # records it is about to be dropped with the rest.
             upright = ImageOps.exif_transpose(image)
+    except Image.DecompressionBombError as e:
+        # Pillow's own pixel limit, which Image.open enforces from the header
+        # alone, before the side check above sees the size. It is a plain
+        # Exception, not one of the decoder errors below.
+        raise too_large from e
     except (UnidentifiedImageError, OSError, SyntaxError, ValueError) as e:
         # Pillow reports a truncated or corrupt file as OSError (or, for some
         # decoders, SyntaxError/ValueError).
