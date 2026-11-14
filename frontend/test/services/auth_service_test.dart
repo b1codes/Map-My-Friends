@@ -474,6 +474,50 @@ void main() {
       },
     );
 
+    test('concurrent callers share one refresh', () async {
+      // Two requests that both got a 401. The server rotates and blacklists
+      // refresh tokens, so a second refresh with 'spent' would be refused,
+      // and its sign-out would wipe the tokens the first one stored.
+      seedTokens(access: 'old', refresh: 'spent', username: 'u');
+      adapter.reply('POST', 'user/auth/token/refresh/', 200, {
+        'access': 'new',
+        'refresh': 'rotated',
+      });
+
+      final tokens = await Future.wait([
+        auth.refreshAccessToken(),
+        auth.refreshAccessToken(),
+      ]);
+
+      expect(tokens, ['new', 'new']);
+      expect(
+        adapter.requestsTo('POST', 'user/auth/token/refresh/'),
+        hasLength(1),
+      );
+      expect(await storedValues(), {
+        accessKey: 'new',
+        refreshKey: 'rotated',
+        usernameKey: 'u',
+      });
+    });
+
+    test('a refresh after the shared one settles is a new request', () async {
+      seedTokens(access: 'old', refresh: 'spent', username: 'u');
+      adapter.reply('POST', 'user/auth/token/refresh/', 200, {
+        'access': 'new',
+        'refresh': 'rotated',
+      });
+
+      await auth.refreshAccessToken();
+      await auth.refreshAccessToken();
+
+      final sent = adapter.requestsTo('POST', 'user/auth/token/refresh/');
+      expect(sent.map((r) => r.data), [
+        {'refresh': 'spent'},
+        {'refresh': 'rotated'},
+      ]);
+    });
+
     test('logs out and returns null when the refresh is rejected', () async {
       seedTokens(access: 'old', refresh: 'expired', username: 'u');
       adapter.reply('POST', 'user/auth/token/refresh/', 401);

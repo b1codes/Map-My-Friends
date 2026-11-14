@@ -247,7 +247,22 @@ class AuthService {
     return null;
   }
 
-  Future<String?> refreshAccessToken() async {
+  /// The refresh in flight, which every caller until it settles shares.
+  Future<String?>? _refreshing;
+
+  /// Swaps the stored refresh token for a new access token, or signs out.
+  ///
+  /// Concurrent callers (several requests that all got a 401) share one
+  /// request. The server rotates and blacklists refresh tokens, so a second
+  /// request with the same token is refused, and its sign-out would delete
+  /// the tokens the first one just stored.
+  Future<String?> refreshAccessToken() {
+    return _refreshing ??= _refreshAccessToken().whenComplete(() {
+      _refreshing = null;
+    });
+  }
+
+  Future<String?> _refreshAccessToken() async {
     final refreshToken = await _storage.read(key: _refreshTokenKey);
     if (refreshToken == null) return null;
 
