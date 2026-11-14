@@ -1,4 +1,4 @@
-"""JSON that is well formed but not valid Unicode.
+"""JSON that is well formed but not valid Unicode, or nested too deep.
 
 JSON may spell a UTF-16 surrogate on its own ("\\ud800"), and Python decodes
 it into a str that can't be encoded as UTF-8. DRF accepted it, and a
@@ -6,6 +6,12 @@ response that echoed it back (a validation message, the saved record)
 failed to render: a 500 on every route that takes a body. Firestore stores
 UTF-8 too. Found by the API fuzz test (tests/test_fuzz_api.py), so the API
 now refuses such a body with a 400 before any view sees it.
+
+The Unicode check walked the parsed body recursively, two Python frames per
+level, so a ~1 KB body nested 600 deep raised RecursionError (a 500) on any
+JSON route, unauthenticated register included. Nesting far deeper than that
+overflows json.loads itself, which DRF doesn't catch either. Both are now a
+400, and the parser refuses nesting past MAX_DEPTH.
 """
 
 import io
@@ -17,7 +23,7 @@ from rest_framework.parsers import JSONParser
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import AccessToken
 
-from apps.common.parsers import StrictJSONParser
+from apps.common.parsers import MAX_DEPTH, StrictJSONParser
 from apps.common.testing import FirestoreTestMixin, ThrottleIsolationMixin
 
 
@@ -62,6 +68,42 @@ class StrictJSONParserTests(APITestCase):
                         issubclass(parser, JSONParser)
                         and not issubclass(parser, StrictJSONParser),
                     )
+
+
+def nested(depth: int, inner: str = "1") -> str:
+    """`depth` levels of alternating arrays and objects around `inner`."""
+    opens = "".join("[" if i % 2 else '{"a": ' for i in range(depth))
+    closes = "".join("]" if i % 2 else "}" for i in reversed(range(depth)))
+    return opens + inner + closes
+
+
+class NestingDepthTests(APITestCase):
+    def test_nesting_up_to_the_limit_parses(self):
+        data = parse(nested(MAX_DEPTH))
+        for _ in range(MAX_DEPTH):
+            data = data["a"] if isinstance(data, dict) else data[0]
+        self.assertEqual(data, 1)
+
+    def test_nesting_past_the_limit_is_refused(self):
+        for depth in (MAX_DEPTH + 1, 600, 5_000):
+            for text in ("[" * depth + "]" * depth, nested(depth)):
+                with (
+                    self.subTest(depth=depth, text=text[:4]),
+                    self.assertRaisesMessage(ParseError, "nested too deep"),
+                ):
+                    parse(text)
+
+    def test_nesting_too_deep_for_json_itself_is_a_parse_error(self):
+        # Deep enough that json.loads overflows the C stack with RecursionError.
+        depth = 200_000
+        with self.assertRaises(ParseError):
+            parse("[" * depth + "]" * depth)
+
+    def test_the_walk_does_not_recurse(self):
+        # Wide and deep at once, with a lone surrogate at the very bottom.
+        text = "[" + ", ".join([nested(MAX_DEPTH - 1, r'"\ud800"')] * 50) + "]"
+        with self.assertRaisesMessage(ParseError, "valid Unicode"):
+            parse(text)
 
 
 def _api_views():
@@ -109,3 +151,20 @@ class LoneSurrogateRequestTests(
                 response = self.send(method, url, raw)
                 self.assertEqual(response.status_code, 400)
                 self.assertIn("valid Unicode", response.json()["detail"])
+
+
+class DeeplyNestedRequestTests(ThrottleIsolationMixin, APITestCase):
+    """Unauthenticated, ~1 KB: the cheapest way to get a 500 out of the API."""
+
+    def test_register_answers_400(self):
+        for depth in (600, 200_000):
+            raw = '{"username": ' + "[" * depth + "]" * depth + "}"
+            with self.subTest(depth=depth):
+                response = self.client.generic(
+                    "POST",
+                    "/api/user/auth/register/",
+                    raw,
+                    content_type="application/json",
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertIn("JSON parse error", response.json()["detail"])
