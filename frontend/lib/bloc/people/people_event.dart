@@ -26,15 +26,21 @@ class AddPerson extends PersonWrite {
   final XFile? profileImage;
   final Uint8List? imageBytes;
 
+  /// Sent as the POST's `Idempotency-Key`. The form keeps one for every
+  /// attempt at saving the same person, so a retry after a save that timed
+  /// out but went through gets that person back instead of a second one.
+  final String? idempotencyKey;
+
   const AddPerson(
     this.person, {
     this.profileImage,
     this.imageBytes,
+    this.idempotencyKey,
     super.done,
   });
 
   @override
-  List<Object?> get props => [person, profileImage, imageBytes];
+  List<Object?> get props => [person, profileImage, imageBytes, idempotencyKey];
 }
 
 class UpdatePerson extends PersonWrite {

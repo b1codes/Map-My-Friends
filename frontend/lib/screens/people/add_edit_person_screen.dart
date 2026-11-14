@@ -26,6 +26,7 @@ import '../../components/shared/ambient_scaffold.dart';
 import '../../components/shared/chromatic_pulse.dart';
 import '../../components/shared/glass_surfaces.dart';
 import '../../components/shared/glass_header.dart';
+import '../../utils/idempotency_key.dart';
 import '../../utils/initials.dart';
 import '../../utils/pin_color.dart';
 
@@ -46,6 +47,11 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
   final _formKey = GlobalKey<FormState>();
   final _imagePicker = ImagePicker();
   bool _isSaving = false;
+
+  /// The `Idempotency-Key` for adding this person: one for every attempt
+  /// this form makes, so a retry after a save that timed out but went
+  /// through gets that person back rather than creating them again.
+  final String _idempotencyKey = newIdempotencyKey();
 
   late TextEditingController _firstNameController;
   late TextEditingController _lastNameController;
@@ -304,6 +310,7 @@ class _AddEditPersonScreenState extends State<AddEditPersonScreen> {
                 person,
                 profileImage: _selectedImage,
                 imageBytes: _selectedImageBytes,
+                idempotencyKey: _idempotencyKey,
                 done: saved,
               ),
       );

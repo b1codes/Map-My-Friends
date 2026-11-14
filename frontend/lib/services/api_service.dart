@@ -11,6 +11,17 @@ import 'api_config.dart';
 import 'auth_service.dart';
 
 class ApiService {
+  /// How long a POST, PUT or PATCH waits for the answer; reads keep the
+  /// 3 s default. A write can take far longer than a read: a cold start
+  /// (about 2 s for the image, more under load), then a geocode of up to
+  /// three Nominatim attempts with a 1 s pause between them, then the
+  /// Firestore writes. Give up at 3 s and the server commits anyway, so the
+  /// retry the form offers saved the person twice. 20 s covers that worst
+  /// case about twice over and stays under Cloud Run's 30 s request limit.
+  static const Duration writeReceiveTimeout = Duration(seconds: 20);
+
+  static const Set<String> _writeMethods = {'POST', 'PUT', 'PATCH'};
+
   late final Dio _dio;
   final AuthService _authService;
 
@@ -44,6 +55,16 @@ class ApiService {
         );
 
     _dio.interceptors.add(_authService.authInterceptor(_dio));
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          if (_writeMethods.contains(options.method)) {
+            options.receiveTimeout = writeReceiveTimeout;
+          }
+          return handler.next(options);
+        },
+      ),
+    );
   }
 
   Future<List<Person>> getPeople() async {
@@ -107,6 +128,7 @@ class ApiService {
     Person person, {
     XFile? profileImage,
     Uint8List? imageBytes,
+    String? idempotencyKey,
   }) async {
     try {
       Uint8List? bytes = imageBytes;
@@ -120,7 +142,11 @@ class ApiService {
         imageName: profileImage?.name,
       );
 
-      final response = await _dio.post<dynamic>('people/', data: formData);
+      final response = await _dio.post<dynamic>(
+        'people/',
+        data: formData,
+        options: Options(headers: {'Idempotency-Key': ?idempotencyKey}),
+      );
       if (response.statusCode == 201) {
         return Person.fromGeoJson(response.data as Map<String, dynamic>);
       } else {

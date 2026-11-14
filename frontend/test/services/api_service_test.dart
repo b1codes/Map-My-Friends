@@ -143,6 +143,68 @@ void main() {
     expect(service.dio.httpClientAdapter, same(api));
   });
 
+  // A write the server commits after the client gave up invites a retry
+  // that saves it twice, and 3 s is shorter than a cold start plus a
+  // geocode, so writes wait longer than reads.
+  group('timeouts', () {
+    setUp(() {
+      service = ApiService.forTesting(
+        dio: fakeDio(
+          api,
+          BaseOptions(
+            baseUrl: testBaseUrl,
+            receiveTimeout: const Duration(seconds: 3),
+          ),
+        ),
+        authService: authServiceOn(authBackend),
+      );
+    });
+
+    test('reads keep the 3 s receive timeout', () async {
+      api.reply('GET', 'people/', 200, <Object>[]);
+      api.reply('GET', 'trips/', 200, <Object>[]);
+
+      await service.getPeople();
+      await service.getTrips();
+
+      expect(
+        api.requests.map((r) => r.receiveTimeout),
+        everyElement(const Duration(seconds: 3)),
+      );
+    });
+
+    test('writes wait ${ApiService.writeReceiveTimeout.inSeconds} s', () async {
+      expect(ApiService.writeReceiveTimeout, const Duration(seconds: 20));
+      api.reply('POST', 'people/', 201, personFeature('new-id'));
+      api.reply('PATCH', 'people/p1/', 200, personFeature('p1'));
+      api.reply('PATCH', 'trips/t1/', 200, tripJson('t1'));
+      api.reply('POST', 'contact-logs/', 201, contactLogJson('c1'));
+
+      await service.addPerson(person);
+      await service.updatePerson(person.copyWith(id: 'p1'));
+      await service.updateTripStatus('t1', TripStatus.draft);
+      await service.addContactLog(
+        ContactLog(
+          id: '',
+          personId: 'p1',
+          channel: ContactChannel.call,
+          contactedAt: DateTime.utc(2026, 3, 4, 12),
+        ),
+      );
+
+      expect(api.requests.map((r) => r.method), [
+        'POST',
+        'PATCH',
+        'PATCH',
+        'POST',
+      ]);
+      expect(
+        api.requests.map((r) => r.receiveTimeout),
+        everyElement(const Duration(seconds: 20)),
+      );
+    });
+  });
+
   group('auth interceptor', () {
     test('attaches the stored access token as a Bearer header', () async {
       api.reply('GET', 'people/', 200, <Object>[]);
@@ -419,6 +481,32 @@ void main() {
       final part = (api.requests.single.data as FormData).files.single;
       expect(part.value.length, 2);
       expect(part.value.filename, 'original.png');
+    });
+
+    test('sends the Idempotency-Key it is given', () async {
+      api.reply('POST', 'people/', 201, personFeature('new-id'));
+
+      await service.addPerson(person, idempotencyKey: 'key-1');
+
+      expect(
+        api.requestsTo('POST', 'people/').single.headers['Idempotency-Key'],
+        'key-1',
+      );
+    });
+
+    test('sends no Idempotency-Key without one', () async {
+      api.reply('POST', 'people/', 201, personFeature('new-id'));
+
+      await service.addPerson(person);
+
+      expect(
+        api
+            .requestsTo('POST', 'people/')
+            .single
+            .headers
+            .containsKey('Idempotency-Key'),
+        isFalse,
+      );
     });
 
     test('rejects a non-201 success status', () async {

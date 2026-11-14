@@ -3,12 +3,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:bloc_test/bloc_test.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:map_my_friends/bloc/people/people_bloc.dart';
 import 'package:map_my_friends/components/map/custom_map_marker.dart';
@@ -20,10 +22,12 @@ import 'package:map_my_friends/models/person.dart';
 import 'package:map_my_friends/models/station.dart';
 import 'package:map_my_friends/screens/people/add_edit_person_screen.dart';
 import 'package:map_my_friends/services/api_service.dart';
+import 'package:map_my_friends/services/auth_service.dart';
 import 'package:map_my_friends/utils/pin_color.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
+import '../../helpers/fake_http_adapter.dart';
 import '../../helpers/people_writes.dart';
 
 class MockPeopleBloc extends MockBloc<PeopleEvent, PeopleState>
@@ -483,6 +487,112 @@ void main() {
 
       verify(() => peopleBloc.add(any(that: isA<AddPerson>()))).called(1);
     });
+
+    // A save the server commits after the client gave up (a timeout) looks
+    // like a failure, so the user taps Save again. The retry carries the
+    // first attempt's Idempotency-Key, so the server answers with the
+    // person it already made instead of making a second one.
+    testWidgets('a retry after a failed save reuses the idempotency key', (
+      tester,
+    ) async {
+      answerPeopleWrites(peopleBloc, error: Exception('timed out'));
+      await pumpForm(tester);
+      await fillRequired(tester);
+      await save(tester);
+      answerPeopleWrites(peopleBloc);
+
+      await save(tester);
+
+      final keys = verify(
+        () => peopleBloc.add(captureAny()),
+      ).captured.cast<AddPerson>().map((e) => e.idempotencyKey).toList();
+      expect(keys, hasLength(2));
+      expect(keys.first, matches(RegExp(r'^[A-Za-z0-9_-]{1,128}$')));
+      expect(keys.last, keys.first);
+      expect(find.byType(AddEditPersonScreen), findsNothing);
+    });
+
+    testWidgets('each new form gets a new idempotency key', (tester) async {
+      await pumpForm(tester);
+      await fillRequired(tester);
+      await save(tester);
+      await tester.tap(find.text('open'));
+      await _settle(tester);
+      await fillRequired(tester);
+
+      await save(tester);
+
+      final keys = verify(
+        () => peopleBloc.add(captureAny()),
+      ).captured.cast<AddPerson>().map((e) => e.idempotencyKey).toList();
+      expect(keys, hasLength(2));
+      expect(keys, everyElement(isNotNull));
+      expect(keys.last, isNot(keys.first));
+    });
+  });
+
+  // The whole path, form to HTTP: a POST that times out, then the retry.
+  testWidgets('the retry after a timeout sends the first attempt\'s '
+      'Idempotency-Key', (tester) async {
+    tester.view.physicalSize = const Size(600, 3000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+    FlutterSecureStorage.setMockInitialValues({});
+    final http = FakeHttpAdapter();
+    http.on(
+      'POST',
+      'people/',
+      (r) => throw DioException.receiveTimeout(
+        timeout: ApiService.writeReceiveTimeout,
+        requestOptions: r,
+      ),
+    );
+    http.reply('POST', 'people/', 201, {
+      'type': 'Feature',
+      'id': 'new-id',
+      'geometry': {
+        'type': 'Point',
+        'coordinates': [-97.74, 30.27],
+      },
+      'properties': {
+        'first_name': 'Cy',
+        'last_name': 'Oh',
+        'city': 'Austin',
+        'state': 'TX',
+        'country': 'USA',
+      },
+    });
+    http.reply('GET', 'people/', 200, <Object>[]);
+    final apiService = ApiService.forTesting(
+      dio: fakeDio(http),
+      authService: AuthService.forTesting(
+        dioFactory: (options) => Dio(options)..httpClientAdapter = http,
+      ),
+    );
+    final bloc = PeopleBloc(apiService: apiService);
+    addTearDown(bloc.close);
+    await tester.pumpWidget(
+      BlocProvider<PeopleBloc>.value(
+        value: bloc,
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: AddEditPersonScreen(apiService: apiService),
+        ),
+      ),
+    );
+    await _settle(tester);
+    await fillRequired(tester);
+    await save(tester);
+    expect(find.textContaining("Couldn't save Cy"), findsOneWidget);
+
+    await save(tester);
+
+    final posts = http.requestsTo('POST', 'people/');
+    expect(posts, hasLength(2));
+    final firstKey = posts.first.headers['Idempotency-Key'];
+    expect(firstKey, isA<String>());
+    expect(posts.last.headers['Idempotency-Key'], firstKey);
   });
 
   group('photo', () {

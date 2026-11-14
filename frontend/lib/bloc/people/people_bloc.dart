@@ -50,6 +50,7 @@ class PeopleBloc extends Bloc<PeopleEvent, PeopleState> {
         event.person,
         profileImage: event.profileImage,
         imageBytes: event.imageBytes,
+        idempotencyKey: event.idempotencyKey,
       );
       final current = state;
       if (current is PeopleLoaded) {
