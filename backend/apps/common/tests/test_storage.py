@@ -8,7 +8,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, SimpleTestCase, override_settings
 from PIL import Image
 
-from apps.common.storage import save_upload, upload_url
+from apps.common.storage import delete_upload, save_upload, upload_url
 
 
 def png(name="avatar.png", color="red"):
@@ -72,6 +72,55 @@ class StorageTests(SimpleTestCase):
             image = Image.open(handle)
             self.assertEqual(image.size, (2, 2))
             self.assertEqual(image.convert("RGB").getpixel((0, 0)), (0, 0, 255))
+
+
+class DeleteUploadTests(SimpleTestCase):
+    def setUp(self):
+        media_root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, media_root, ignore_errors=True)
+        media = override_settings(MEDIA_ROOT=media_root)
+        media.enable()
+        self.addCleanup(media.disable)
+
+    def test_deletes_a_file_save_upload_stored(self):
+        name = save_upload(png(), prefix="profile_images")
+
+        delete_upload(name, prefix="profile_images")
+
+        self.assertFalse(default_storage.exists(name))
+
+    def test_leaves_anything_save_upload_would_not_have_named(self):
+        # The field is data; only a name this app gave a photo under this
+        # prefix is ever removed.
+        other_prefix = save_upload(png(), prefix="user_profiles")
+        names = [
+            "",
+            None,
+            other_prefix,
+            "profile_images/../secrets.png",
+            "profile_images/ada.png",
+            "https://example.com/profile_images/" + "a" * 32 + ".png",
+            "profile_images/" + "a" * 32 + ".svg",
+        ]
+        with mock.patch.object(default_storage, "delete") as delete:
+            for name in names:
+                delete_upload(name, prefix="profile_images")
+        delete.assert_not_called()
+        self.assertTrue(default_storage.exists(other_prefix))
+
+    def test_a_storage_failure_is_logged_not_raised(self):
+        name = save_upload(png(), prefix="profile_images")
+
+        with (
+            mock.patch(
+                "django.core.files.storage.FileSystemStorage.delete",
+                side_effect=OSError("bucket unreachable"),
+            ),
+            self.assertLogs("apps.common.storage", level="ERROR") as logs,
+        ):
+            delete_upload(name, prefix="profile_images")
+
+        self.assertIn(name, logs.output[0])
 
 
 class CloudStorageTests(SimpleTestCase):
@@ -172,6 +221,14 @@ class CloudStorageTests(SimpleTestCase):
             f"https://storage.googleapis.com/mmf-media/{name}",
         )
         self.blobs[name].generate_signed_url.assert_not_called()
+
+    def test_delete_upload_removes_the_object_from_the_bucket(self):
+        name = save_upload(png(), prefix="profile_images")
+
+        delete_upload(name, prefix="profile_images")
+
+        self.bucket.delete_blob.assert_called_once()
+        self.assertEqual(self.bucket.delete_blob.call_args.args[0], name)
 
 
 def _production_storage_options():

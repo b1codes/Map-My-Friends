@@ -391,7 +391,7 @@ class PersonUpdateTests(PersonTestCase):
         self.client.patch(self.url, {"owner": "owner-b"}, format="json")
         self.assertEqual(stored(self.person.id).to_dict()["owner_key"], "owner-a")
 
-    def test_update_unknown_id_is_404(self, _geocode):
+    def test_update_unknown_id_is_404(self, geocode):
         for method in (self.client.put, self.client.patch):
             with self.subTest(method.__name__):
                 response = method(
@@ -399,6 +399,20 @@ class PersonUpdateTests(PersonTestCase):
                 )
                 self.assertEqual(response.status_code, 404)
         self.assertFalse(stored("does-not-exist").exists)
+        # Nobody's address, so no Nominatim lookup either.
+        geocode.assert_not_called()
+
+    def test_update_of_a_person_deleted_meanwhile_is_404(self, _geocode):
+        current = self.people.get_for_owner(self.person.id, "owner-a")
+        self.people.delete(self.person.id, "owner-a")
+
+        with patch.object(PersonRepository, "get_for_owner", return_value=current):
+            response = self.client.patch(
+                self.url, {"first_name": "Augusta"}, format="json"
+            )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(stored(self.person.id).exists)
 
     def test_update_another_owners_person_is_404_and_writes_nothing(self, _geocode):
         self.client.force_authenticate(user=self.other)

@@ -18,12 +18,13 @@ from django.contrib.auth.models import User
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, override_settings
+from google.api_core import exceptions as gcloud_exceptions
 from PIL import Image
 from rest_framework import serializers
 from rest_framework.test import APITestCase
 
 from apps.common.storage import MAX_IMAGE_BYTES, MAX_IMAGE_SIDE, save_upload
-from apps.common.testing import FirestoreTestMixin
+from apps.common.testing import FirestoreTestMixin, ThrottleIsolationMixin
 
 HTML = b"<html><body><script>alert(document.cookie)</script></body></html>"
 SVG = (
@@ -229,3 +230,143 @@ class UploadEndpointTests(TempMediaMixin, FirestoreTestMixin, APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("profile_image", response.data)
         self.assertEqual(self.stored_files(), [])
+
+
+LONDON = (51.5074, -0.1278, "Europe/London")
+PERSON = {"first_name": "Ada", "city": "London", "country": "UK", "tag": "FRIEND"}
+
+
+@patch("apps.people.views.geocode_address", return_value=LONDON)
+class PersonPhotoLifecycleTests(
+    ThrottleIsolationMixin, TempMediaMixin, FirestoreTestMixin, APITestCase
+):
+    """The bucket serves every object to anyone with its URL, cached for a
+    year, so a person's photo is stored only once the write it belongs to is
+    sure to land, and goes when it stops being theirs."""
+
+    collections_to_purge = ["people"]
+
+    def setUp(self):
+        super().setUp()
+        self.user = User.objects.create_user(username="uploader", password="pw")
+        self.other = User.objects.create_user(username="other", password="pw")
+        self.client.force_authenticate(user=self.user)
+
+    def photo(self):
+        return upload("avatar.png", image_bytes("PNG"))
+
+    def create_with_photo(self):
+        response = self.client.post(
+            "/api/people/",
+            {**PERSON, "profile_image": self.photo()},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 201)
+        [stored] = self.stored_files()
+        return response.data["id"], stored
+
+    def test_a_patch_for_an_unknown_person_stores_nothing(self, geocode):
+        response = self.client.patch(
+            "/api/people/not-a-real-id/",
+            {"city": "Paris", "profile_image": self.photo()},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(self.stored_files(), [])
+        geocode.assert_not_called()
+
+    def test_a_patch_for_someone_elses_person_stores_nothing(self, geocode):
+        person_id, _ = self.create_with_photo()
+        geocode.reset_mock()
+        before = self.stored_files()
+        self.client.force_authenticate(user=self.other)
+
+        response = self.client.patch(
+            f"/api/people/{person_id}/",
+            {"city": "Paris", "profile_image": self.photo()},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(self.stored_files(), before)
+        geocode.assert_not_called()
+
+    def test_a_failed_create_removes_the_photo_it_stored(self, _geocode):
+        with patch(
+            "apps.people.repositories.PersonRepository.create",
+            side_effect=gcloud_exceptions.ServiceUnavailable("down"),
+        ):
+            response = self.client.post(
+                "/api/people/",
+                {**PERSON, "profile_image": self.photo()},
+                format="multipart",
+            )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(self.stored_files(), [])
+
+    def test_a_failed_update_removes_the_photo_it_stored(self, _geocode):
+        person_id, first = self.create_with_photo()
+
+        with patch(
+            "apps.people.repositories.PersonRepository.update",
+            side_effect=gcloud_exceptions.ServiceUnavailable("down"),
+        ):
+            response = self.client.patch(
+                f"/api/people/{person_id}/",
+                {"profile_image": self.photo()},
+                format="multipart",
+            )
+
+        self.assertEqual(response.status_code, 503)
+        # The old photo is still the person's, so it stays.
+        self.assertEqual(self.stored_files(), [first])
+
+    def test_replacing_a_photo_deletes_the_old_one(self, _geocode):
+        person_id, first = self.create_with_photo()
+
+        response = self.client.patch(
+            f"/api/people/{person_id}/",
+            {"profile_image": self.photo()},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        [second] = self.stored_files()
+        self.assertNotEqual(second, first)
+        self.assertTrue(
+            response.data["properties"]["profile_image"].endswith(second.name)
+        )
+
+    def test_a_patch_without_a_photo_keeps_it(self, _geocode):
+        person_id, first = self.create_with_photo()
+
+        response = self.client.patch(
+            f"/api/people/{person_id}/", {"first_name": "Augusta"}, format="multipart"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.stored_files(), [first])
+
+    def test_deleting_a_person_deletes_their_photo(self, _geocode):
+        person_id, _ = self.create_with_photo()
+
+        response = self.client.delete(f"/api/people/{person_id}/")
+
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(self.stored_files(), [])
+
+    def test_a_storage_failure_does_not_fail_the_delete(self, _geocode):
+        person_id, _ = self.create_with_photo()
+
+        with (
+            patch(
+                "django.core.files.storage.FileSystemStorage.delete",
+                side_effect=OSError("down"),
+            ),
+            self.assertLogs("apps.common.storage", level="ERROR"),
+        ):
+            response = self.client.delete(f"/api/people/{person_id}/")
+
+        self.assertEqual(response.status_code, 204)

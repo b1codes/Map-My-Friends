@@ -9,11 +9,14 @@ from rest_framework.throttling import UserRateThrottle
 
 from apps.common.ownership import owner_key_for
 from apps.common.parsers import StrictJSONParser
-from apps.common.storage import save_upload
+from apps.common.storage import delete_upload, save_upload
 
 from .repositories import ContactLogRepository, PersonRepository
 from .serializers import ContactLogSerializer, PersonSerializer
 from .services import GeocodingUnavailable, geocode_address
+
+ADDRESS_FIELDS = ("city", "state", "country", "street")
+PHOTO_PREFIX = "profile_images"
 
 
 class GeocoderUnavailable(APIException):
@@ -65,9 +68,13 @@ class PersonViewSet(viewsets.ViewSet):
         serializer.is_valid(raise_exception=True)
         payload = self._serialize_dates(dict(serializer.validated_data))
         payload = self._apply_geocoding(payload)
-        payload = self._apply_upload(request, payload)
+        photo = self._apply_upload(request, payload)
 
-        person = self.repository.create(owner_key_for(request), payload)
+        try:
+            person = self.repository.create(owner_key_for(request), payload)
+        except Exception:
+            delete_upload(photo, PHOTO_PREFIX)
+            raise
         return Response(
             PersonSerializer(person, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
@@ -85,18 +92,34 @@ class PersonViewSet(viewsets.ViewSet):
         )
         serializer.is_valid(raise_exception=True)
         payload = self._serialize_dates(dict(serializer.validated_data))
-        if any(k in payload for k in ("city", "state", "country", "street")):
-            payload = self._apply_geocoding(payload)
-        payload = self._apply_upload(request, payload)
-
-        person = self.repository.update(pk, owner_key_for(request), payload)
-        if person is None:
+        owner_key = owner_key_for(request)
+        # Found first, so a request for nobody's person, or someone else's,
+        # costs no geocoder lookup and stores no photo.
+        current = self.repository.get_for_owner(pk, owner_key)
+        if current is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
+        if any(k in payload for k in ADDRESS_FIELDS):
+            payload = self._apply_geocoding(payload)
+        photo = self._apply_upload(request, payload)
+
+        try:
+            person = self.repository.update(pk, owner_key, payload, current=current)
+        except Exception:
+            delete_upload(photo, PHOTO_PREFIX)
+            raise
+        if person is None:
+            # Deleted since it was found.
+            delete_upload(photo, PHOTO_PREFIX)
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        if photo is not None:
+            delete_upload(current.profile_image, PHOTO_PREFIX)
         return Response(PersonSerializer(person, context={"request": request}).data)
 
     def destroy(self, request, pk=None):
-        if not self.repository.delete(pk, owner_key_for(request)):
+        person = self.repository.delete(pk, owner_key_for(request))
+        if person is None:
             return Response(status=status.HTTP_404_NOT_FOUND)
+        delete_upload(person.profile_image, PHOTO_PREFIX)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @staticmethod
@@ -135,10 +158,13 @@ class PersonViewSet(viewsets.ViewSet):
         return payload
 
     def _apply_upload(self, request, payload):
+        """Store the uploaded photo, if any, and point payload at it. Returns
+        the stored name, for the caller to delete if the write fails."""
         uploaded = request.FILES.get("profile_image")
-        if uploaded is not None:
-            payload["profile_image"] = save_upload(uploaded, prefix="profile_images")
-        return payload
+        if uploaded is None:
+            return None
+        payload["profile_image"] = save_upload(uploaded, prefix=PHOTO_PREFIX)
+        return payload["profile_image"]
 
 
 class ContactLogViewSet(viewsets.ViewSet):

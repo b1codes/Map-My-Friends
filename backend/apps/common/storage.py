@@ -9,12 +9,16 @@ filesystem and Cloud Storage — no code branches on environment.
 from __future__ import annotations
 
 import io
+import logging
+import re
 import uuid
 
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from PIL import Image, ImageOps, UnidentifiedImageError
 from rest_framework import serializers
+
+logger = logging.getLogger(__name__)
 
 # The app uploads a cropped PNG of at most 1024x1024 (add_edit_person_screen
 # and the profile screen); these leave room for a phone photo sent directly.
@@ -91,6 +95,28 @@ def save_upload(uploaded_file, prefix: str) -> str:
     content, extension = clean_image(uploaded_file)
     name = f"{prefix}/{uuid.uuid4().hex}{extension}"
     return default_storage.save(name, ContentFile(content))
+
+
+def delete_upload(name: str | None, prefix: str) -> None:
+    """Delete a file save_upload stored under `prefix/`, if name is one.
+
+    For a photo that stopped being anyone's: its person was deleted, or it
+    was replaced. The bucket serves every object to anyone with its URL, so
+    one left behind stays readable. Only a name save_upload could have given
+    under this prefix is deleted; the field is data, and anything else in it
+    is not this app's file to remove.
+
+    Best effort: the change that orphaned the file has already been saved,
+    so a storage failure is logged rather than raised.
+    """
+    extensions = "|".join(re.escape(ext) for ext in IMAGE_FORMATS.values())
+    pattern = rf"{re.escape(prefix)}/[0-9a-f]{{32}}(?:{extensions})"
+    if not name or not re.fullmatch(pattern, name):
+        return
+    try:
+        default_storage.delete(name)
+    except Exception:
+        logger.exception("Could not delete the stored upload %s", name)
 
 
 def upload_url(name: str | None, request=None) -> str | None:

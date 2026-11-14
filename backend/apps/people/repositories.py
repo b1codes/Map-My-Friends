@@ -20,9 +20,10 @@ account; tests/test_round_trip_budgets.py holds each route to its count.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, replace
 from datetime import UTC, datetime
 
+from google.api_core.exceptions import NotFound
 from google.cloud.firestore_v1 import DELETE_FIELD
 from google.cloud.firestore_v1.base_query import FieldFilter
 
@@ -161,28 +162,48 @@ class PersonRepository:
         return self._record(ref.id, payload)
 
     def update(
-        self, person_id: str, owner_key: str | None, data: dict
+        self,
+        person_id: str,
+        owner_key: str | None,
+        data: dict,
+        current: PersonRecord | None = None,
     ) -> PersonRecord | None:
-        doc = self._owned_doc(person_id, owner_key)
-        if doc is None:
-            return None
+        """Apply data to the person, and return them as they are afterwards.
+
+        current is the person as get_for_owner returned them, to save reading
+        them again. None when they aren't owner_key's, or were deleted before
+        the write landed.
+        """
+        if current is None:
+            current = self.get_for_owner(person_id, owner_key)
+            if current is None:
+                return None
+        elif (current.id, current.owner_key) != (person_id, owner_key):
+            raise ValueError("current is not this owner's person")
 
         payload = {k: v for k, v in data.items() if k in _PERSON_WRITABLE_FIELDS}
         payload["updated_at"] = _now_iso()
-        doc.reference.update(payload)
-        return self._record(doc.id, {**(doc.to_dict() or {}), **payload})
+        try:
+            self._collection().document(person_id).update(payload)
+        except NotFound:
+            return None
+        return replace(
+            current, **{k: v for k, v in payload.items() if k in _PERSON_FIELDS}
+        )
 
-    def delete(self, person_id: str, owner_key: str | None) -> bool:
+    def delete(self, person_id: str, owner_key: str | None) -> PersonRecord | None:
+        """Delete the person and their logs, and return the person as they
+        were. None when they aren't owner_key's."""
         doc = self._owned_doc(person_id, owner_key)
         if doc is None:
-            return False
+            return None
         # Firestore leaves subcollections behind when a parent is deleted, so
         # the logs go in the same commit.
         logs = [
             log.reference for log in doc.reference.collection(CONTACT_LOGS).stream()
         ]
         fs.delete_all([*logs, doc.reference])
-        return True
+        return self._hydrate(doc)
 
 
 def _last_contact(log: dict | None) -> dict:
