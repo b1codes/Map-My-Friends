@@ -496,6 +496,29 @@ class TripUpdateTests(TripViewTestCase):
             {"name": "London Heathrow Airport", "code": "LHR", "type": "AIRPORT"},
         )
 
+    def test_status_alone_keeps_stops_legs_and_bookings(self):
+        # The app's Trips list changes a status this way, so it must not
+        # touch what the planner saved.
+        created = self.create_trip_with_stops(CHICAGO, LONDON)
+        leg_id = created["legs"][0]["id"]
+        self.client.patch(
+            f"{TRIPS_URL}{created['id']}/",
+            {"legs": [{"id": leg_id, "booking_reference": "BA123"}]},
+            format="json",
+        )
+
+        response = self.client.patch(
+            f"{TRIPS_URL}{created['id']}/", {"status": "CANCELLED"}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], "CANCELLED")
+        self.assertEqual(
+            [s["id"] for s in response.data["stops"]],
+            [s["id"] for s in created["stops"]],
+        )
+        self.assertEqual(response.data["legs"][0]["id"], leg_id)
+        self.assertEqual(response.data["legs"][0]["booking_reference"], "BA123")
+
     def test_snapshot_fields_are_read_only(self):
         created = self.create_trip(
             stops=[

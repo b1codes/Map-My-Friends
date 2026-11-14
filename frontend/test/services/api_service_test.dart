@@ -729,6 +729,28 @@ void main() {
       });
     });
 
+    group('updateTripStatus', () {
+      test('patches trips/<id>/ with the status alone', () async {
+        api.reply('PATCH', 'trips/t1/', 200, tripJson('t1'));
+
+        await service.updateTripStatus('t1', TripStatus.cancelled);
+
+        // No stops or legs: the server would replace them wholesale.
+        expect(api.requestsTo('PATCH', 'trips/t1/').single.data, {
+          'status': 'CANCELLED',
+        });
+      });
+
+      test('wraps an HTTP error', () async {
+        api.reply('PATCH', 'trips/t1/', 409);
+
+        await expectLater(
+          service.updateTripStatus('t1', TripStatus.booked),
+          throwsA(exceptionStartingWith('Failed to update trip: DioException')),
+        );
+      });
+    });
+
     group('deleteTrip', () {
       test('deletes trips/<id>/', () async {
         api.reply('DELETE', 'trips/t1/', 204);

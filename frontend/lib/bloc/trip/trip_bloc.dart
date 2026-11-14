@@ -254,7 +254,11 @@ class TripBloc extends Bloc<TripEvent, TripState> {
   ) async {
     emit(state.copyWith(isLoading: true, clearError: true));
     try {
-      await _apiService.updateTrip(event.trip.copyWith(status: event.status));
+      final id = event.trip.id;
+      if (id == null) throw Exception('Trip ID is required for update');
+      // Status only: the whole trip would replace its stops and legs, and
+      // with them the legs' booking details and the stops' snapshots.
+      await _apiService.updateTripStatus(id, event.status);
       add(const FetchUserTrips());
     } catch (e) {
       emit(state.copyWith(isLoading: false, error: e.toString()));

@@ -78,6 +78,7 @@ void main() {
     registerFallbackValue(const TripState());
     registerFallbackValue(testPerson);
     registerFallbackValue(<TripStop>[]);
+    registerFallbackValue(TripStatus.draft);
     registerFallbackValue(
       Trip(name: 'Test Trip', date: DateTime(2026), stops: const []),
     );
@@ -733,8 +734,8 @@ void main() {
       'updates that trip by id, not the one open in the planner',
       build: () {
         when(
-          () => apiService.updateTrip(any()),
-        ).thenAnswer((inv) async => inv.positionalArguments.first as Trip);
+          () => apiService.updateTripStatus(any(), any()),
+        ).thenAnswer((_) async => saved.copyWith(status: TripStatus.booked));
         when(() => apiService.getTrips()).thenAnswer((_) async => [saved]);
         return tripBloc;
       },
@@ -742,10 +743,11 @@ void main() {
       seed: () => TripState(stops: plannerStops),
       act: (bloc) => bloc.add(UpdateTripStatus(saved, TripStatus.booked)),
       verify: (bloc) {
-        final sent =
-            verify(() => apiService.updateTrip(captureAny())).captured.single
-                as Trip;
-        expect(sent, saved.copyWith(status: TripStatus.booked));
+        verify(
+          () => apiService.updateTripStatus('saved-1', TripStatus.booked),
+        ).called(1);
+        // The whole trip would replace its stops and legs on the server.
+        verifyNever(() => apiService.updateTrip(any()));
         verifyNever(() => apiService.createTrip(any()));
         verify(() => apiService.getTrips()).called(1);
         expect(bloc.state.stops, plannerStops);
@@ -758,7 +760,7 @@ void main() {
       'reports a failure and keeps the planner',
       build: () {
         when(
-          () => apiService.updateTrip(any()),
+          () => apiService.updateTripStatus(any(), any()),
         ).thenThrow(Exception('Failed to update trip'));
         return tripBloc;
       },

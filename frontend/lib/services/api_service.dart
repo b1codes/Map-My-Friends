@@ -284,6 +284,24 @@ class ApiService {
     }
   }
 
+  /// Changes only a trip's status. Sending the whole trip, as [updateTrip]
+  /// does, replaces its stops and legs, which drops their booking details.
+  Future<Trip> updateTripStatus(String id, TripStatus status) async {
+    try {
+      final response = await _dio.patch<dynamic>(
+        'trips/$id/',
+        data: {'status': status.value},
+      );
+      if (response.statusCode == 200) {
+        return Trip.fromJson(response.data as Map<String, dynamic>);
+      } else {
+        throw Exception('Failed to update trip');
+      }
+    } catch (e) {
+      throw Exception('Failed to update trip: $e');
+    }
+  }
+
   Future<void> deleteTrip(String id) async {
     try {
       final response = await _dio.delete<dynamic>('trips/$id/');
