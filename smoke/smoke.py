@@ -52,9 +52,11 @@ import urllib.request
 from dataclasses import dataclass, field
 
 # How many times one request is tried when the instance that answers doesn't
-# have the throwaway account. Production runs at most 3 instances
-# (infra/cloud_run.tf); each retry registers the account on whichever
-# instance answers, so it spreads to them all within a few.
+# have the throwaway account. Production is capped at one instance per
+# revision until GCIP (infra/cloud_run.tf), but during a release the old
+# and new revisions can each have one, and the cap may be lifted later.
+# Each retry registers the account on whichever instance answers, so it
+# spreads to them all within a few.
 ATTEMPTS = 8
 
 
